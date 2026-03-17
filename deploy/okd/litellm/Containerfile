@@ -1,0 +1,40 @@
+# SOPHIA-CORE : Build 37
+FROM ghcr.io/berriai/litellm-non_root:main-latest
+
+USER root
+
+ENV PRISMA_BIN_DIR="/app/prisma-bin" \
+    HOME="/tmp" \
+    XDG_CACHE_HOME="/tmp/.cache" \
+    TIKTOKEN_CACHE_DIR="/app/tiktoken-cache"
+
+RUN pip install --no-cache-dir prisma==0.11.0 nodejs-bin
+
+# 1. Téléchargement brut Prisma
+RUN prisma py fetch
+
+# 2. Extraction des binaires Prisma présents
+RUN mkdir -p ${PRISMA_BIN_DIR} && \
+    find /app/.cache -type f \( \
+      -name '*query-engine-*' -o \
+      -name '*query_engine*' -o \
+      -name 'migration-engine-*' -o \
+      -name 'schema-engine-*' -o \
+      -name 'prisma-fmt-*' \
+    \) -exec cp {} ${PRISMA_BIN_DIR}/ \; && \
+    chmod +x ${PRISMA_BIN_DIR}/* || true
+
+# 3. Cache tiktoken offline
+RUN mkdir -p /app/tiktoken-cache
+COPY tiktoken-cache/ /app/tiktoken-cache/
+RUN chmod -R a+rX /app/tiktoken-cache
+
+# 4. Vérifications visuelles
+RUN echo "=== BINAIRES PRISMA EXTRAITS ===" && ls -la ${PRISMA_BIN_DIR} && \
+    echo "=== CACHE TIKTOKEN ===" && ls -la /app/tiktoken-cache
+
+# 5. Compatibilité OpenShift
+RUN chgrp -R 0 /app /usr/lib/python3.13/site-packages/prisma /tmp && \
+    chmod -R g=u /app /usr/lib/python3.13/site-packages/prisma /tmp
+
+USER 1001

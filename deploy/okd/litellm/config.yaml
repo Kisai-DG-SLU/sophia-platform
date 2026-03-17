@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: sophia-core
+data:
+  config.yaml: |
+    model_list:
+      - model_name: sophia-architect
+        litellm_params:
+          model: deepinfra/NousResearch/Hermes-3-Llama-3.1-405B
+          api_key: "os.environ/DEEPINFRA_API_KEY"
+
+      - model_name: sophia-coder
+        litellm_params:
+          model: deepinfra/Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo
+          api_key: "os.environ/DEEPINFRA_API_KEY"
+
+      - model_name: sophia-chat
+        litellm_params:
+          model: deepinfra/meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
+          api_key: "os.environ/DEEPINFRA_API_KEY"
+
+      - model_name: sophia-router
+        litellm_params:
+          model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+          api_key: "os.environ/DEEPINFRA_API_KEY"
+
+    litellm_settings:
+      success_callback: ["local"]
+      failure_callback: ["local"]
+      set_completed_by: true
+
+    general_settings:
+      database_url: "os.environ/DATABASE_URL"
+      master_key: "os.environ/LITELLM_MASTER_KEY"
+
+  # --- LE FICHIER DES PRIX HORS-LIGNE ---
+  custom_cost_map.json: |
+    {
+      "deepinfra/NousResearch/Hermes-3-Llama-3.1-405B": {
+        "input_cost_per_token": 0.0000008,
+        "output_cost_per_token": 0.0000008,
+        "max_tokens": 8192,
+        "max_input_tokens": 128000,
+        "litellm_provider": "deepinfra"
+      },
+      "deepinfra/Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo": {
+        "input_cost_per_token": 0.00000013,
+        "output_cost_per_token": 0.00000013,
+        "max_tokens": 8192,
+        "max_input_tokens": 32000,
+        "litellm_provider": "deepinfra"
+      },
+      "deepinfra/meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo": {
+        "input_cost_per_token": 0.00000035,
+        "output_cost_per_token": 0.00000040,
+        "max_tokens": 8192,
+        "max_input_tokens": 128000,
+        "litellm_provider": "deepinfra"
+      },
+      "deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": {
+        "input_cost_per_token": 0.00000004,
+        "output_cost_per_token": 0.00000004,
+        "max_tokens": 8192,
+        "max_input_tokens": 128000,
+        "litellm_provider": "deepinfra"
+      }
+    }

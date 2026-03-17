@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: sophia-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      initContainers:
+      - name: build-tiktoken-cache
+        image: image-registry.openshift-image-registry.svc:5000/sophia-core/sophia-litellm:latest
+        imagePullPolicy: Always
+        command:
+        - /usr/bin/python3.13
+        - -c
+        - |
+          import base64
+          from pathlib import Path
+
+          outdir = Path("/work")
+          outdir.mkdir(parents=True, exist_ok=True)
+
+          parts = []
+          for p in [
+              Path("/chunks00/part00"),
+              Path("/chunks01/part01"),
+              Path("/chunks02/part02"),
+              Path("/chunks03/part03"),
+          ]:
+              if p.exists():
+                  parts.append(p.read_text())
+
+          if not parts:
+              raise SystemExit("No tiktoken parts found")
+
+          data = "".join(parts)
+          target = outdir / "9b5ad71b2ce5302211f9c61530b329a4922fc6a4"
+          target.write_bytes(base64.b64decode(data))
+          print("Wrote", target, target.stat().st_size)
+        volumeMounts:
+        - name: tiktoken-cache
+          mountPath: /work
+        - name: tiktoken-part-00
+          mountPath: /chunks00
+          readOnly: true
+        - name: tiktoken-part-01
+          mountPath: /chunks01
+          readOnly: true
+        - name: tiktoken-part-02
+          mountPath: /chunks02
+          readOnly: true
+        - name: tiktoken-part-03
+          mountPath: /chunks03
+          readOnly: true
+
+      containers:
+      - name: litellm
+        image: image-registry.openshift-image-registry.svc:5000/sophia-core/sophia-litellm:latest
+        imagePullPolicy: Always
+        args: ["--config", "/app/config/config.yaml", "--host", "0.0.0.0", "--port", "4000"]
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+
+        env:
+        - name: LITELLM_LOG
+          value: "DEBUG"
+        - name: HOME
+          value: "/tmp"
+        - name: XDG_CACHE_HOME
+          value: "/tmp/.cache"
+        - name: TIKTOKEN_CACHE_DIR
+          value: "/tmp/tiktoken_cache"
+
+        - name: PRISMA_CLIENT_ENGINE_TYPE
+          value: "binary"
+
+        - name: PRISMA_QUERY_ENGINE_BINARY
+          value: "/app/prisma-bin/query-engine-debian-openssl-3.0.x"
+        - name: PRISMA_MIGRATION_ENGINE_BINARY
+          value: "/app/prisma-bin/schema-engine-debian-openssl-3.0.x"
+        - name: PRISMA_INTROSPECTION_ENGINE_BINARY
+          value: "/app/prisma-bin/schema-engine-debian-openssl-3.0.x"
+
+        - name: TELEMETRY
+          value: "False"
+        - name: LITELLM_LOCAL_MODEL_COST_MAP
+          value: "True"
+        - name: CUSTOM_MODEL_COST_MAP
+          value: "/app/config/custom_cost_map.json"
+
+        - name: PRISMA_PY_SKIP_INSTALL
+          value: "True"
+        - name: PRISMA_OFFLINE_MODE
+          value: "True"
+        - name: USE_PRISMA_MIGRATE
+          value: "True"
+        - name: LITELLM_NON_ROOT
+          value: "True"
+        - name: LITELLM_MIGRATION_DIR
+          value: "/tmp/migrations"
+        - name: LITELLM_UI_PATH
+          value: "/tmp/ui"
+
+        envFrom:
+        - secretRef:
+            name: llm-api-keys
+
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: writable-tmp
+          mountPath: /tmp
+        - name: tiktoken-cache
+          mountPath: /tmp/tiktoken_cache
+          readOnly: true
+
+      volumes:
+      - name: config
+        configMap:
+          name: litellm-config
+      - name: writable-tmp
+        emptyDir: {}
+      - name: tiktoken-cache
+        emptyDir: {}
+      - name: tiktoken-part-00
+        configMap:
+          name: tiktoken-part-00
+      - name: tiktoken-part-01
+        configMap:
+          name: tiktoken-part-01
+      - name: tiktoken-part-02
+        configMap:
+          name: tiktoken-part-02
+      - name: tiktoken-part-03
+        configMap:
+          name: tiktoken-part-03
+          optional: true
