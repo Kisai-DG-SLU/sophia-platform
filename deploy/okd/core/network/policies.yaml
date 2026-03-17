@@ -1,0 +1,38 @@
+# 1. On bloque tout le trafic sortant de sophia-core, SAUF vers le provider LLM
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: sophia-core
+spec:
+  egress:
+  - type: Allow
+    to:
+      cidrSelector: 172.30.0.0/16 # Services internes OKD (vital pour le DNS)
+  - type: Allow
+    to:
+      dnsName: api.deepinfra.com  # L'exception pour l'API de tes LLMs
+  - type: Deny
+    to:
+      cidrSelector: 0.0.0.0/0     # Blocage de tout le reste
+---
+# 2. On protège Postgres : IL N'ACCEPTE QUE LiteLLM
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-litellm-to-postgres
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres-sophia
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: litellm
+    ports:
+    - protocol: TCP
+      port: 5432
