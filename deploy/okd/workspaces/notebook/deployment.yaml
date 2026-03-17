@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-notebook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sophia-notebook
+  template:
+    metadata:
+      labels:
+        app: sophia-notebook
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: notebook
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-notebook:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8888
+              protocol: TCP
+          env:
+            - name: HOME
+              value: /tmp
+            - name: WORKSPACE_DIR
+              value: /workspace
+            - name: JUPYTER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: sophia-notebook-secret
+                  key: token
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: sophia-notebook-workspace-pvc

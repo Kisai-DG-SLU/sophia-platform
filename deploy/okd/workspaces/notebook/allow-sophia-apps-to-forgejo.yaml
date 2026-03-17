@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sophia-apps-to-forgejo
+  namespace: sophia-git
+spec:
+  podSelector:
+    matchLabels:
+      app: forgejo
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: sophia-apps
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 2222

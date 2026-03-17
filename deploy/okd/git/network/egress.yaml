@@ -1,0 +1,22 @@
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: sophia-git
+spec:
+  egress:
+  - to:
+      dnsName: github.com
+    type: Allow
+  - to:
+      dnsName: smtp.gmail.com
+    type: Allow
+  - to:
+      cidrSelector: 172.30.0.0/16 # Autorise la communication avec les autres services OKD
+    type: Allow
+  - to:
+      cidrSelector: 10.8.0.0/24   # <-- NOUVEAU : Autorise le retour vers ton tunnel WireGuard
+    type: Allow
+  - to:
+      cidrSelector: 0.0.0.0/0     # Bloque tout le reste (Air-Gapped)
+    type: Deny

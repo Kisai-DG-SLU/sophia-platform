@@ -1,0 +1,22 @@
+# SOPHIA-CORE-BASE (Layer 0)
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+# Dépendances système & Libs C++ (Intel R630)
+RUN microdnf install -y \
+    shadow-utils \
+    tar \
+    gzip \
+    ca-certificates \
+    libstdc++ \
+    && microdnf clean all
+
+# Sécurité OKD : UID 1001
+RUN useradd -u 1001 -g 0 -m -s /bin/bash sophia-user
+USER 1001
+WORKDIR /home/sophia-user
+
+# Installation de Pixi
+RUN curl -fsSL https://pixi.sh/install.sh | bash
+ENV PATH="/home/sophia-user/.pixi/bin:${PATH}"
+
+CMD ["/bin/bash"]

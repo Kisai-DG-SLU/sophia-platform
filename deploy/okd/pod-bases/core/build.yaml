@@ -1,0 +1,21 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-core-base
+  namespace: sophia-core
+spec:
+  source:
+    type: Git
+    git:
+      uri: http://forgejo-svc.sophia-git.svc:3000/daminou/sophia-brain.git
+    sourceSecret:
+      name: forgejo-creds
+    contextDir: config/okd/pod-bases/core/
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: sophia-core:base

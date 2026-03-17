@@ -1,0 +1,44 @@
+FROM debian:12-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HOME=/tmp \
+    WORKSPACE_DIR=/workspace
+
+WORKDIR ${WORKSPACE_DIR}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    git \
+    bash \
+    tini \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Pixi
+RUN curl -fsSL https://pixi.sh/install.sh | bash
+
+ENV PATH="/tmp/.pixi/bin:${PATH}"
+
+# Make pixi available in interactive shells/terminals
+RUN printf '%s\n' 'export PATH="/tmp/.pixi/bin:$PATH"' > /etc/profile.d/pixi.sh && \
+    chmod 0644 /etc/profile.d/pixi.sh
+
+# Jupyter global minimal (UI only)
+RUN /tmp/.pixi/bin/pixi global install jupyterlab
+
+RUN mkdir -p ${WORKSPACE_DIR} /opt/app-root /tmp/.local/share/jupyter /tmp/.pixi && \
+    chgrp -R 0 ${WORKSPACE_DIR} /opt/app-root /tmp && \
+    chmod -R g=u ${WORKSPACE_DIR} /opt/app-root /tmp
+
+COPY jupyter_lab_config.py /opt/app-root/jupyter_lab_config.py
+COPY start-notebook.sh /opt/app-root/start-notebook.sh
+
+RUN chmod +x /opt/app-root/start-notebook.sh
+
+EXPOSE 8888
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/opt/app-root/start-notebook.sh"]

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-notebook
+spec:
+  selector:
+    app: sophia-notebook
+  ports:
+    - name: http
+      port: 8888
+      targetPort: 8888
+      protocol: TCP
