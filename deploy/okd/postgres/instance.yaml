@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-sophia
+  namespace: sophia-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-sophia
+  template:
+    metadata:
+      labels:
+        app: postgres-sophia
+    spec:
+      containers:
+      - name: postgres
+        image: quay.io/sclorg/postgresql-15-c9s:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        # --- BLOC SÉCURITÉ (SCC restricted-v2) ---
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        # -----------------------------------------
+        env:
+        - name: POSTGRESQL_USER
+          value: sophia
+        - name: POSTGRESQL_PASSWORD
+          value: sophia_password_2026
+        - name: POSTGRESQL_DATABASE
+          value: sophia_db
+        volumeMounts:
+        - mountPath: /var/lib/pgsql/data
+          name: storage
+          subPath: postgres-data
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: pvc-litellm
