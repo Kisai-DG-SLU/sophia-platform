@@ -7,7 +7,7 @@ spec:
   source:
     type: Git
     git:
-      uri: http://forgejo-svc.sophia-git.svc:3000/daminou/sophia-brain.git
+      uri: http://forgejo-svc.sophia-git.svc:3000/cyclopdev/sophia-brain.git
     sourceSecret:
       name: forgejo-creds
     contextDir: config/okd/pod-bases/core/
