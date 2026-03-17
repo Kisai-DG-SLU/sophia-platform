@@ -62,6 +62,40 @@ Additional architectural concepts explored:
 - controlled workspace environments for AI agents
 - project-centric orchestration
 
+```mermaid
+flowchart TB
+    U[Users / IDE / UI / API]
+    WG[WireGuard Access]
+    U --> WG
+
+    WG --> APPS[sophia-apps\nFrontends / UI]
+    WG --> CORE[sophia-core\nOrchestration / LiteLLM]
+    WG --> GIT[sophia-git\nForgejo / Project Memory]
+
+    CORE --> INFER[sophia-inference\nLocal Models / Ollama / llama.cpp]
+    CORE --> MEM[sophia-memory\nQdrant / Vector Memory]
+    CORE --> SKILLS[sophia-skills\nMCP Servers / Tools]
+    CORE --> DMZ[sophia-dmz\nSecure Web Acquisition]
+    CORE --> SANDBOX[sophia-sandbox\nDev Workspaces / OpenCode]
+    CORE --> TEST[sophia-test\nValidation / CI]
+    CORE --> APPS
+
+    SKILLS --> GIT
+    SANDBOX --> GIT
+    TEST --> GIT
+
+    DMZ --> WEB[External Web]
+    DMZ --> COURT[Semantic Court / Validation]
+    COURT --> MEM
+
+    GIT --> BRAIN[Guesdon-Brain / sophia-brain / project repos]
+
+    PROD[prod-tenant-* namespaces]
+    CORE --> PROD
+    PROD --> MEM
+    PROD --> INFER
+```
+
 More details are available in the documentation.
 
 ---
