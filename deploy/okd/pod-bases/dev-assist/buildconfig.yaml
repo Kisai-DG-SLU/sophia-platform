@@ -1,0 +1,22 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ${DEV_IMAGE_NAME:-sophia-dev-base}
+  namespace: ${SANDBOX_NAMESPACE}
+spec:
+  source:
+    type: Git
+    git:
+      uri: ${GIT_REPO_URL}
+      ref: ${GIT_BRANCH:-main}
+    contextDir: ${DOCKER_CONTEXT:-deploy/docker/dev-assist}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ${DEV_IMAGE_NAME:-sophia-dev-base}:latest
+  triggers:
+    - type: ConfigChange

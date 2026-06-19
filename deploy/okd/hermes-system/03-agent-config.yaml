@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${AGENT_CONFIG_MAP}
+  namespace: ${AGENT_NAMESPACE}
+data:
+  OPENAI_API_BASE_URL: ${LITELLM_SERVICE:-http://litellm:4000/v1}
+
+  QDRANT_URL: ${QDRANT_SERVICE:-http://qdrant:6333}
+  NEO4J_URL: ${NEO4J_SERVICE:-bolt://neo4j:7687}
+  POSTGRES_URL: ${POSTGRES_URL:-postgresql://user:password@postgres:5432/sophia_db}
+  FORGEJO_URL: ${FORGEJO_SERVICE:-http://forgejo:3000}
+  EMBEDDING_URL: ${EMBEDDING_SERVICE:-http://embedding:8080}
+
+  WORKSPACE_DIR: "${WORKSPACE_DIR:-/app/workspace}"

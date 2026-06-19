@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent-dionysos
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  serviceName: "dionysos"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dionysos
+  template:
+    metadata:
+      labels:
+        app: dionysos
+    spec:
+      serviceAccountName: ${SERVICE_ACCOUNT}
+      hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+
+      initContainers:
+      - name: init-workspace
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export HOME=/tmp
+          cd /opt/data
+          git config --global --add safe.directory /opt/data
+          git init
+          git remote add origin http://${FORGEJO_USER}:${FORGEJO_TOKEN}@${FORGEJO_SERVICE}:3000/${ORG_NAME}/${BRAIN_REPO}.git
+          git config core.sparseCheckout true
+          echo "config/agents/common/" >> .git/info/sparse-checkout
+          echo "config/agents/dionysos/" >> .git/info/sparse-checkout
+          git pull --depth=1 origin main || echo "No initial config."
+          if [ -d "config/agents/common" ]; then cp -r config/agents/common/* . 2>/dev/null || true ; fi
+          if [ -d "config/agents/dionysos" ]; then cp -r config/agents/dionysos/* . 2>/dev/null || true ; fi
+          rm -rf config/
+          if [ -f "config.yaml" ]; then
+            envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
+          fi
+        env:
+        - name: AGENT_MODEL
+          value: ${MODEL_ROUTINE:-sophia-routine}
+        - name: FORGEJO_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-dionysos
+              key: username
+        - name: FORGEJO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-dionysos
+              key: password
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+
+      containers:
+      - name: dionysos
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        imagePullPolicy: Always
+        command: ["hermes", "gateway", "run"]
+        tty: true
+        stdin: true
+        env:
+        - name: AGENT_PERSONA
+          value: "DIONYSOS"
+        - name: PATH
+          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        - name: API_SERVER_ENABLED
+          value: "true"
+        - name: API_SERVER_HOST
+          value: "0.0.0.0"
+        - name: API_SERVER_KEY
+          value: ${API_SERVER_KEY}
+        - name: GATEWAY_ALLOW_ALL_USERS
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          readOnly: true
+        - name: agent-storage
+          mountPath: /opt/data
+
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
+      - name: agent-storage
+        emptyDir: {}

@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dionysos
+  namespace: ${AGENT_NAMESPACE}
+  labels:
+    app: dionysos
+spec:
+  clusterIP: None
+  selector:
+    app: dionysos
+  ports:
+  - name: api
+    port: ${AGENT_API_PORT:-8642}
+    targetPort: ${AGENT_API_PORT:-8642}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hephaistos
+  namespace: ${AGENT_NAMESPACE}
+  labels:
+    app: hephaistos
+spec:
+  clusterIP: None
+  selector:
+    app: hephaistos
+  ports:
+  - name: api
+    port: ${AGENT_API_PORT:-8642}
+    targetPort: ${AGENT_API_PORT:-8642}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ouranos
+  namespace: ${AGENT_NAMESPACE}
+  labels:
+    app: ouranos
+spec:
+  clusterIP: None
+  selector:
+    app: ouranos
+  ports:
+  - name: api
+    port: ${AGENT_API_PORT:-8642}
+    targetPort: ${AGENT_API_PORT:-8642}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: athena
+  namespace: ${AGENT_NAMESPACE}
+  labels:
+    app: athena
+spec:
+  clusterIP: None
+  selector:
+    app: athena
+  ports:
+  - name: api
+    port: ${AGENT_API_PORT:-8642}
+    targetPort: ${AGENT_API_PORT:-8642}

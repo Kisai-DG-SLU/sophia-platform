@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-gateway
+  namespace: ${SANDBOX_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-gateway
+  template:
+    metadata:
+      labels:
+        app: dev-gateway
+    spec:
+      serviceAccountName: ${GATEWAY_SERVICE_ACCOUNT:-dev-gateway-sa}
+      containers:
+        - name: gateway
+          image: ${INTERNAL_REGISTRY}/${SANDBOX_NAMESPACE}/${GATEWAY_IMAGE:-sophia-gateway-base}:latest
+          securityContext:
+            capabilities:
+              add:
+                - SYS_CHROOT
+          ports:
+            - containerPort: 2222
+          volumeMounts:
+            - name: ssh-pubkey
+              mountPath: /tmp/ssh-pubkey
+              readOnly: true
+      volumes:
+        - name: ssh-pubkey
+          secret:
+            secretName: ${SSH_PUBKEY_SECRET:-sophia-ssh-pubkey}

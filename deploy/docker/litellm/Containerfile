@@ -1,0 +1,34 @@
+FROM ghcr.io/berriai/litellm-non_root:main-latest
+
+USER root
+
+ENV PRISMA_BIN_DIR="/app/prisma-bin" \
+    HOME="/tmp" \
+    XDG_CACHE_HOME="/tmp/.cache" \
+    TIKTOKEN_CACHE_DIR="/app/tiktoken-cache"
+
+RUN pip install --no-cache-dir prisma==${PRISMA_VERSION:-0.11.0} nodejs-bin
+
+RUN prisma py fetch
+
+RUN mkdir -p ${PRISMA_BIN_DIR} && \
+    find /app/.cache -type f \( \
+      -name '*query-engine-*' -o \
+      -name '*query_engine*' -o \
+      -name 'migration-engine-*' -o \
+      -name 'schema-engine-*' -o \
+      -name 'prisma-fmt-*' \
+    \) -exec cp {} ${PRISMA_BIN_DIR}/ \; && \
+    chmod +x ${PRISMA_BIN_DIR}/* || true
+
+RUN mkdir -p /app/tiktoken-cache
+COPY tiktoken-cache/ /app/tiktoken-cache/
+RUN chmod -R a+rX /app/tiktoken-cache
+
+RUN echo "=== PRISMA BINARIES ===" && ls -la ${PRISMA_BIN_DIR} && \
+    echo "=== TIKTOKEN CACHE ===" && ls -la /app/tiktoken-cache
+
+RUN chgrp -R 0 /app /usr/lib/python3.13/site-packages/prisma /tmp && \
+    chmod -R g=u /app /usr/lib/python3.13/site-packages/prisma /tmp
+
+USER ${APP_UID:-1001}

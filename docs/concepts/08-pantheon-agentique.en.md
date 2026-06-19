@@ -17,6 +17,8 @@ The Agent Pantheon addresses this problem by applying two strict rules:
 
 This approach limits the impact of erroneous or malicious behavior: a compromised agent cannot leave its domain.
 
+**Model-agnostic by design.** Each agent is an independent pod, so each agent can use a different model. An agent could even function without a dedicated agentic model -- agentic behavior (specialization, confinement, output format) is enforced by the Kubernetes infrastructure, not by the model. This means the platform can integrate models of very different sizes and capabilities, or even non-AI tools.
+
 ---
 
 ## The agents

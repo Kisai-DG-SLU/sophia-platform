@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${RUNNER_NAME:-forgejo-runner-gpu}
+  namespace: ${GIT_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${RUNNER_NAME:-forgejo-runner-gpu}
+  template:
+    metadata:
+      labels:
+        app: ${RUNNER_NAME:-forgejo-runner-gpu}
+    spec:
+      serviceAccountName: ${RUNNER_SERVICE_ACCOUNT:-forgejo-runner-sa}
+      initContainers:
+      - name: extract-runner
+        image: gitea/act_runner:latest
+        command: ["/bin/sh", "-c", "cp $(which act_runner) /shared/act_runner && chmod +x /shared/act_runner"]
+        volumeMounts:
+        - name: shared-bin
+          mountPath: /shared
+      containers:
+      - name: runner
+        image: ${INTERNAL_REGISTRY}/${SANDBOX_NAMESPACE}/${DEV_IMAGE_NAME:-sophia-dev-base}:latest
+        workingDir: /data-runner
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          rm -f .runner
+          /shared/act_runner register \
+            --instance "$GITEA_INSTANCE_URL" \
+            --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
+            --name "$GITEA_RUNNER_NAME" \
+            --labels "$GITEA_RUNNER_LABELS" \
+            --no-interactive \
+            --config /config/config.yaml
+          exec /shared/act_runner daemon --config /config/config.yaml
+        env:
+        - name: GITEA_INSTANCE_URL
+          value: ${FORGEJO_SERVICE:-http://forgejo-svc:3000}
+        - name: GITEA_RUNNER_REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${RUNNER_SECRET_NAME}
+              key: ${RUNNER_TOKEN_KEY:-registration_token}
+        - name: GITEA_RUNNER_NAME
+          value: ${RUNNER_NAME:-forgejo-runner-gpu}
+        - name: GITEA_RUNNER_LABELS
+          value: ${RUNNER_LABELS:-gpu:host,linux:host,pixi:host,exec:host}
+        resources:
+          limits:
+            nvidia.com/gpu: ${GPU_COUNT:-1}
+        volumeMounts:
+        - name: shared-bin
+          mountPath: /shared
+        - name: runner-data
+          mountPath: /data-runner
+        - name: config-volume
+          mountPath: /config
+      volumes:
+      - name: shared-bin
+        emptyDir: {}
+      - name: runner-data
+        emptyDir: {}
+      - name: config-volume
+        configMap:
+          name: ${RUNNER_CONFIG_MAP:-runner-config}

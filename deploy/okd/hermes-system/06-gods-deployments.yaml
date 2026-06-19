@@ -1,0 +1,308 @@
+# --- ATHENA ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent-athena
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  serviceName: "athena"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: athena
+  template:
+    metadata:
+      labels:
+        app: athena
+    spec:
+      serviceAccountName: athena-sa
+      initContainers:
+      - name: init-workspace
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export HOME=/tmp
+          cd /opt/data
+          git config --global --add safe.directory /opt/data
+          git init
+          git remote add origin http://${FORGEJO_USER}:${FORGEJO_TOKEN}@${FORGEJO_SERVICE}:3000/${ORG_NAME}/${BRAIN_REPO}.git
+          git config core.sparseCheckout true
+          echo "config/agents/common/" >> .git/info/sparse-checkout
+          echo "config/agents/athena/" >> .git/info/sparse-checkout
+          git pull --depth=1 origin main || true
+          if [ -d "config/agents/common" ]; then cp -r config/agents/common/* . 2>/dev/null || true ; fi
+          if [ -d "config/agents/athena" ]; then cp -r config/agents/athena/* . 2>/dev/null || true ; fi
+          rm -rf config/
+        env:
+        - name: AGENT_MODEL
+          value: ${MODEL_ROUTINE:-sophia-routine}
+        - name: FORGEJO_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-athena
+              key: username
+        - name: FORGEJO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-athena
+              key: password
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+      containers:
+      - name: hermes
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          envsubst < /opt/data/config.yaml > /tmp/config-expanded.yaml
+          mv /tmp/config-expanded.yaml /opt/data/config.yaml
+          echo "Config envsubst done"
+          exec hermes gateway run
+        tty: true
+        stdin: true
+        env:
+        - name: HOME
+          value: /opt/hermes
+        - name: AGENT_PERSONA
+          value: "ATHENA"
+        - name: AGENT_MODEL
+          value: ${MODEL_ROUTINE:-sophia-routine}
+        - name: REQUIRE_HITL
+          value: "systematic"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: ${HITL_DB_SECRET}
+              key: POSTGRES_URL
+        - name: TELEGRAM_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${AGENT_SECRET}
+              key: telegram_bot_token
+        - name: TELEGRAM_HITL_CHAT_ID
+          value: ${TELEGRAM_HITL_CHAT_ID}
+        - name: PATH
+          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        - name: API_SERVER_ENABLED
+          value: "true"
+        - name: API_SERVER_HOST
+          value: "0.0.0.0"
+        - name: API_SERVER_KEY
+          value: ${API_SERVER_KEY}
+        - name: GATEWAY_ALLOW_ALL_USERS
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+        - name: hitl-tools
+          mountPath: /opt/hermes/tools/approval.py
+          subPath: approval.py
+        - name: hitl-tools
+          mountPath: /opt/hermes/tools/approval_store.py
+          subPath: approval_store.py
+      volumes:
+      - name: agent-storage
+        emptyDir: {}
+      - name: hitl-tools
+        configMap:
+          name: ${HITL_TOOLS_CONFIGMAP}
+---
+# --- HEPHAISTOS ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent-hephaistos
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  serviceName: "hephaistos"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hephaistos
+  template:
+    metadata:
+      labels:
+        app: hephaistos
+    spec:
+      serviceAccountName: hephaistos-sa
+      initContainers:
+      - name: init-workspace
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export HOME=/tmp
+          cd /opt/data
+          git config --global --add safe.directory /opt/data
+          git init
+          git remote add origin http://${FORGEJO_USER}:${FORGEJO_TOKEN}@${FORGEJO_SERVICE}:3000/${ORG_NAME}/${BRAIN_REPO}.git
+          git config core.sparseCheckout true
+          echo "config/agents/common/" >> .git/info/sparse-checkout
+          echo "config/agents/hephaistos/" >> .git/info/sparse-checkout
+          git pull --depth=1 origin main || true
+          if [ -d "config/agents/common" ]; then cp -r config/agents/common/* . 2>/dev/null || true ; fi
+          if [ -d "config/agents/hephaistos" ]; then cp -r config/agents/hephaistos/* . 2>/dev/null || true ; fi
+          rm -rf config/
+          if [ -f "config.yaml" ]; then
+            envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
+          fi
+        env:
+        - name: AGENT_MODEL
+          value: ${MODEL_ROUTINE:-sophia-routine}
+        - name: FORGEJO_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-hephaistos
+              key: username
+        - name: FORGEJO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-hephaistos
+              key: password
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+      containers:
+      - name: hermes
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command: ["hermes", "gateway", "run"]
+        tty: true
+        stdin: true
+        env:
+        - name: AGENT_PERSONA
+          value: "HEPHAISTOS"
+        - name: PATH
+          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        - name: API_SERVER_ENABLED
+          value: "true"
+        - name: API_SERVER_HOST
+          value: "0.0.0.0"
+        - name: API_SERVER_KEY
+          value: ${API_SERVER_KEY}
+        - name: GATEWAY_ALLOW_ALL_USERS
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+      volumes:
+      - name: agent-storage
+        emptyDir: {}
+---
+# --- OURANOS ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent-ouranos
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  serviceName: "ouranos"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ouranos
+  template:
+    metadata:
+      labels:
+        app: ouranos
+    spec:
+      serviceAccountName: ouranos-sa
+      initContainers:
+      - name: init-workspace
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export HOME=/tmp
+          cd /opt/data
+          git config --global --add safe.directory /opt/data
+          git init
+          git remote add origin http://${FORGEJO_USER}:${FORGEJO_TOKEN}@${FORGEJO_SERVICE}:3000/${ORG_NAME}/${BRAIN_REPO}.git
+          git config core.sparseCheckout true
+          echo "config/agents/common/" >> .git/info/sparse-checkout
+          echo "config/agents/ouranos/" >> .git/info/sparse-checkout
+          git pull --depth=1 origin main || true
+          if [ -d "config/agents/common" ]; then cp -r config/agents/common/* . 2>/dev/null || true ; fi
+          if [ -d "config/agents/ouranos" ]; then cp -r config/agents/ouranos/* . 2>/dev/null || true ; fi
+          rm -rf config/
+          if [ -f "config.yaml" ]; then
+            envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
+          fi
+        env:
+        - name: AGENT_MODEL
+          value: ${MODEL_ROUTINE:-sophia-routine}
+        - name: FORGEJO_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-ouranos
+              key: username
+        - name: FORGEJO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${FORGEJO_SECRET_PREFIX}-ouranos
+              key: password
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+      containers:
+      - name: hermes
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command: ["hermes", "gateway", "run"]
+        tty: true
+        stdin: true
+        env:
+        - name: AGENT_PERSONA
+          value: "OURANOS"
+        - name: REQUIRE_HITL
+          value: "prompt"
+        - name: PATH
+          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        - name: API_SERVER_ENABLED
+          value: "true"
+        - name: API_SERVER_HOST
+          value: "0.0.0.0"
+        - name: API_SERVER_KEY
+          value: ${API_SERVER_KEY}
+        - name: GATEWAY_ALLOW_ALL_USERS
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: ${AGENT_CONFIG_MAP}
+        - secretRef:
+            name: ${AGENT_SECRET}
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+      volumes:
+      - name: agent-storage
+        emptyDir: {}

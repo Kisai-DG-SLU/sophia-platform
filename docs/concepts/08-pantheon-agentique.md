@@ -17,6 +17,8 @@ Le Pantheon Agentique repond a ce probleme en appliquant deux regles strictes :
 
 Cette approche permet de limiter l'impact d'un comportement errone ou malveillant : un agent compromis ne peut pas sortir de son domaine.
 
+**Model-agnostique par conception.** Chaque agent etant un pod independant, chaque agent peut utiliser un modele different. Un agent pourrait meme fonctionner sans modele agentique dedie -- le comportement agentique (specialisation, confinement, format de sortie) est enforce par l'infrastructure Kubernetes, pas par le modele. Cela signifie que la plateforme peut integrer des modeles de tailles et de capacites tres differentes, voire des outils non-base sur l'IA.
+
 ---
 
 ## Les agents

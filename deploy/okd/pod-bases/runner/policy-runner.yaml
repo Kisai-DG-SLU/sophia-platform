@@ -1,0 +1,17 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: allow-runner-to-forgejo
+  namespace: ${GIT_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: forgejo
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ${RUNNER_NAME:-forgejo-runner-gpu}
+    ports:
+    - protocol: TCP
+      port: 3000

@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${AGENT_NAMESPACE}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${SERVICE_ACCOUNT}
+  namespace: ${AGENT_NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${SERVICE_ACCOUNT}-cluster-reader-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-reader
+subjects:
+- kind: ServiceAccount
+  name: ${SERVICE_ACCOUNT}
+  namespace: ${AGENT_NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${SERVICE_ACCOUNT}-scc-hostaccess
+  namespace: ${AGENT_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:hostaccess
+subjects:
+- kind: ServiceAccount
+  name: ${SERVICE_ACCOUNT}
+  namespace: ${AGENT_NAMESPACE}
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: ${AGENT_IMAGE_NAME}
+  namespace: ${AGENT_NAMESPACE}
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ${AGENT_IMAGE_NAME}-build
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ${AGENT_IMAGE_NAME}:latest
+  strategy:
+    dockerStrategy: {}
+  source:
+    type: Dockerfile
+    dockerfile: |
+      FROM nousresearch/hermes-agent:latest
+      USER root
+      ENV OC_VERSION=${OC_VERSION:-4.14}
+
+      RUN apt-get update && apt-get install -y \
+          curl wget tar gzip unzip \
+          git openssh-client \
+          jq \
+          dnsutils iputils-ping netcat-openbsd tcpdump \
+          procps \
+          vim \
+          tree htop lsof rsync ncdu \
+          gettext-base \
+          python3-psycopg2 \
+          python3-pip \
+          && rm -rf /var/lib/apt/lists/*
+
+      RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq \
+          && chmod +x /usr/local/bin/yq
+
+      RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${OC_VERSION}/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz \
+          && tar -xvf /tmp/oc.tar.gz -C /usr/local/bin oc kubectl \
+          && rm /tmp/oc.tar.gz \
+          && mkdir -p /opt/data \
+          && chown -R ${APP_UID}:0 /opt/data \
+          && chmod -R 775 /opt/data
+
+      RUN curl -L https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz \
+          && tar -xvf /tmp/zellij.tar.gz -C /usr/local/bin zellij \
+          && chmod +x /usr/local/bin/zellij \
+          && rm /tmp/zellij.tar.gz
+
+      RUN echo '/usr/lib/python3/dist-packages' > /opt/hermes/.venv/lib/python3.13/site-packages/debian-system.pth
+
+      RUN /opt/hermes/.venv/bin/python3 -m pip install python-telegram-bot
+
+      RUN chown -R ${APP_UID}:0 /opt/hermes && chmod -R 775 /opt/hermes
+
+      USER ${APP_UID}
+
+      RUN echo "source /opt/hermes/.venv/bin/activate" >> /tmp/.bashrc

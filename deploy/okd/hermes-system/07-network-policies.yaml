@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-agents-to-forgejo
+  namespace: ${GIT_NAMESPACE}
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ${AGENT_NAMESPACE}
+    ports:
+    - protocol: TCP
+      port: 3000

@@ -1,0 +1,16 @@
+{
+  "ai": {
+    "provider": "openai-compatible",
+    "endpoint": "${LITELLM_SERVICE:-http://litellm:4000/v1}",
+    "model": "${AGENT_MODEL:-default-model}",
+    "temperature": 0.2,
+    "contextWindow": 8192,
+    "stream": true,
+    "rulesPath": "/mnt/rules/agent-context.md"
+  },
+  "ui": {
+    "theme": "dark",
+    "autoSave": true,
+    "fontFamily": "monospace"
+  }
+}

@@ -11,12 +11,13 @@ La plateforme assemble des composants open-source en une infrastructure coherent
 La conception de SophIA est guidee par plusieurs principes fondamentaux :
 
 - Souverainete sur les donnees, les modeles et l'infrastructure
+- **Model-agnostique** : l'architecture ne depend d'aucun modele specifique. Chaque agent, etant un pod autonome, peut utiliser un modele different -- du plus petit modele local au plus grand modele public. L'intelligence du systeme reside dans l'architecture, pas dans le modele.
 - Isolation reseau stricte entre les composants critiques
 - Integration modulaire de technologies open-source
 - Deploiement reproductible de l'infrastructure
 - Auditabilite des interactions IA
 
-L'architecture est conque pour etre **logiciel-agnostique** et **materiel-agnostique**. Chaque composant peut etre remplace par une alternative equivalente, qu'elle soit open-source, proprietaire ou developpee en interne. Les choix effectues dans l'implementation de reference sont des exemples parmi de nombreuses configurations possibles.
+L'architecture est conque pour etre **model-agnostique**, **logiciel-agnostique** et **materiel-agnostique**. Chaque composant peut etre remplace par une alternative equivalente, qu'elle soit open-source, proprietaire ou developpee en interne. Les choix effectues dans l'implementation de reference sont des exemples parmi de nombreuses configurations possibles.
 
 ---
 
@@ -111,6 +112,20 @@ Caracteristiques principales :
 - Conception materiel-agnostique (toute infrastructure repondant aux exigences peut etre substituce)
 
 La configuration materielle specifique utilisee pour le Proof of Concept est documentee dans la section deploiement. Elle est intentionnellement non-prescriptive : chaque organisation doit adapter les choix d'infrastructure a son propre contexte, echelle et exigences de securite.
+
+---
+
+## Architecture anti-hallucination
+
+La plateforme est concue pour restreindre les hallucinations non pas par le modele, mais par l'architecture elle-meme. Les mecanismes suivants sont independants du modele sous-jacent :
+
+- **Confinement RBAC** : chaque agent a des permissions strictement minimales. Meme si un agent hallucine une commande destructrice, le cluster Kubernetes la rejette (principe du moindre privilege).
+- **HITL par code** : Athena et Ouranos ont leurs actions de mutation interceptees par un verrou HITL au niveau du terminal. Aucune action critique n'est executee sans validation humaine, quelque soit le modele.
+- **Format de sortie impose** : les sous-agents communiquent exclusivement en JSON strict. Tout ecart de format est detecte et rejete.
+- **Isolation reseau** : les NetworkPolicies empechent tout agent de communiquer en dehors de son perimetre autorise.
+- **Supervision** : Dionysos observe en lecture seule l'ensemble du systeme et peut alerter sur des comportements anormaux.
+
+Ces mecanismes fonctionnent avec n'importe quel modele, du plus petit (quelques milliards de parametres) au plus grand. L'architecture ne suppose aucune capacite agentique intrinseque du modele -- le comportement agentique est enforce par la structure des pods, le RBAC et les contraintes d'infrastructure.
 
 ---
 
