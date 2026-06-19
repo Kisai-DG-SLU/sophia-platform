@@ -1,48 +1,48 @@
-# Sophia Agent Pantheon Deployment
+# Deploiement du Pantheon Agentique Sophia
 
-This directory contains the OpenShift/Kubernetes manifests for deploying the **SophIA Agent Pantheon** — a multi-agent architecture based on zero-trust and strict RBAC segmentation.
+Ce repertoire contient les manifests OpenShift/Kubernetes pour deployer le **Pantheon Agentique SophIA** — une architecture multi-agents basee sur le zero-trust et la segmentation RBAC stricte.
 
-## Deployment Order
+## Ordre de deploiement
 
-The manifests must be applied sequentially to satisfy dependencies:
+Les manifests doivent etre appliques sequentiellement pour satisfaire les dependances :
 
 1. `01-agent-build.yaml` — Namespace, ServiceAccount, ImageStream, BuildConfig
-2. `02-observer-dionysos.yaml` — (Optional) Dionysos observer pod for cluster diagnosis
-3. `03-agent-config.yaml` — ConfigMap with RAG endpoints and LLM configuration
-4. `04-agent-deployment-sophia.yaml` — Main Sophia agent deployment
-5. `05-gods-rbac.yaml` — ServiceAccounts and RBAC for specialized agents
-6. `06-gods-deployments.yaml` — Athena, Hephaistos, Ouranos deployments
-7. `07-network-policies.yaml` — Network policies for zero-trust isolation
-8. `08-services.yaml` — Internal headless services for agent routing
+2. `02-observer-dionysos.yaml` — (Optionnel) Pod observateur Dionysos pour le diagnostic du cluster
+3. `03-agent-config.yaml` — ConfigMap avec les endpoints RAG et la configuration LLM
+4. `04-agent-deployment-sophia.yaml` — Deploiement principal de l'agent Sophia
+5. `05-gods-rbac.yaml` — ServiceAccounts et RBAC pour les agents specialises
+6. `06-gods-deployments.yaml` — Deploiements d'Athena, Hephaistos, Ouranos
+7. `07-network-policies.yaml` — Politiques reseau pour l'isolation zero-trust
+8. `08-services.yaml` — Services internes headless pour le routage des agents
 
-## Model Agnosticism
+## Agnosticisme des modeles
 
-Each agent pod is configured independently via its `AGENT_MODEL` environment variable. Sophia can use a powerful reasoning model (`${MODEL_THINK}`) while her sub-agents run a lighter, faster model (`${MODEL_ROUTINE}`). Each god deployment in `06-gods-deployments.yaml` has its own model configuration.
+Chaque pod agent est configure independamment via sa variable d'environnement `AGENT_MODEL`. Sophia peut utiliser un modele de raisonnement puissant (`${MODEL_THINK}`) tandis que ses sous-agents utilisent un modele plus leger et rapide (`${MODEL_ROUTINE}`). Chaque deite dans `06-gods-deployments.yaml` possede sa propre configuration de modele.
 
-Because agentic behavior is enforced by infrastructure (RBAC, NetworkPolicies, output format validation) rather than the model itself, the architecture works with any model -- from small local models to large public APIs. You can even deploy an agent without any AI backend if its role is purely deterministic.
+Etant donne que le comportement agentique est enforce par l'infrastructure (RBAC, NetworkPolicies, validation du format de sortie) plutot que par le modele lui-meme, l'architecture fonctionne avec n'importe quel modele — des petits modeles locaux aux grandes API publiques. Vous pouvez meme deployer un agent sans backend IA si son role est purement deterministe.
 
-The `${AGENT_MODEL}`, `${OPENAI_API_BASE_URL}`, and `${OPENAI_API_KEY}` environment variables in the ConfigMap and Secrets control which model each agent uses.
+Les variables d'environnement `${AGENT_MODEL}`, `${OPENAI_API_BASE_URL}` et `${OPENAI_API_KEY}` dans le ConfigMap et les Secrets controlent le modele utilise par chaque agent.
 
-## Variable Reference
+## Reference des variables
 
-Substitute the following variables (via envsubst or Helm) before applying:
+Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 
-| Variable | Description | Default |
+| Variable | Description | Defaut |
 |---|---|---|
-| `${AGENT_NAMESPACE}` | Agent system namespace | `hermes-system` |
-| `${INTERNAL_REGISTRY}` | Internal image registry URL | `image-registry.openshift-image-registry.svc:5000` |
-| `${AGENT_IMAGE_NAME}` | Agent image stream name | `hermes-agent-oc` |
-| `${SERVICE_ACCOUNT}` | Main agent service account | `hermes-sa` |
-| `${AGENT_CONFIG_MAP}` | ConfigMap name | `hermes-behavior-config` |
-| `${AGENT_SECRET}` | Agent secret name | `hermes-agent-secret` |
-| `${FORGEJO_SERVICE}` | Git service internal URL | `forgejo-svc.git-ns.svc.cluster.local:3000` |
-| `${LITELLM_SERVICE}` | LiteLLM proxy URL | `http://litellm-svc.core-ns.svc.cluster.local:4000/v1` |
-| `${ORG_NAME}` | Git organization | `my-org` |
-| `${BRAIN_REPO}` | Agent configuration repository | `agent-brain` |
-| `${SANDBOX_NAMESPACE}` | Hephaistos sandbox namespace | `sandbox` |
-| `${APPS_NAMESPACE}` | Ouranos apps namespace | `apps` |
-| `${GIT_NAMESPACE}` | Git service namespace | `git` |
-| `${MODEL_THINK}` | Reasoning model for Sophia | `sophia-think` |
-| `${MODEL_ROUTINE}` | Lightweight model for sub-agents | `sophia-routine` |
-| `${API_SERVER_KEY}` | Internal API key for agent communication | (required) |
-| `${TELEGRAM_HITL_CHAT_ID}` | Telegram chat ID for HITL approvals | (required) |
+| `${AGENT_NAMESPACE}` | Namespace du systeme d'agents | `hermes-system` |
+| `${INTERNAL_REGISTRY}` | URL du registre d'images interne | `image-registry.openshift-image-registry.svc:5000` |
+| `${AGENT_IMAGE_NAME}` | Nom de l'image stream de l'agent | `hermes-agent-oc` |
+| `${SERVICE_ACCOUNT}` | Service account principal de l'agent | `hermes-sa` |
+| `${AGENT_CONFIG_MAP}` | Nom du ConfigMap | `hermes-behavior-config` |
+| `${AGENT_SECRET}` | Nom du secret de l'agent | `hermes-agent-secret` |
+| `${FORGEJO_SERVICE}` | URL interne du service Git | `forgejo-svc.git-ns.svc.cluster.local:3000` |
+| `${LITELLM_SERVICE}` | URL du proxy LiteLLM | `http://litellm-svc.core-ns.svc.cluster.local:4000/v1` |
+| `${ORG_NAME}` | Organisation Git | `my-org` |
+| `${BRAIN_REPO}` | Depot de configuration des agents | `agent-brain` |
+| `${SANDBOX_NAMESPACE}` | Namespace sandbox d'Hephaistos | `sandbox` |
+| `${APPS_NAMESPACE}` | Namespace apps d'Ouranos | `apps` |
+| `${GIT_NAMESPACE}` | Namespace du service Git | `git` |
+| `${MODEL_THINK}` | Modele de raisonnement pour Sophia | `sophia-think` |
+| `${MODEL_ROUTINE}` | Modele leger pour les sous-agents | `sophia-routine` |
+| `${API_SERVER_KEY}` | Cle API interne pour la communication entre agents | (requis) |
+| `${TELEGRAM_HITL_CHAT_ID}` | ID du chat Telegram pour les approbations HITL | (requis) |

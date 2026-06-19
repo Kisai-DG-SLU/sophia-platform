@@ -1,8 +1,8 @@
-# Contributing
+# Contribution
 
-SOPHIA is currently an exploratory architecture project.
+SOPHIA est actuellement un projet d'architecture exploratoire.
 
-External contributions are welcome once the core architecture
-and documentation are stabilized.
+Les contributions externes seront les bienvenues une fois que l'architecture
+centrale et la documentation seront stabilisees.
 
-In the meantime, discussions and feedback are encouraged.
+En attendant, les discussions et retours sont encourages.

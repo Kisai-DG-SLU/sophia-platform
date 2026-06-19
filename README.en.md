@@ -117,16 +117,33 @@ The project aims to evolve into a **reference architecture for sovereign AI infr
 
 ## Documentation
 
-Documentation will progressively be published in the `/docs` directory.
+Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 
-Planned topics include:
+- **[Architecture](docs/architecture.en.md)** — Principles, components and high-level organization
+- **[Security](docs/security.en.md)** — Security model and isolation
+- **[Vision](docs/vision.en.md)** — Project goals and motivations
+- **[Roadmap](docs/roadmap.en.md)** — Milestones and planning
+- **[Glossary](docs/glossary.en.md)** — Terms and definitions
 
-- architecture overview
-- security model
-- context management
-- workspace management
-- orchestration model
-- deployment examples
+### Architectural Concepts (10 topics)
+
+| Concept | Description |
+|---------|-------------|
+| [Project Model](docs/concepts/00-project-model.en.md) | Project management model and workspaces |
+| [Context Management](docs/concepts/01-context-management.en.md) | Context management for model interactions |
+| [Workspace Management](docs/concepts/02-workspace-management.en.md) | Workspace isolation and management |
+| [RAG 5D](docs/concepts/03-rag-5d.en.md) | Five-dimensional knowledge topology |
+| [SAS Paranoiaque](docs/concepts/04-sas-paranoiaque.en.md) | Isolated and secure web acquisition |
+| [Semantic Court](docs/concepts/05-tribunal-semantique.en.md) | Trust validation before RAG ingestion |
+| [Ghost Search](docs/concepts/06-ghost-search.en.md) | Decoy queries to obfuscate intentions |
+| [DLP Filter](docs/concepts/07-dlp-filter.en.md) | Data leak detection and blocking |
+| [Agentic Pantheon](docs/concepts/08-pantheon-agentique.en.md) | Specialized agents, confinement and isolation |
+| [Deterministic Automation](docs/concepts/09-automation-deterministe.en.md) | Deterministic workflows with n8n |
+
+### Deployment
+
+- [Deployment Overview](deploy/README.en.md) — Reference OKD configuration
+- [Infrastructure POC](deploy/infrastructure.en.md) — Proof of Concept specification
 
 ---
 

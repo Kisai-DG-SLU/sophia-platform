@@ -108,16 +108,33 @@ Le projet vise a evoluer vers une architecture de reference pour les infrastruct
 
 ## Documentation
 
-La documentation est progressivement publiee dans le repertoire `docs/`.
+La documentation est organisee dans le repertoire [`docs/`](docs/index.md).
 
-Sujets prevus :
+- **[Architecture](docs/architecture.md)** — Principes, composants et organisation haut niveau
+- **[Securite](docs/security.md)** — Modele de securite et isolation
+- **[Vision](docs/vision.md)** — Objectifs et motivations du projet
+- **[Roadmap](docs/roadmap.md)** — Etapes et planification
+- **[Glossaire](docs/glossary.md)** — Lexique des termes
 
-- vue d'ensemble de l'architecture
-- modele de securite
-- gestion de contexte
-- gestion des espaces de travail
-- modele d'orchestration
-- exemples de deploiement
+### Concepts architecturaux (10 fiches)
+
+| Concept | Description |
+|---------|-------------|
+| [Project Model](docs/concepts/00-project-model.md) | Modele de gestion de projet et espaces de travail |
+| [Context Management](docs/concepts/01-context-management.md) | Gestion du contexte pour les interactions avec les modeles |
+| [Workspace Management](docs/concepts/02-workspace-management.md) | Isolation et gestion des environnements de travail |
+| [RAG 5D](docs/concepts/03-rag-5d.md) | Topologie de la connaissance en cinq dimensions |
+| [Sas Paranoiaque](docs/concepts/04-sas-paranoiaque.md) | Acquisition web isolee et securisee |
+| [Tribunal Semantique](docs/concepts/05-tribunal-semantique.md) | Validation de confiance avant ingestion RAG |
+| [Ghost Search](docs/concepts/06-ghost-search.md) | Requetes leurres pour masquer les intentions |
+| [DLP Filter](docs/concepts/07-dlp-filter.md) | Detection et blocage des fuites de donnees |
+| [Pantheon Agentique](docs/concepts/08-pantheon-agentique.md) | Agents specialises, confinement et isolation |
+| [Automation Deterministe](docs/concepts/09-automation-deterministe.md) | Workflows deterministes avec n8n |
+
+### Deploiement
+
+- [Exemple de deploiement](deploy/README.md) — Configuration OKD de reference
+- [Infrastructure POC](deploy/infrastructure.md) — Specification du Proof of Concept
 
 ---
 

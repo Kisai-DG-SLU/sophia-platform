@@ -1,9 +1,9 @@
-# CI Runners — Forgejo Actions
+# Runners CI — Forgejo Actions
 
-This directory contains deployment manifests for Forgejo Action Runners.
+Ce repertoire contient les manifests de deploiement pour les Forgejo Action Runners.
 
-## Resources
+## Ressources
 
-- `runner-gpu.yaml` — Deployment of a GPU-enabled runner for CI workloads requiring GPU acceleration
-- `policy-runner.yaml` — NetworkPolicy allowing runner-to-Forgejo API access
-- `Dockerfile` — at `deploy/docker/runner/Dockerfile`
+- `runner-gpu.yaml` — Deploiement d'un runner avec GPU pour les charges de travail CI necessitant une acceleration GPU
+- `policy-runner.yaml` — NetworkPolicy autorisant l'acces du runner a l'API Forgejo
+- `Dockerfile` — dans `deploy/docker/runner/Dockerfile`

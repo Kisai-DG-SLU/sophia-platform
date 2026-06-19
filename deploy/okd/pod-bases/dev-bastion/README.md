@@ -1,15 +1,15 @@
-# Dev Bastion — SSH Gateway
+# Bastion Dev — Passerelle SSH
 
-The dev bastion provides secure SSH access into the sandbox namespace.
+Le bastion developpement fournit un acces SSH securise au namespace sandbox.
 
 ## Architecture
 
-- `dev-gateway.yaml` — Deployment running an OpenSSH server (port 2222) with strict key-based authentication
-- `dev-infra-headless.yaml` — Headless service for DNS-based pod discovery
-- `gateway-strict-isolation.yaml` — NetworkPolicy limiting the gateway to DNS and workspace access only
+- `dev-gateway.yaml` — Deployment executant un serveur OpenSSH (port 2222) avec authentification stricte par cle
+- `dev-infra-headless.yaml` — Service headless pour la decouverte de pods via DNS
+- `gateway-strict-isolation.yaml` — NetworkPolicy limitant la passerelle au seul acces DNS et workspace
 
-## Usage
+## Utilisation
 
-1. Deploy the gateway and related resources
-2. SSH into the gateway using your configured key: `ssh -p 2222 app-user@<gateway-ip>`
-3. From the gateway, connect to dev workspaces within the cluster
+1. Deployer la passerelle et les ressources associees
+2. Se connecter en SSH a la passerelle avec sa cle configuree : `ssh -p 2222 app-user@<gateway-ip>`
+3. Depuis la passerelle, se connecter aux workspaces de developpement dans le cluster

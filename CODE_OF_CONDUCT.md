@@ -1,5 +1,5 @@
-# Code of Conduct
+# Code de Conduite
 
-SOPHIA follows a simple rule:
+SOPHIA suit une regle simple :
 
-Respectful discussion and constructive technical exchange.
+Discussions respectueuses et echanges techniques constructifs.
