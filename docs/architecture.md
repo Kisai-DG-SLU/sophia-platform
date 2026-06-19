@@ -1,179 +1,119 @@
-# SOPHIA Architecture
+# Architecture SophIA
 
-SOPHIA (Sovereign Orchestrator Platform for Holistic Intelligence Architecture) is an experimental open architecture designed to orchestrate artificial intelligence systems in a sovereign and secure environment.
+SophIA (Sovereign Orchestrator Platform for Holistic Intelligence Architecture) est une architecture ouverte et experimentale conque pour orchestrer des systemes d'intelligence artificielle dans un environnement souverain et securise.
 
-The platform assembles open-source components into a coherent infrastructure that enables organizations to deploy, govern and operate AI systems while preserving control over their data and infrastructure.
-
----
-
-# Architectural Principles
-
-The design of SOPHIA is guided by several core principles:
-
-- Sovereignty over data, models and infrastructure
-- Strict network isolation between critical components
-- Modular integration of open-source technologies
-- Reproducible infrastructure deployment
-- Auditability of AI interactions
+La plateforme assemble des composants open-source en une infrastructure coherente qui permet aux organisations de deployer, gouverner et exploiter des systemes d'IA tout en preservant le controle de leurs donnees et de leur infrastructure.
 
 ---
 
-# High-Level Architecture
+## Principes architecturaux
 
-SOPHIA is built on top of a Kubernetes platform (OKD / OpenShift).
+La conception de SophIA est guidee par plusieurs principes fondamentaux :
 
-The architecture follows a **Hub & Spoke model**:
+- Souverainete sur les donnees, les modeles et l'infrastructure
+- Isolation reseau stricte entre les composants critiques
+- Integration modulaire de technologies open-source
+- Deploiement reproductible de l'infrastructure
+- Auditabilite des interactions IA
 
-Core cognitive services are isolated in central namespaces, while development and application environments are separated into dedicated zones.
+L'architecture est conque pour etre **logiciel-agnostique** et **materiel-agnostique**. Chaque composant peut etre remplace par une alternative equivalente, qu'elle soit open-source, proprietaire ou developpee en interne. Les choix effectues dans l'implementation de reference sont des exemples parmi de nombreuses configurations possibles.
+
+---
+
+## Architecture haut niveau
+
+SophIA repose sur une plateforme Kubernetes (OKD / OpenShift). L'architecture suit un modele Hub and Spoke : les services cognitifs centraux sont isoles dans des namespaces dedies, tandis que les environnements de developpement et d'application sont separes dans des zones distinctes.
+
 ```
                 +-----------------------+
-                |      sophia-core     |
-                |   Orchestration AI   |
-                +-----------+----------+
+                |     sophia-core       |
+                |  Orchestration IA     |
+                +-----------+-----------+
                             |
         ----------------------------------------------
         |                    |                       |
 +---------------+   +---------------+      +---------------+
 | sophia-git    |   | sophia-memory |      | sophia-skills |
-| Code & specs  |   | Vector store  |      | MCP servers   |
+| Code & specs  |   | Base vecto.   |      | Serveurs MCP  |
 +---------------+   +---------------+      +---------------+
-                                                     |
-                                               +-----------+
-                                               | inference |
-                                               | models    |
-                                               +-----------+
-                                                     |
-                                               +-----------+
-                                               |   DMZ     |
-                                               | web data  |
-                                               +-----------+
+                                                    |
+                                              +-----------+
+                                              | inference |
+                                              | modeles   |
+                                              +-----------+
+                                                    |
+                                              +-----------+
+                                              |   DMZ     |
+                                              | web data  |
+                                              +-----------+
 ```
----
-
-# Core Namespaces
-
-## sophia-core
-
-Central orchestration layer.
-
-Responsibilities:
-
-* LLM routing
-* agent orchestration
-* execution workflows
-* API access
-
-Technologies:
-
-* LiteLLM
-* orchestration engines
-* logging and telemetry
 
 ---
 
-## sophia-inference
+## Namespaces centraux
 
-Local model execution environment.
+### sophia-core
 
-Responsibilities:
+Couche d'orchestration centrale. Responsabilites : routage des modeles, orchestration des agents, flux d'execution, acces API.
 
-* hosting local models
-* CPU-based inference
-* model execution isolation
+Technologies (exemple) : LiteLLM, moteurs d'orchestration, journalisation et telemetrie.
 
-Technologies:
+### sophia-inference
 
-* Ollama
-* llama.cpp
+Environnement d'execution locale des modeles. Responsabilites : hebergement de modeles locaux, inference CPU/GPU, isolation de l'execution.
 
----
+Technologies (exemple) : Ollama, llama.cpp.
 
-## sophia-memory
+### sophia-memory
 
-Persistent knowledge layer.
+Couche de connaissance persistante. Responsabilites : stockage vectoriel, indexation RAG, persistence des connaissances.
 
-Responsibilities:
+Technologies (exemple) : Qdrant.
 
-* vector storage
-* RAG indexing
-* knowledge persistence
+### sophia-git
 
-Technologies:
+Couche de gouvernance des connaissances et du code. Responsabilites : memoire de projet, stockage des specifications, versionnement du code.
 
-* Qdrant
+Technologies (exemple) : Forgejo.
 
----
+### sophia-skills
 
-## sophia-git
+Outils et capacites contextuelles. Responsabilites : serveurs MCP, injection de contexte, execution d'outils pour les agents.
 
-Knowledge and code governance layer.
+### sophia-dmz
 
-Responsibilities:
-
-* project memory
-* specifications storage
-* code versioning
-
-Technologies:
-
-* Forgejo
+Couche d'acquisition web securisee. Responsabilites : extraction web externe, nettoyage, mecanismes anti-tracage.
 
 ---
 
-## sophia-skills
+## Zones de developpement et d'execution
 
-Tooling and contextual capabilities.
+Des namespaces supplementaires fournissent des environnements controles :
 
-Responsibilities:
-
-* MCP servers
-* context injection
-* tool execution for agents
-
----
-
-## sophia-dmz
-
-Secure web acquisition layer.
-
-Responsibilities:
-
-* external web extraction
-* sanitization
-* anti-tracking mechanisms
+| Namespace        | Role                                |
+|------------------|-------------------------------------|
+| sophia-sandbox   | environnements de developpement     |
+| sophia-test      | validation CI/CD                    |
+| sophia-apps      | interfaces utilisateur              |
+| prod-*           | charges de travail locataires       |
 
 ---
 
-# Development and Runtime Zones
+## Plateforme d'infrastructure
 
-Additional namespaces provide controlled environments:
+L'implementation de reference de l'architecture SophIA fonctionne actuellement sur un cluster Kubernetes mono-noeud (OKD) deploye sur un serveur bare-metal.
 
-| Namespace      | Role                        |
-| -------------- | --------------------------- |
-| sophia-sandbox | development environments    |
-| sophia-test    | CI/CD validation            |
-| sophia-apps    | user interfaces             |
-| prod-*         | tenant production workloads |
+Caracteristiques principales :
 
----
+- Orchestration Kubernetes
+- Politiques reseau strictes via des mecanismes d'isolation
+- Stockage persistant
+- Conception materiel-agnostique (toute infrastructure repondant aux exigences peut etre substituce)
 
-# Infrastructure Platform
-
-SOPHIA currently runs on a **single-node OpenShift (OKD)** cluster deployed on a bare-metal server.
-
-Key characteristics:
-
-* Kubernetes orchestration
-* OVN-Kubernetes networking
-* strict network policies
-* persistent storage via LVM
+La configuration materielle specifique utilisee pour le Proof of Concept est documentee dans la section deploiement. Elle est intentionnellement non-prescriptive : chaque organisation doit adapter les choix d'infrastructure a son propre contexte, echelle et exigences de securite.
 
 ---
 
-# Status
+## Statut
 
-The architecture is currently experimental.
-
-Initial infrastructure components are operational and the documentation is progressively being published.
-
-````
+L'architecture est actuellement experimentale. Les composants d'infrastructure initiaux sont operationnels et la documentation est progressivement publiee.

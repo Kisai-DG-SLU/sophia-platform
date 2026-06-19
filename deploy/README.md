@@ -1,98 +1,80 @@
-# SOPHIA — Deployment Example
+# SOPHIA : Exemple de Deploiement
 
-This directory contains an example deployment of the SOPHIA architecture (for now on **OKD (OpenShift Kubernetes Distribution)**).
+Ce repertoire contient un exemple de deploiement de l'architecture SophIA (actuellement sur **OKD**, la distribution Kubernetes d'OpenShift).
 
-The configuration provided here corresponds to the **Proof of Concept environment** used during the initial development of the project.
+La configuration fournie correspond a l'environnement de Proof of Concept utilise lors du developpement initial du projet.
 
-It demonstrates how the different components of the SOPHIA architecture can be deployed on a Kubernetes platform.
-
----
-
-## Purpose
-
-The goal of this directory is to:
-
-- provide a **reference deployment layout**
-- illustrate how the platform components are organized
-- document the **namespace architecture**
-- allow experimentation and local reproduction of the system
-
-This configuration is **not intended to be a production-ready distribution**.
-
-Instead, it serves as an **example infrastructure** used for experimentation and documentation.
+Elle demontre comment les differents composants de l'architecture SophIA peuvent etre deployes sur une plateforme Kubernetes.
 
 ---
 
-## Platform
+## Objectif
 
-The reference deployment environment uses:
+Ce repertoire a pour but de :
+
+- fournir une disposition de deploiement de reference
+- illustrer comment les composants de la plateforme sont organises
+- documenter l'architecture des namespaces
+- permettre l'experimentation et la reproduction locale du systeme
+
+Cette configuration n'est pas destinee a etre une distribution prete pour la production. Elle sert d'exemple d'infrastructure utilise pour l'experimentation et la documentation.
+
+---
+
+## Plateforme
+
+L'environnement de deploiement de reference utilise :
 
 - OKD (OpenShift Kubernetes Distribution)
-- containerized services
-- namespace-based isolation
-- network segmentation via Kubernetes NetworkPolicies
+- services conteneurises
+- isolation par namespaces
+- segmentation reseau via NetworkPolicies Kubernetes
 
-The deployment structure follows the architectural principles described in:
-
-```
-
-docs/architecture.md
-
-```
+La structure de deploiement suit les principes architecturaux decrits dans `docs/architecture.md`.
 
 ---
 
-## Namespace Model
+## Modele de namespaces
 
-The example deployment uses a segmented namespace architecture.
+Le deploiement exemple utilise une architecture de namespaces segmentee. Les namespaces typiques incluent :
 
-Typical namespaces include:
+| Namespace        | Role                                      |
+|------------------|-------------------------------------------|
+| sophia-core      | services d'orchestration                  |
+| sophia-inference | execution locale de modeles               |
+| sophia-memory    | base vectorielle                          |
+| sophia-git       | depots de projets                         |
+| sophia-skills    | outils MCP                                |
+| sophia-dmz       | acquisition web controlee                 |
+| sophia-sandbox   | environnements de developpement           |
+| sophia-test      | environnements de validation              |
+| sophia-apps      | interfaces utilisateur                    |
 
-| Namespace | Role |
-|----------|------|
-| sophia-core | orchestration services |
-| sophia-inference | local model runtime |
-| sophia-memory | vector database |
-| sophia-git | project repositories |
-| sophia-skills | MCP tools |
-| sophia-dmz | controlled web acquisition |
-| sophia-sandbox | development workspaces |
-| sophia-test | validation environments |
-| sophia-apps | user interfaces |
-
-This layout illustrates the **Hub & Spoke architecture** used by the platform.
+Cette disposition illustre l'architecture Hub and Spoke utilisee par la plateforme.
 
 ---
 
-## Important Notes
+## Remarques importantes
 
-This deployment example reflects the configuration used for the author's experimentation environment.
+Cet exemple de deploiement reflete la configuration utilisee pour l'environnement d'experimentation de l'auteur. Il peut inclure des politiques de securite simplifiees, des hypotheses d'infrastructure locale et des configurations specifiques au developpement.
 
-It may include:
-
-- simplified security policies
-- local infrastructure assumptions
-- development-specific configurations
-
-Before any real-world deployment, organizations should adapt the configuration to their own infrastructure and security requirements.
+Avant tout deploiement reel, les organisations doivent adapter la configuration a leur propre infrastructure et exigences de securite.
 
 ---
 
-## Future Improvements
+## Ameliorations futures
 
-In the future, the deployment layer may include:
+A l'avenir, la couche de deploiement pourra inclure :
 
-- reproducible Helm charts
-- Kustomize packages
-- automated cluster bootstrap
-- reference architectures for different deployment scales
+- des charts Helm reproductibles
+- des packages Kustomize
+- un bootstrap automatise de cluster
+- des architectures de reference pour differentes echelles de deploiement
 
 ---
 
-## Status
+## Statut
 
 Experimental.
 
-This directory documents the infrastructure used to validate the architecture concepts described in this repository.
-
----
+Ce repertoire documente l'infrastructure utilisee pour valider les concepts architecturaux decrits dans ce depot.

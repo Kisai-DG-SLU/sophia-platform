@@ -1,103 +1,79 @@
+# Modele de Securite SophIA
+
+La securite est un principe fondamental de conception de SophIA.
+
+L'architecture implemente une approche Zero Trust dans laquelle chaque composant est isole et autorise a communiquer uniquement avec les services explicitement autorises.
 
 ---
 
-# SOPHIA Security Model
+## Principes fondamentaux de securite
 
-Security is a fundamental design principle of SOPHIA.
+Le systeme est concu autour des principes suivants :
 
-The architecture implements a **Zero Trust approach** in which each component is isolated and allowed to communicate only with explicitly authorized services.
-
----
-
-# Core Security Principles
-
-The system is designed around the following principles:
-
-- Least privilege network access
-- Isolation between namespaces
-- controlled external connectivity
-- reproducible infrastructure
-- full traceability of AI interactions
+- Acces reseau par moindre privilege
+- Isolation entre les namespaces
+- Connectivite externe controlee
+- Infrastructure reproductible
+- Tracabilite complete des interactions IA
 
 ---
 
-# Network Segmentation
+## Segmentation reseau
 
-Each namespace belongs to a specific security zone.
+Chaque namespace appartient a une zone de securite specifique.
 
-| Zone | Purpose |
-|-----|--------|
-| brain | orchestration services |
-| air-gapped | local inference and memory |
-| outils | tooling and MCP services |
-| sas | external web acquisition |
-| dev | development environments |
-| frontend | user interfaces |
+| Zone       | Objectif                            |
+|------------|-------------------------------------|
+| brain      | services d'orchestration            |
+| air-gapped | inference locale et memoire         |
+| outils     | outils et services MCP              |
+| sas        | acquisition web externe             |
+| dev        | environnements de developpement     |
+| frontend   | interfaces utilisateur              |
 
-Network communication between zones is restricted using Kubernetes **NetworkPolicies**.
-
----
-
-# Air-Gapped Components
-
-Certain namespaces are intentionally isolated from external networks.
-
-Examples:
-
-- sophia-inference
-- sophia-memory
-
-These namespaces are prevented from accessing the internet to eliminate the risk of data exfiltration.
+Les communications reseau entre zones sont restreintes a l'aide de NetworkPolicies Kubernetes.
 
 ---
 
-# External Data Acquisition
+## Composants air-gapped
 
-External information is retrieved through a dedicated isolation layer.
-
-The **DMZ layer** is responsible for:
-
-- web extraction
-- content sanitization
-- removal of executable content
-- delivery of purified markdown data to the system
-
-This prevents malicious scripts or tracking mechanisms from entering the platform.
+Certains namespaces sont intentionnellement isoles des reseaux externes. Parmi les exemples : sophia-inference et sophia-memory. Ces namespaces n'ont pas acces a Internet afin d'eliminer tout risque d'exfiltration de donnees.
 
 ---
 
-# Data Protection
+## Acquisition de donnees externes
 
-Sensitive data is protected using several mechanisms:
+Les informations externes sont recuperees via une couche d'isolation dediee. La couche DMZ est responsable de l'extraction web, du nettoyage du contenu, de la suppression du contenu executable et de la livraison de donnees purifiees au format Markdown au systeme interne.
 
-- encrypted storage volumes
-- strict access control
-- secrets managed through Kubernetes
-- audit logging
-
-Persistent data such as vector databases and repository storage are hosted on encrypted volumes.
+Ce mecanisme empeche les scripts malveillants ou les mecanismes de tracage de penetrer dans la plateforme.
 
 ---
 
-# Prompt and Interaction Logging
+## Protection des donnees
 
-All AI interactions can be logged to ensure auditability.
+Les donnees sensibles sont protegees par plusieurs mecanismes :
 
-Logs include:
+- Volumes de stockage chiffres
+- Controle d'acces strict
+- Secrets geres via Kubernetes
+- Journalisation d'audit
 
-- prompts
-- responses
-- routing decisions
-- blocked requests
-
-This allows forensic analysis and traceability of AI behaviour.
+Les donnees persistantes telles que les bases vectorielles et les depots de code sont hebergees sur des volumes chiffres.
 
 ---
 
-# Future Security Enhancements
+## Journalisation des interactions
 
-Planned improvements include:
+Toutes les interactions IA peuvent etre journalisees pour garantir l'auditabilite. Les journaux incluent les prompts, les reponses, les decisions de routage et les requetes bloquees.
 
-- advanced DLP filtering
-- semantic verification pipelines
-- automated validation of external knowledge sources
+Cela permet une analyse forensique et une tracabilite du comportement de l'IA.
+
+---
+
+## Ameliorations futures de la securite
+
+Les ameliorations prevues incluent :
+
+- Filtrage DLP avance
+- Pipelines de verification semantique
+- Validation automatisee des sources de connaissance externes

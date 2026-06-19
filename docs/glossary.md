@@ -1,199 +1,149 @@
-# Glossary
+# Glossaire
 
-This glossary defines key terms used throughout the SOPHIA documentation.
+Ce glossaire definit les termes cles utilises dans la documentation SophIA.
 
-It includes both general AI concepts and terms specific to the architecture.
+Il inclut a la fois des concepts generaux de l'IA et des termes specifiques a l'architecture.
 
 ---
 
-# AI Concepts
+# Concepts IA
 
 ## LLM (Large Language Model)
 
-A machine learning model trained on large text datasets capable of generating and understanding natural language.
+Modele de langage entraine sur de grands ensembles de donnees textuelles, capable de generer et de comprendre le langage naturel.
 
-Examples include GPT-style models or open-source models such as Llama or Mistral.
+Exemples : modeles de type GPT, ou modeles open-source tels que Llama ou Mistral.
 
 ---
 
 ## RAG (Retrieval-Augmented Generation)
 
-A technique that improves language model responses by retrieving relevant information from an external knowledge base before generating an answer.
+Technique qui ameliore les reponses d'un modele de langage en recuperant des informations pertinentes depuis une base de connaissance externe avant de generer une reponse.
 
-This typically involves:
-
-- a vector database
-- embeddings
-- a retrieval pipeline
+Cela implique generalement une base vectorielle, des embeddings et un pipeline de recherche.
 
 ---
 
 ## Embeddings
 
-Vector representations of text used to compare semantic similarity between documents.
+Representations vectorielles du texte utilisees pour comparer la similarite semantique entre documents.
 
-Embeddings allow systems to retrieve relevant information from large document collections.
+Les embeddings permettent aux systemes de recuperer des informations pertinentes dans de grandes collections de documents.
 
 ---
 
-## Vector Database
+## Base vectorielle
 
-A database designed to store and search embeddings efficiently.
+Base de donnees conque pour stocker et rechercher efficacement des embeddings.
 
-Common vector databases include:
-
-- Qdrant
-- Weaviate
-- Pinecone
+Exemples courants : Qdrant, Weaviate, Milvus.
 
 ---
 
 ## Agent
 
-A software component capable of performing tasks using AI models and external tools.
+Composant logiciel capable d'effectuer des taches en utilisant des modeles d'IA et des outils externes.
 
-Agents may perform actions such as:
-
-- writing code
-- querying data
-- interacting with APIs
-- orchestrating workflows
+Les agents peuvent ecrire du code, interroger des donnees, interagir avec des API ou orchestrer des flux de travail.
 
 ---
 
-# SOPHIA Architecture Concepts
+# Concepts de l'architecture SophIA
 
-## SOPHIA
+## SophIA
 
-SOPHIA stands for **Sovereign Orchestrator Platform for Holistic Intelligence Architecture**.
+Acronyme de **Sovereign Orchestrator Platform for Holistic Intelligence Architecture**.
 
-It is an experimental architecture designed to orchestrate AI systems within a secure and sovereign infrastructure.
+Architecture experimentale conque pour orchestrer des systemes d'IA dans une infrastructure securisee et souveraine.
 
 ---
 
 ## Brain
 
-The **Brain** contains the memory and intellectual structure of a project.
+Le Brain contient la memoire et la structure intellectuelle d'un projet. Il inclut generalement les specifications, la configuration du projet et la memoire persistante.
 
-It typically includes:
-
-- specifications
-- project configuration
-- persistent memory
-
-The Brain does not contain executable code.
+Le Brain ne contient pas de code executable.
 
 ---
 
 ## Repository
 
-The repository contains the operational artifacts of a project.
+Le repository contient les artefacts operationnels d'un projet : code source, notebooks, jeux de donnees, sorties generees.
 
-Examples include:
-
-- source code
-- notebooks
-- datasets
-- generated outputs
-
-Repositories are usually managed through Git.
+Les repositories sont generalement geres via Git.
 
 ---
 
 ## Workspace
 
-A workspace is a temporary execution environment used by agents or users.
+Environnement d'execution temporaire utilise par les agents ou les utilisateurs. Caracteristiques : ephemere, reproductible, isole.
 
-Characteristics:
-
-- ephemeral
-- reproducible
-- isolated
-
-Workspaces may run locally or inside containerized environments.
+Les workspaces peuvent fonctionner localement ou dans des environnements conteneurises.
 
 ---
 
-## Project
+## Projet
 
-In SOPHIA, **everything is modeled as a project**.
-
-A project represents a unit of work that includes:
-
-- a Brain
-- a repository
-- one or more workspaces
+Dans SophIA, tout est modelise comme un projet. Un projet represente une unite de travail qui inclut un Brain, un repository et un ou plusieurs workspaces.
 
 ---
 
-# Security Concepts
+# Concepts de securite
 
-## Sas Paranoïaque
+## Sas Paranoiaque
 
-An isolated acquisition layer responsible for retrieving information from the internet while protecting the internal infrastructure.
+Couche d'acquisition isolee responsable de la recuperation d'informations depuis Internet tout en protegeant l'infrastructure interne.
 
-Its responsibilities include:
-
-- isolating web access
-- sanitizing content
-- preventing data leakage
+Ses responsabilites incluent : isolation de l'acces web, nettoyage du contenu, prevention des fuites de donnees.
 
 ---
 
-## Tribunal Sémantique
+## Tribunal Semantique
 
-A validation mechanism that evaluates the credibility of external information before integrating it into the knowledge base.
+Mecanisme de validation qui evalue la credibilite des informations externes avant leur integration dans la base de connaissance.
 
-Its purpose is to reduce the risk of ingesting unreliable or AI-generated content.
+Son objectif est de reduire le risque d'ingestion de contenu non fiable ou gener par IA.
 
 ---
 
-# Infrastructure Concepts
+# Concepts d'infrastructure
 
 ## Namespace
 
-A logical isolation boundary used in Kubernetes environments.
+Limite d'isolation logique utilisee dans les environnements Kubernetes.
 
-Namespaces allow components to be separated and secured within the same cluster.
+Les namespaces permettent de separer et securiser les composants au sein d'un meme cluster.
 
 ---
 
 ## DMZ (Demilitarized Zone)
 
-A network segment designed to isolate systems that interact with external networks.
+Segment reseau concu pour isoler les systemes qui interagissent avec les reseaux externes.
 
-In SOPHIA, the DMZ hosts services responsible for interacting with the public internet.
+Dans SophIA, la DMZ heberge les services responsables de l'interaction avec Internet.
 
 ---
 
 ## MCP (Model Context Protocol)
 
-A protocol used to expose tools and capabilities to AI models in a structured way.
+Protocole utilise pour exposer des outils et des capacites aux modeles d'IA de maniere structuree.
 
-MCP allows agents to discover and invoke external capabilities.
-
----
-
-# Governance Concepts
-
-## Context Management
-
-The process of constructing and controlling the information provided to AI models.
-
-Proper context management helps ensure:
-
-- predictable behavior
-- efficient use of context windows
-- reduced noise in prompts
+MCP permet aux agents de decouvrir et d'invoquer des capacites externes.
 
 ---
 
-## Workspace Management
+# Concepts de gouvernance
 
-The mechanisms used to manage execution environments for projects and agents.
+## Gestion de contexte
 
-This includes:
+Processus de construction et de controle des informations fournies aux modeles d'IA.
 
-- environment creation
-- isolation
-- reproducibility
+Une gestion de contexte appropriee garantit un comportement previsible, une utilisation efficace des fenetres de contexte et une reduction du bruit dans les prompts.
+
+---
+
+## Gestion des espaces de travail
+
+Mecanismes utilises pour gerer les environnements d'execution des projets et des agents.
+
+Cela inclut la creation d'environnements, l'isolation et la reproductibilite.

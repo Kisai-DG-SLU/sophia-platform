@@ -1,70 +1,70 @@
-# SOPHIA Roadmap
+# Feuille de Route SophIA
 
-The SOPHIA project evolves progressively from infrastructure experimentation to a complete sovereign AI platform.
-
----
-
-# Phase 0 — Infrastructure Foundations
-
-Completed.
-
-- bare metal server deployment
-- OKD cluster installation
-- secure VPN access
-- storage architecture
-- initial namespaces
+Le projet SophIA evolue progressivement de l'experimentation infrastructurelle vers une plateforme d'IA souveraine complete.
 
 ---
 
-# Phase 1 — Core Platform
+## Phase 0 : Fondations d'infrastructure
 
-In progress.
+Terminee.
 
-- LiteLLM routing layer
-- Forgejo deployment
-- local inference environment
-- vector memory infrastructure
-- MCP tooling
-
----
-
-# Phase 2 — Architecture Stabilization
-
-Planned.
-
-- workspace management
-- project model standardization
-- context management system
-- improved orchestration layer
-- documentation publication
+- Deploiement du serveur bare-metal
+- Installation du cluster OKD
+- Acces VPN securise
+- Architecture de stockage
+- Namespaces initiaux
 
 ---
 
-# Phase 3 — Security & Governance
+## Phase 1 : Plateforme centrale
 
-Future work.
+En cours.
 
-- DLP filtering pipeline
-- semantic validation system
-- advanced audit logging
-- knowledge verification workflows
-
----
-
-# Phase 4 — User Interfaces
-
-Future work.
-
-- system dashboard
-- knowledge interface
-- operational monitoring tools
+- Couche de routage LiteLLM
+- Deploiement de la plateforme Git
+- Environnement d'inference locale
+- Infrastructure de memoire vectorielle
+- Outils MCP
 
 ---
 
-# Phase 5 — Industrialization
+## Phase 2 : Stabilisation de l'architecture
 
-Long term.
+Planifiee.
 
-- reproducible deployment packages
-- reference architecture for organizations
-- support for multi-tenant deployments
+- Gestion des espaces de travail
+- Standardisation du modele de projet
+- Systeme de gestion de contexte
+- Amelioration de la couche d'orchestration
+- Publication de la documentation
+
+---
+
+## Phase 3 : Securite et gouvernance
+
+Travail futur.
+
+- Pipeline de filtrage DLP
+- Systeme de validation semantique
+- Journalisation d'audit avancee
+- Flux de verification des connaissances
+
+---
+
+## Phase 4 : Interfaces utilisateur
+
+Travail futur.
+
+- Tableau de bord systeme
+- Interface de connaissance
+- Outils de supervision operationnelle
+
+---
+
+## Phase 5 : Industrialisation
+
+Long terme.
+
+- Packages de deploiement reproductibles
+- Architecture de reference pour les organisations
+- Support pour les deploiements multi-locataires
