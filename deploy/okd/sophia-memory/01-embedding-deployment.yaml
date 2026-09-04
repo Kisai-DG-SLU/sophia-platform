@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sophia-embedding
+  name: sophia-embedding
+  namespace: ${SOPHIA_MEMORY_NAMESPACE:-sophia-memory}
+spec:
+  replicas: ${EMBEDDING_REPLICAS:-1}
+  selector:
+    matchLabels:
+      app: sophia-embedding
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: sophia-embedding
+    spec:
+      containers:
+      - env:
+        - name: MODEL_PATH
+          value: ${EMBEDDING_MODEL_PATH:-/models/bge-m3}
+        image: ${EMBEDDING_IMAGE:-image-registry.openshift-image-registry.svc:5000/sophia-memory/sophia-embedding:latest}
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        name: sophia-embedding
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: ${EMBEDDING_CPU_LIMIT:-2}
+            memory: ${EMBEDDING_MEM_LIMIT:-4Gi}
+          requests:
+            cpu: ${EMBEDDING_CPU_REQUEST:-1}
+            memory: ${EMBEDDING_MEM_REQUEST:-2Gi}
