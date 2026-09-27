@@ -44,5 +44,5 @@ Regardless of infrastructure choices, the following prerequisites apply:
 
 - a containerization environment (Kubernetes or equivalent)
 - a network isolation mechanism (network policies)
-- persistent storage for databases and repositories
+- persistent storage for databases and repositories, prepared and sized as described in [persistent storage](stockage-persistant.en.md)
 - secure access (VPN or equivalent) for administrators and users

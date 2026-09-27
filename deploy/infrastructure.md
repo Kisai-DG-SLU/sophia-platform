@@ -44,5 +44,5 @@ Quel que soit le choix d'infrastructure, les prerequis suivants s'appliquent :
 
 - un environnement de conteneurisation (Kubernetes ou equivalent)
 - un mecanisme d'isolation reseau (network policies)
-- un stockage persistant pour les bases de donnees et depots
+- un stockage persistant pour les bases de donnees et depots, prepare et dimensionne comme decrit dans [stockage persistant](stockage-persistant.md)
 - un acces securise (VPN ou equivalent) pour les administrateurs et utilisateurs

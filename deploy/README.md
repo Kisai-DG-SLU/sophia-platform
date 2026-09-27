@@ -16,6 +16,7 @@ Ce repertoire a pour but de :
 - illustrer comment les composants de la plateforme sont organises
 - documenter l'architecture des namespaces
 - permettre l'experimentation et la reproduction locale du systeme
+- dimensionner et preparer le stockage persistant : voir [stockage persistant](stockage-persistant.md)
 
 Cette configuration n'est pas destinee a etre une distribution prete pour la production. Elle sert d'exemple d'infrastructure utilise pour l'experimentation et la documentation.
 
