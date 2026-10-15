@@ -60,6 +60,7 @@ Typical namespaces include:
 | sophia-sandbox | development workspaces |
 | sophia-test | validation environments |
 | sophia-apps | user interfaces |
+| sophia-identity | identity and SSO (Keycloak) |
 
 This layout illustrates the **Hub & Spoke architecture** used by the platform.
 

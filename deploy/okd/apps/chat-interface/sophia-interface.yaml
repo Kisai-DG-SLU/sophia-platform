@@ -1,0 +1,213 @@
+# SophIA - Interface de production, namespace sophia-apps.
+#
+# Prérequis (l'administrateur, opérations sur les secrets) :
+#   - secret forgejo-build-credentials : basic-auth Forgejo (compte de build en lecture)
+#   - secret sophia-interface-litellm : LITELLM_API_KEY = virtual key LiteLLM dédiée à la prod
+#   - secret sophia-interface-oauth2  : client-secret (client Keycloak sophia-interface)
+#                                       et cookie-secret (32 caractères aléatoires)
+#
+# Chemin d'une requête : Route → oauth2-proxy :4180 (connexion Keycloak, realm sophia)
+# → nginx :8080 (front, liste blanche, clé LiteLLM, identité x-litellm-end-user-id) → LiteLLM.
+# Application : oc apply -f deploy/okd/sophia-interface.yaml ; oc start-build sophia-interface -n sophia-apps
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-interface
+  namespace: sophia-apps
+  labels: { app: sophia-interface }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-interface
+  namespace: sophia-apps
+  labels: { app: sophia-interface }
+spec:
+  source:
+    type: Git
+    git:
+      uri: http://forgejo-svc.sophia-git.svc.cluster.local:3000/ORGANISATION/chat-interface.git
+      ref: main
+    sourceSecret:
+      name: forgejo-build-credentials
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: deploy/Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: sophia-interface:latest
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3
+  resources:
+    limits: { cpu: "1", memory: 1Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-interface
+  namespace: sophia-apps
+  labels: { app: sophia-interface }
+  annotations:
+    # Nouveau build → nouvelle image → redéploiement automatique.
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-interface:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"interface\")].image"}]'
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: sophia-interface }
+  template:
+    metadata:
+      labels: { app: sophia-interface }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      volumes:
+        - name: oauth2
+          secret: { secretName: sophia-interface-oauth2, defaultMode: 0440 }
+      containers:
+        # Connexion obligatoire. Échanges serveur à serveur par le Service interne de
+        # Keycloak (pas de TLS ni de DNS public à résoudre) ; le navigateur, lui, passe
+        # par auth.apps.example.org. Les jetons portent l'émetteur public.
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
+          args:
+            - --http-address=0.0.0.0:4180
+            - --upstream=http://127.0.0.1:8080/
+            - --reverse-proxy=true
+            - --provider=keycloak-oidc
+            - --client-id=sophia-interface
+            - --client-secret-file=/etc/oauth2/client-secret
+            - --cookie-secret-file=/etc/oauth2/cookie-secret
+            - --cookie-name=_sophia
+            - --cookie-secure=true
+            - --cookie-refresh=1h
+            - --redirect-url=https://chat.example.org/oauth2/callback
+            - --whitelist-domain=chat.example.org
+            - --oidc-issuer-url=https://auth.apps.example.org/realms/sophia
+            - --skip-oidc-discovery=true
+            - --login-url=https://auth.apps.example.org/realms/sophia/protocol/openid-connect/auth
+            - --redeem-url=http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/token
+            - --oidc-jwks-url=http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/certs
+            - --backend-logout-url=http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/logout?id_token_hint={id_token}
+            - --scope=openid profile email
+            - --code-challenge-method=S256
+            - --email-domain=*
+            # Un utilisateur sans groupe n'entre pas.
+            - --allowed-group=admin
+            - --allowed-group=responsables
+            - --allowed-group=proteges
+            - --allowed-group=invites
+            - --pass-user-headers=true
+            - --skip-provider-button=true
+            - --silence-ping-logging=true
+          ports:
+            - { name: http, containerPort: 4180 }
+          volumeMounts:
+            - { name: oauth2, mountPath: /etc/oauth2, readOnly: true }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /ping, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ping, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+        - name: interface
+          image: sophia-interface:latest
+          ports:
+            - { name: nginx, containerPort: 8080 }
+          env:
+            - name: LITELLM_API_KEY
+              valueFrom:
+                secretKeyRef: { name: sophia-interface-litellm, key: LITELLM_API_KEY }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /, port: nginx }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: nginx }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-interface
+  namespace: sophia-apps
+  labels: { app: sophia-interface }
+spec:
+  selector: { app: sophia-interface }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sophia-interface
+  namespace: sophia-apps
+  labels: { app: sophia-interface }
+  annotations:
+    # Réponses longues en streaming (gros modèles).
+    haproxy.router.openshift.io/timeout: 900s
+spec:
+  host: chat.example.org
+  to: { kind: Service, name: sophia-interface }
+  port: { targetPort: http }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+# Entrée : seul le routeur OpenShift, vers oauth2-proxy (nginx :8080 n'est joignable
+# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak et le DNS du cluster.
+# Ne vise que les pods de l'interface : sophia-notebook, dans le même namespace, n'est pas concerné.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-interface
+  namespace: sophia-apps
+  labels: { app: sophia-interface }
+spec:
+  podSelector:
+    matchLabels: { app: sophia-interface }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }
+      ports:
+        - { protocol: TCP, port: 4180 }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: litellm }
+      ports:
+        - { protocol: TCP, port: 4000 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-identity }
+      ports:
+        - { protocol: TCP, port: 8080 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

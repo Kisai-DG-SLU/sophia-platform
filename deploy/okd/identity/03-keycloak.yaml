@@ -1,0 +1,48 @@
+# PIdent.3 — Instance Keycloak (CR de l'operator 26.8.1, API k8s.keycloak.org/v2beta1).
+#
+# TLS terminé par le routeur (Route edge) : Keycloak écoute en HTTP dans le cluster
+# et fait confiance aux en-têtes X-Forwarded-* du routeur.
+# Nom public : auth.apps.example.org — couvert par le joker DNS et le certificat
+# du routeur, résout aussi depuis le cluster.
+# backchannelDynamic : les proxys OIDC peuvent appeler Keycloak par son Service
+# interne, les jetons portent toujours l'émetteur public.
+---
+apiVersion: k8s.keycloak.org/v2beta1
+kind: Keycloak
+metadata:
+  name: sophia-keycloak
+  namespace: sophia-identity
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    host: postgres-sophia.sophia-core.svc.cluster.local
+    port: 5432
+    database: keycloak
+    usernameSecret: { name: keycloak-db, key: username }
+    passwordSecret: { name: keycloak-db, key: password }
+  http:
+    httpEnabled: true
+  hostname:
+    hostname: https://auth.apps.example.org
+    backchannelDynamic: true
+  proxy:
+    headers: xforwarded
+  ingress:
+    enabled: false
+  resources:
+    requests: { cpu: 200m, memory: 768Mi }
+    limits: { cpu: "2", memory: 1536Mi }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: keycloak
+  namespace: sophia-identity
+spec:
+  host: auth.apps.example.org
+  to: { kind: Service, name: sophia-keycloak-service }
+  port: { targetPort: 8080 }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
