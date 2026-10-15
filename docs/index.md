@@ -7,6 +7,7 @@ Bienvenue dans la documentation de l'architecture SophIA.
 ## Vue d'ensemble
 
 - [Pitch](pitch.md) — SophIA en une phrase, 30 secondes et 3 minutes
+- [Périmètre fonctionnel](functional-scope.md) — Ce que SophIA doit faire et pour qui, avec l'état de chaque fonction
 - [Architecture](architecture.md) — Principes, composants et organisation haut niveau
 - [Vision](vision.md) — Objectifs et motivations du projet
 - [Problem Space](problem-space.md) — Problématique adressée par SophIA

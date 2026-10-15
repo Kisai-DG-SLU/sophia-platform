@@ -7,6 +7,7 @@ Welcome to the SophIA architecture documentation.
 ## Overview
 
 - [Pitch](pitch.en.md) — SophIA in one sentence, 30 seconds and 3 minutes
+- [Functional scope](functional-scope.en.md) — What SophIA must do and for whom, with the status of each function
 - [Architecture](architecture.en.md) — Principles, components and high-level organization
 - [Vision](vision.en.md) — Project goals and motivations
 - [Problem Space](problem-space.en.md) — Problem space addressed by SophIA
