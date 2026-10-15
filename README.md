@@ -110,6 +110,7 @@ Le projet vise a evoluer vers une architecture de reference pour les infrastruct
 
 La documentation est organisee dans le repertoire [`docs/`](docs/index.md).
 
+- **[Pitch](docs/pitch.md)** — SophIA en une phrase, 30 secondes et 3 minutes
 - **[Architecture](docs/architecture.md)** — Principes, composants et organisation haut niveau
 - **[Securite](docs/security.md)** — Modele de securite et isolation
 - **[Vision](docs/vision.md)** — Objectifs et motivations du projet
