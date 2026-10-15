@@ -1,0 +1,35 @@
+# PIdent.1 — Namespace de l'identité et operator Keycloak officiel (OLM).
+#
+# installPlanApproval: Manual — toute installation ou mise à jour de l'operator
+# attend l'approbation de l'administrateur :
+#   oc get installplan -n sophia-identity
+#   oc patch installplan <nom> -n sophia-identity --type merge -p '{"spec":{"approved":true}}'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sophia-identity
+  labels:
+    zone: identite
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: sophia-identity
+  namespace: sophia-identity
+spec:
+  targetNamespaces:
+    - sophia-identity
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: keycloak-operator
+  namespace: sophia-identity
+spec:
+  name: keycloak-operator
+  channel: fast
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: keycloak-operator.v26.8.1
+  installPlanApproval: Manual

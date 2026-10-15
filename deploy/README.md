@@ -50,6 +50,7 @@ Le deploiement exemple utilise une architecture de namespaces segmentee. Les nam
 | sophia-sandbox   | environnements de developpement           |
 | sophia-test      | environnements de validation              |
 | sophia-apps      | interfaces utilisateur                    |
+| sophia-identity  | identité et SSO (Keycloak)                |
 
 Cette disposition illustre l'architecture Hub and Spoke utilisee par la plateforme.
 

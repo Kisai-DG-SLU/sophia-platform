@@ -1,0 +1,74 @@
+# PIdent.4 — Realm « sophia » : groupes, politique de mots de passe, premier client.
+#
+# Import unique : l'operator crée le realm s'il n'existe pas, il ne le met pas à jour
+# ensuite. Les évolutions passent par la console d'administration, puis sont reportées ici.
+#
+# Les utilisateurs ne sont PAS dans ce fichier (données personnelles, mots de passe) :
+# l'administrateur les crée dans la console et les place dans leur groupe.
+#
+# Le secret du client vient d'un Secret Kubernetes (placeholder), jamais du dépôt :
+#   oc create secret generic keycloak-client-sophia-interface -n sophia-identity \
+#     --from-literal=secret="$(openssl rand -hex 32)"
+---
+apiVersion: k8s.keycloak.org/v2beta1
+kind: KeycloakRealmImport
+metadata:
+  name: realm-sophia
+  namespace: sophia-identity
+spec:
+  keycloakCRName: sophia-keycloak
+  placeholders:
+    SOPHIA_INTERFACE_CLIENT_SECRET:
+      secret: { name: keycloak-client-sophia-interface, key: secret }
+  realm:
+    realm: sophia
+    displayName: SophIA
+    enabled: true
+    registrationAllowed: false
+    resetPasswordAllowed: false
+    rememberMe: true
+    loginWithEmailAllowed: true
+    bruteForceProtected: true
+    passwordPolicy: "length(12) and notUsername"
+    internationalizationEnabled: true
+    supportedLocales: [fr, en]
+    defaultLocale: fr
+    # Rôles de l'objectif fonctionnel (F8). Les niveaux de confidentialité
+    # s'appuieront sur ces groupes (P6).
+    groups:
+      - name: admin
+      - name: responsables
+      - name: proteges
+      - name: invites
+    # Pas de liste clientScopes : elle remplacerait les scopes par défaut de
+    # Keycloak (profile, email, basic, roles…) au lieu de s'y ajouter.
+    clients:
+      - clientId: sophia-interface
+        name: Interface SophIA
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: ${SOPHIA_INTERFACE_CLIENT_SECRET}
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        implicitFlowEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://chat.example.org/oauth2/callback
+        webOrigins:
+          - https://chat.example.org
+        attributes:
+          pkce.code.challenge.method: S256
+          post.logout.redirect.uris: https://chat.example.org/
+        # Les groupes de l'utilisateur dans le jeton (claim « groups »), sans scope dédié.
+        protocolMappers:
+          - name: groups
+            protocol: openid-connect
+            protocolMapper: oidc-group-membership-mapper
+            config:
+              claim.name: groups
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"

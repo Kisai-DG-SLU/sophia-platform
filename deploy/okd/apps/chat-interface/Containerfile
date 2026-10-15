@@ -1,0 +1,39 @@
+# SophIA - Interface de production (namespace sophia-apps)
+#
+# Même gabarit nginx et mêmes scripts de rendu que le pod de dev : l'application
+# est placée en /mnt/prod pour que nginx.conf.in serve tel quel. Seul nginx change :
+# celui du système au lieu de celui de pixi.
+#
+# Au démarrage (deploy/entrypoint.sh) : rendu de nginx.conf avec LITELLM_API_KEY
+# (secretKeyRef), rendu de pricing.json, puis nginx au premier plan.
+# OpenShift lance le conteneur avec un UID arbitraire du groupe 0 : les chemins
+# écrits au démarrage sont donnés au groupe 0.
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6
+
+RUN microdnf install -y nginx python3 \
+ && microdnf clean all
+
+WORKDIR /mnt/prod
+
+# Fichiers du front : la liste blanche de nginx.conf.in ne sert que ceux-là.
+COPY index.html models.js ./
+COPY css/ css/
+COPY js/ js/
+COPY images/ images/
+COPY deploy/nginx.conf.in deploy/render-config.py deploy/render-pricing.py deploy/entrypoint.sh deploy/
+
+# Le gabarit lit mime.types dans l'environnement pixi du pod de dev.
+# Journaux vers la sortie du conteneur (oc logs), pas dans des fichiers.
+RUN mkdir -p .pixi/envs/default/etc/nginx deploy/logs \
+ && ln -s /etc/nginx/mime.types .pixi/envs/default/etc/nginx/mime.types \
+ && ln -sf /dev/stdout deploy/logs/access.log \
+ && ln -sf /dev/stderr deploy/logs/error.log \
+ && chmod 755 deploy/entrypoint.sh \
+ && chgrp -R 0 /mnt/prod /var/lib/nginx /var/log/nginx /run \
+ && chmod -R g=u /mnt/prod /var/lib/nginx /var/log/nginx /run
+
+USER 1001
+EXPOSE 8080
+
+ENTRYPOINT ["/mnt/prod/deploy/entrypoint.sh"]
