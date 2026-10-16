@@ -1,0 +1,44 @@
+# Certificats de confiance — émetteur Let's Encrypt par validation DNS-01 (cert-manager).
+# Aucun port ouvert sur Internet : la propriété du domaine se prouve par un enregistrement
+# TXT _acme-challenge, posé puis retiré par cert-manager via l'API du fournisseur DNS.
+# Le bloc « solvers » est à adapter au fournisseur DNS : cert-manager en prend plusieurs en
+# charge nativement, et d'autres par webhook (voir la documentation de cert-manager).
+# Exemple ci-dessous : RFC 2136 (mise à jour DNS standard, clé TSIG dans un secret).
+# Adresse e-mail ACME facultative (rappels d'expiration) : « email: … » sous « acme: ».
+---
+# Recette d'abord : certificats de test (non reconnus par les navigateurs), quotas larges.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef: { name: letsencrypt-staging-account }
+    solvers:
+      - dns01:
+          rfc2136:
+            nameserver: "ns.example.org:53"
+            tsigKeyName: acme-update
+            tsigAlgorithm: HMACSHA256
+            tsigSecretSecretRef: { name: dns-update-key, key: tsig-secret }
+        selector:
+          dnsZones: [example.org]
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef: { name: letsencrypt-prod-account }
+    solvers:
+      - dns01:
+          rfc2136:
+            nameserver: "ns.example.org:53"
+            tsigKeyName: acme-update
+            tsigAlgorithm: HMACSHA256
+            tsigSecretSecretRef: { name: dns-update-key, key: tsig-secret }
+        selector:
+          dnsZones: [example.org]

@@ -1,0 +1,26 @@
+# Certificat par défaut du routeur OpenShift : toutes les Routes sans certificat propre le
+# présentent. Il couvre le joker *.apps et les noms hors joker.
+# cert-manager le renouvelle seul (30 jours avant l'échéance) ; le routeur recharge le
+# secret sans interruption.
+# issuerRef : letsencrypt-staging pour la recette, puis letsencrypt-prod.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sophia-ingress
+  namespace: openshift-ingress
+spec:
+  secretName: sophia-ingress-tls
+  issuerRef: { kind: ClusterIssuer, name: letsencrypt-staging }
+  commonName: "*.apps.example.org"
+  dnsNames:
+    - "*.apps.example.org"     # console, oauth, Keycloak (auth.apps), notebook…
+    - chat.example.org         # interface de discussion
+    - router.example.org       # routeur de modèles (LiteLLM)
+    - forge.example.org        # forge Git (Forgejo)
+    - queue.example.org        # file de messages (console de gestion)
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  duration: 2160h      # 90 jours (Let's Encrypt)
+  renewBefore: 720h    # renouvelé 30 jours avant

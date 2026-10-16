@@ -1,0 +1,82 @@
+# SearXNG, métamoteur auto-hébergé, dans le sas (sophia-dmz).
+# Joignable seulement par sophia-web (02-network.yaml). Sortie JSON, pas de limiteur
+# (instance privée), SafeSearch modéré par défaut — strict pour les protégés (par requête).
+# Prérequis (l'administrateur) : oc create secret generic searxng -n sophia-dmz --from-literal=SEARXNG_SECRET="$(openssl rand -hex 32)"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: searxng-settings
+  namespace: sophia-dmz
+data:
+  settings.yml: |
+    use_default_settings:
+      engines:
+        keep_only: [qwant, duckduckgo, brave, startpage, wikipedia, wikidata]
+    general:
+      instance_name: "SophIA"
+      enable_metrics: false
+    search:
+      safe_search: 1
+      autocomplete: ""
+      default_lang: "fr"
+      formats: [json]
+    server:
+      limiter: false
+      public_instance: false
+      image_proxy: false
+      method: "GET"
+    outgoing:
+      request_timeout: 4.0
+      max_request_timeout: 8.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng
+  namespace: sophia-dmz
+  labels: { app: searxng }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: searxng } }
+  template:
+    metadata:
+      labels: { app: searxng }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: searxng
+          image: docker.io/searxng/searxng:2026.9.30-a9d990033
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - name: SEARXNG_SECRET
+              valueFrom: { secretKeyRef: { name: searxng, key: SEARXNG_SECRET } }
+          volumeMounts:
+            - { name: settings, mountPath: /etc/searxng }
+            - { name: cache, mountPath: /var/cache/searxng }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+      volumes:
+        - name: settings
+          configMap: { name: searxng-settings }
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: searxng
+  namespace: sophia-dmz
+  labels: { app: searxng }
+spec:
+  selector: { app: searxng }
+  ports: [{ name: http, port: 8080, targetPort: http }]

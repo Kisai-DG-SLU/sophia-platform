@@ -1,0 +1,79 @@
+# NetworkPolicies du sas (sophia-dmz).
+# Le sas sort sur Internet (80, 443) et vers le DNS du cluster, JAMAIS vers les réseaux
+# internes : un modèle trompé par une page ne peut pas faire lire l'intérieur du cluster.
+# Entrées : sophia-web ← interface (sophia-apps) et agents (hermes-system) ; SearXNG ← sophia-web.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: sophia-dmz
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-internet-and-dns
+  namespace: sophia-dmz
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]
+      ports:
+        - { protocol: TCP, port: 80 }
+        - { protocol: TCP, port: 443 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-web-to-searxng
+  namespace: sophia-dmz
+spec:
+  podSelector: { matchLabels: { app: sophia-web } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app: searxng } }
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-web-ingress
+  namespace: sophia-dmz
+spec:
+  podSelector: { matchLabels: { app: sophia-web } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+          podSelector: { matchLabels: { app: sophia-interface } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: hermes-system } }
+      ports: [{ protocol: TCP, port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: searxng-ingress
+  namespace: sophia-dmz
+spec:
+  podSelector: { matchLabels: { app: searxng } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: sophia-web } }
+      ports: [{ protocol: TCP, port: 8080 }]

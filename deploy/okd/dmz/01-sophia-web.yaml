@@ -1,0 +1,77 @@
+# sophia-web : serveur MCP + REST de recherche web (sophia-dmz).
+# L'image est construite dans sophia-apps et tirée par sophia-dmz : aucun identifiant
+# Forgejo dans la zone exposée au web.
+# Build binaire, depuis une copie locale du code du service (le dépôt d'origine contient
+# des sous-modules SSH qu'un build Git d'OpenShift ne peut pas cloner) :
+#   oc start-build sophia-web -n sophia-apps --from-dir=<code de sophia-web> --follow
+# Prérequis (l'administrateur), une fois :
+#   oc policy add-role-to-user system:image-puller system:serviceaccount:sophia-dmz:default -n sophia-apps
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-web
+  namespace: sophia-apps
+  labels: { app: sophia-web }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-web
+  namespace: sophia-apps
+  labels: { app: sophia-web }
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy: { dockerfilePath: Containerfile }
+  output:
+    to: { kind: ImageStreamTag, name: "sophia-web:latest" }
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-web
+  namespace: sophia-dmz
+  labels: { app: sophia-web }
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-web:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sophia-web\")].image"}]'
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: sophia-web } }
+  template:
+    metadata:
+      labels: { app: sophia-web }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sophia-web
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-web:latest
+          ports: [{ name: http, containerPort: 8000 }]
+          env:
+            - { name: SEARXNG_URL, value: "http://searxng.sophia-dmz.svc.cluster.local:8080" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 20m, memory: 96Mi }
+            limits: { cpu: "1", memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-web
+  namespace: sophia-dmz
+  labels: { app: sophia-web }
+spec:
+  selector: { app: sophia-web }
+  ports: [{ name: http, port: 8000, targetPort: http }]
