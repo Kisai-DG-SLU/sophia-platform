@@ -64,7 +64,7 @@ Cinq niveaux de confidentialité, du plus ouvert au plus restreint : `public` > 
 | **Permissions** | rôles et niveaux de confidentialité ci-dessus ; alertes par mail, SMS ou interface | en cours : rôles et authentification unique (SSO) opérationnels ; confidentialité de la mémoire et alertes prévues |
 | **Connaissance externe sûre** | acquisition web isolée et nettoyée ([Sas Paranoïaque](concepts/04-sas-paranoiaque.md)), requêtes leurres ([Ghost Search](concepts/06-ghost-search.md)), validation croisée avant ingestion ([Tribunal Sémantique](concepts/05-tribunal-semantique.md)) | en cours : sas d'acquisition opérationnel (métamoteur auto-hébergé, pages réduites en texte sans script, adresses internes refusées) ; requêtes leurres et tribunal prévus |
 | **Filtre anti-fuite** | avant tout appel à un service distant : autoriser, anonymiser ou bloquer — voir [DLP Filter](concepts/07-dlp-filter.md) | prévu |
-| **Inférence** | un modèle par agent via le routeur ; bascule entre modèle distant et modèle local par simple routage ; mesure comparative de qualité et de coût | en cours : routeur opérationnel, inférence locale à déployer |
+| **Inférence** | un modèle par agent via le routeur ; bascule entre modèle distant et modèle local par simple routage ; mesure comparative de qualité et de coût | opérationnel : modèle local par défaut sur le GPU du serveur (appels d'outils fiables), modèles distants au choix pour le raisonnement long |
 | **Gouvernance** | coût par token et par projet, budgets par clé ; journal des requêtes, des routages et des blocages ; analyse a posteriori | en cours : coûts et budgets opérationnels |
 | **Industrialisation** | recette reproductible, environnements multi-locataires, architecture de référence | prévu |
 
@@ -80,7 +80,7 @@ Cinq niveaux de confidentialité, du plus ouvert au plus restreint : `public` > 
 | **Développement d'outils à la demande** | un besoin exprimé en discussion devient un projet ; un agent le code et le teste en sandbox ; un autre le déploie après validation humaine | en cours : environnements de développement pilotés par agents |
 | **Automatisation déterministe** | moteur de workflows déclenché par les agents, et pouvant les solliciter à une étape définie | prévu |
 | **Outils métier** | bureautique, graphisme, etc., exposés aux agents comme outils | prévu, à plus long terme |
-| **Voix et présence** | synthèse et reconnaissance vocales, speech-to-speech, vision ; à terme, un robot de compagnie open source pour une présence physique dans le lieu de vie | prévu, à plus long terme |
+| **Voix et présence** | synthèse et reconnaissance vocales, speech-to-speech, vision ; à terme, un robot de compagnie open source pour une présence physique dans le lieu de vie | en cours : reconnaissance et synthèse vocales locales sur CPU (dictée envoyée, réponse lue) ; speech-to-speech, vision et robot prévus |
 
 ---
 

@@ -1,0 +1,37 @@
+# Volume des modèles : LV lv-models (200 Go, XFS) monté sur /var/mnt/models.
+# Les fichiers GGUF y sont déposés depuis le nœud (README, étape 2) : le namespace
+# sophia-inference n'a jamais accès à Internet. Le serveur le monte en lecture seule.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-models
+  labels: { app: sophia-models }
+spec:
+  capacity: { storage: 200Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: /var/mnt/models
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: [master-0] }   # nom du nœud
+  claimRef:
+    namespace: sophia-inference
+    name: pvc-models
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-models
+  namespace: sophia-inference
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-models
+  resources:
+    requests: { storage: 200Gi }

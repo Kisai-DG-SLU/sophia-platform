@@ -1,0 +1,98 @@
+# Serveur d'inférence locale : llama.cpp, Qwen3.5-9B Q6_K, sur l'A2 (15 Go).
+#
+# Mémoire GPU visée (≈ 13 Go) : poids 7,5 Go + cache de contexte ≈ 4 Gio + tampons.
+# Qwen3.5 est hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token.
+# 131072 tokens au total, partagés entre 4 discussions en parallèle (≈ 32 000 chacune).
+# --jinja : gabarit de discussion du modèle, nécessaire aux appels d'outils (MCP, skills).
+# --reasoning off : pas de raisonnement interne par défaut (latence), réactivable par requête.
+# Aucune sortie réseau (04-network) : le serveur ne parle qu'à LiteLLM.
+#
+# Accès au GPU : « chemin pur » (contournement de l'opérateur NVIDIA, voir README).
+# L'opérateur NVIDIA ne fonctionne pas sur ce nœud (crochet du container toolkit en échec,
+# device plugin désactivé) : pas de ressource nvidia.com/gpu, conteneur privilégié qui voit
+# /dev/nvidia*, et libcuda.so.1 du pilote (550.90.07) montée depuis /var/lib/nvidia-pure.
+# SCC privileged accordée au compte default de sophia-inference.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-server
+  namespace: sophia-inference
+  labels: { app: llama-server }
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"llama-server:v0.5.0-cu124","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"llama-server\")].image"}]'
+spec:
+  replicas: 1
+  strategy: { type: Recreate }        # un seul GPU : l'ancien pod libère la carte avant le nouveau
+  selector: { matchLabels: { app: llama-server } }
+  template:
+    metadata:
+      labels: { app: llama-server }
+    spec:
+      priorityClassName: sophia-inference-high
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: llama-server
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/llama-server:v0.5.0-cu124
+          args:
+            - --model
+            - /models/qwen3.5-9b/Qwen3.5-9B-Q6_K.gguf
+            - --alias
+            - sophia-local
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --n-gpu-layers
+            - "999"
+            - --ctx-size
+            - "131072"
+            - --parallel
+            - "4"
+            - --jinja
+            # Raisonnement interne coupé par défaut (mesuré). Une requête
+            # peut le réactiver : chat_template_kwargs {"enable_thinking": true}.
+            - --reasoning
+            - "off"
+            - --metrics
+            - --no-webui
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - { name: LD_LIBRARY_PATH, value: /opt/nvidia-libs }
+          volumeMounts:
+            - { name: models, mountPath: /models, readOnly: true }
+            - { name: nvidia-libs, mountPath: /opt/nvidia-libs, readOnly: true }
+          securityContext:
+            privileged: true            # accès à /dev/nvidia* (chemin pur)
+          startupProbe:                 # chargement du modèle : jusqu'à 10 min
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "8", memory: 16Gi }
+      volumes:
+        - name: models
+          persistentVolumeClaim: { claimName: pvc-models, readOnly: true }
+        - name: nvidia-libs
+          hostPath: { path: /var/lib/nvidia-pure, type: Directory }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-server
+  namespace: sophia-inference
+  labels: { app: llama-server }
+spec:
+  selector: { app: llama-server }
+  ports: [{ name: http, port: 8080, targetPort: http }]
