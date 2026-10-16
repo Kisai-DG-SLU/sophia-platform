@@ -8,7 +8,7 @@ Un modèle de langage servi par le GPU du serveur, et une voix (reconnaissance e
 |---|---|---|
 | Modèle de texte | **Qwen3.5-9B**, GGUF **Q6_K** (7,5 Go, Apache 2.0) | **appels d'outils fiables** (MCP, skills, multi-agent) : tau2-bench ≈ 87, contre ≈ 36 pour un modèle de taille voisine essayé d'abord ; tient sur une carte de 16 Go avec du contexte |
 | Serveur | llama.cpp (`llama-server`), version figée | API compatible OpenAI, appels d'outils (`--jinja`), discussions en parallèle, cache de prompt |
-| Contexte | 4 discussions × 32 000 tokens | modèle hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token |
+| Contexte | cache en 8 bits et partagé : 245 760 tokens, 61 440 par discussion | modèle hybride (8 couches d'attention complète sur 32) : ≈ 17 Kio de cache par token en 8 bits ; même mémoire que 131 072 tokens en 16 bits |
 | Raisonnement interne | coupé par défaut (`--reasoning off`), réactivable par requête | mesuré : même fiabilité des outils, boucles deux fois plus rapides |
 | Image | construite dans le cluster, CUDA compatible avec le pilote du nœud | l'image officielle visait une version de CUDA plus récente que le pilote |
 | Accès au GPU | conteneur privilégié, bibliothèque du pilote (`libcuda.so.1`) montée depuis l'hôte, **sans** ressource `nvidia.com/gpu` | sur ce nœud, le crochet du *container toolkit* de l'opérateur NVIDIA échoue ; le *device plugin* est désactivé |
@@ -23,6 +23,8 @@ Un modèle de langage servi par le GPU du serveur, et une voix (reconnaissance e
 | Une discussion | 16,4 tokens/s, premier token 0,3 s |
 | Quatre discussions simultanées | 9,9 tokens/s chacune, 39 au total |
 | Boucle d'outil (recherche, météo, rappel), sans raisonnement | 4 à 21 s |
+| Information cachée dans ≈ 97 000 tokens | retrouvée (à 15 % et à 60 %) |
+| Lecture d'un très long prompt | ≈ 420 tokens/s (97 000 tokens ≈ 4 min) |
 
 ## Le service vocal (`sophia-voice`)
 
@@ -58,4 +60,4 @@ Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistr
 3. `00`, `01`, `04`, puis `03` et `05` : `--dry-run=server`, puis `apply`.
 4. Routeur de modèles : alias de texte et de voix, puis ajout des alias aux clés virtuelles restreintes.
 
-**Limites :** 4 discussions à la fois (une cinquième attend) ; 32 000 tokens par discussion ; voix d'un petit modèle sur CPU, correcte mais peu expressive.
+**Limites :** 4 discussions à la fois (une cinquième attend) ; 61 440 tokens par discussion, au-delà la discussion est résumée (échanges les plus anciens) et un fichier trop gros est refusé avec un message clair ; voix d'un petit modèle sur CPU, correcte mais peu expressive.

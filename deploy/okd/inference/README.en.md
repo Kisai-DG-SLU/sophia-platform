@@ -8,7 +8,7 @@ A language model served by the server's GPU, and a voice (recognition and synthe
 |---|---|---|
 | Text model | **Qwen3.5-9B**, GGUF **Q6_K** (7.5 GB, Apache 2.0) | **reliable tool calls** (MCP, skills, multi-agent): tau2-bench ≈ 87, against ≈ 36 for a similar-size model tried first; fits a 16 GB card with context |
 | Server | llama.cpp (`llama-server`), pinned version | OpenAI-compatible API, tool calls (`--jinja`), parallel conversations, prompt cache |
-| Context | 4 conversations × 32,000 tokens | hybrid model (8 full-attention layers out of 32): ≈ 32 KiB of cache per token |
+| Context | 8-bit shared cache: 245,760 tokens, 61,440 per conversation | hybrid model (8 full-attention layers out of 32): ≈ 17 KiB of cache per token in 8 bits; same memory as 131,072 tokens in 16 bits |
 | Internal reasoning | off by default (`--reasoning off`), can be re-enabled per request | measured: same tool reliability, loops twice as fast |
 | Image | built in the cluster, CUDA compatible with the node's driver | the official image targeted a newer CUDA than the driver |
 | GPU access | privileged container, driver library (`libcuda.so.1`) mounted from the host, **without** a `nvidia.com/gpu` resource | on this node the NVIDIA operator's container-toolkit hook fails; the device plugin is disabled |
@@ -23,6 +23,8 @@ A language model served by the server's GPU, and a voice (recognition and synthe
 | One conversation | 16.4 tokens/s, first token 0.3 s |
 | Four simultaneous conversations | 9.9 tokens/s each, 39 in total |
 | Tool loop (search, weather, reminder), without reasoning | 4 to 21 s |
+| Fact hidden in ≈ 97,000 tokens | found (at 15 % and 60 %) |
+| Reading a very long prompt | ≈ 420 tokens/s (97,000 tokens ≈ 4 min) |
 
 ## The voice service (`sophia-voice`)
 
@@ -58,4 +60,4 @@ Voices: the model's catalogue, or a voice converted from a freely licensed recor
 3. `00`, `01`, `04`, then `03` and `05`: `--dry-run=server`, then `apply`.
 4. Model router: text and voice aliases, then add the aliases to restricted virtual keys.
 
-**Limits:** 4 conversations at a time (a fifth waits); 32,000 tokens per conversation; voice from a small CPU model, correct but not very expressive.
+**Limits:** 4 conversations at a time (a fifth waits); 61,440 tokens per conversation, beyond that the conversation is summarised (oldest exchanges) and an oversized file is refused with a clear message; voice from a small CPU model, correct but not very expressive.
