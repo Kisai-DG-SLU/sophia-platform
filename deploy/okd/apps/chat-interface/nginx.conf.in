@@ -87,15 +87,19 @@ http {
         # root est le dépôt entier : .git/, deploy/nginx.conf (rendu, il contient
         # la clé LiteLLM), deploy/logs/… Seuls les fichiers du front sont servis,
         # tout le reste rend 404. Un nouveau dossier du front s'ajoute ici.
+        # Cache : le navigateur revalide la page et les scripts à chaque chargement (réponse
+        # 304 si rien n'a changé). Sans en-tête, Safari les garde des jours après une mise à
+        # jour (cache heuristique) : un correctif déployé restait invisible sur l'iPad.
         location = / {
+            add_header Cache-Control "no-cache";
             try_files /index.html =404;
         }
-        location = /index.html { }
-        location = /models.js { }
+        location = /index.html { add_header Cache-Control "no-cache"; }
+        location = /models.js { add_header Cache-Control "no-cache"; }
         location = /pricing.json { add_header Cache-Control "no-store"; }
-        location ^~ /css/ { }
-        location ^~ /js/ { }
-        location ^~ /images/ { }
+        location ^~ /css/ { add_header Cache-Control "no-cache"; }
+        location ^~ /js/ { add_header Cache-Control "no-cache"; }
+        location ^~ /images/ { add_header Cache-Control "max-age=86400"; }
 
         location / {
             return 404;
