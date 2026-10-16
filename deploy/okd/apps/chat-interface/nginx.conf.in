@@ -10,6 +10,8 @@
 # /api/ → LiteLLM interne, préfixe /api/ strippé, LISTE BLANCHE seulement :
 #   /api/v1/chat/completions → http://litellm-svc:4000/v1/chat/completions
 #   /api/v1/models, /api/health/liveliness
+# En prod, /api/v1/chat/completions passe par l'API des discussions (contexte
+# injecté) ; /api/store/ est l'API des discussions et des profils.
 # Tout autre /api/… rend 404 : sans cela, n'importe quel client du proxy
 # appellerait les routes d'administration de LiteLLM (/key/*, /user/*,
 # /model/*…) avec l'identité du pod.
@@ -36,6 +38,13 @@ http {
 
     access_log /mnt/prod/deploy/logs/access.log;
 
+    # Corps de requête : longues conversations, résultats de recherche. Au-delà du tampon,
+    # nginx écrit dans un fichier temporaire : chemins explicites dans deploy/logs (accessible
+    # en écriture en dev comme en prod), sinon le nginx de pixi répond 500.
+    client_body_buffer_size 128k;
+    client_body_temp_path /mnt/prod/deploy/logs/tmp-body;
+    proxy_temp_path /mnt/prod/deploy/logs/tmp-proxy;
+
     sendfile on;
     keepalive_timeout 65;
     gzip on;
@@ -46,6 +55,19 @@ http {
     map $http_x_forwarded_preferred_username $sophia_end_user {
         ""      $http_x_forwarded_email;
         default $http_x_forwarded_preferred_username;
+    }
+
+    # API des discussions et des profils (étapes 6b, 5c), conteneur voisin du pod.
+    upstream sophia_store {
+        server 127.0.0.1:8000;
+        keepalive 8;
+    }
+
+    # Discussions : en prod (identité présente), elles passent par l'API, qui
+    # injecte persona, profil et date avant LiteLLM. En dev, directement LiteLLM.
+    map $sophia_end_user $sophia_chat_upstream {
+        ""      litellm;
+        default sophia_store;
     }
 
     upstream litellm {
@@ -81,7 +103,25 @@ http {
 
         # Routes LiteLLM réellement appelées par le front (js/api.js).
         # Ajouter une route ici, jamais élargir à tout /api/.
-        location ~ ^/api/(v1/models|v1/chat/completions|health/liveliness)$ {
+        location = /api/v1/chat/completions {
+            rewrite ^/api/(.*)$ /$1 break;
+            proxy_pass http://$sophia_chat_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Host litellm-svc.sophia-core.svc.cluster.local:4000;
+            proxy_set_header Connection "";
+            proxy_set_header Authorization ${LITELLM_AUTH};
+            proxy_set_header x-litellm-customer-id "";
+            proxy_set_header x-litellm-end-user-id $sophia_end_user;
+            proxy_set_header X-Sophia-User $sophia_end_user;
+            proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_connect_timeout 10s;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 300s;
+        }
+
+        location ~ ^/api/(v1/models|health/liveliness)$ {
             rewrite ^/api/(.*)$ /$1 break;
             proxy_pass http://litellm;
             proxy_http_version 1.1;
@@ -108,6 +148,21 @@ http {
             proxy_connect_timeout 10s;
             proxy_send_timeout 300s;
             proxy_read_timeout 300s;
+        }
+
+        # API des discussions (étape 6b), conteneur voisin dans le pod. Identité
+        # imposée : celle d'oauth2-proxy, jamais celle du client. Sans identité
+        # (pod de dev, sans proxy), 404 : le front reste sur IndexedDB.
+        location ^~ /api/store/ {
+            if ($sophia_end_user = "") {
+                return 404;
+            }
+            proxy_pass http://127.0.0.1:8000;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header X-Sophia-User $sophia_end_user;
+            proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
+            proxy_read_timeout 60s;
         }
 
         location /api/ {

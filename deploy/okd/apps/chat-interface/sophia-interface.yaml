@@ -5,9 +5,14 @@
 #   - secret sophia-interface-litellm : LITELLM_API_KEY = virtual key LiteLLM dédiée à la prod
 #   - secret sophia-interface-oauth2  : client-secret (client Keycloak sophia-interface)
 #                                       et cookie-secret (32 caractères aléatoires)
+#   - secret sophia-chat-db           : PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
+#                                       (base sophia_chat, étape 6b)
+#   - secret sophia-chat-forgejo      : FORGEJO_TOKEN du compte de service Forgejo « sophia-chat »
+#                                       (projets, étape 6b.2) — optionnel : sans lui, projet global seul
 #
 # Chemin d'une requête : Route → oauth2-proxy :4180 (connexion Keycloak, realm sophia)
 # → nginx :8080 (front, liste blanche, clé LiteLLM, identité x-litellm-end-user-id) → LiteLLM.
+#                └ /api/store/ → API des discussions 127.0.0.1:8000 → PostgreSQL sophia_chat.
 # Application : oc apply -f deploy/okd/sophia-interface.yaml ; oc start-build sophia-interface -n sophia-apps
 ---
 apiVersion: image.openshift.io/v1
@@ -53,7 +58,7 @@ metadata:
   labels: { app: sophia-interface }
   annotations:
     # Nouveau build → nouvelle image → redéploiement automatique.
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-interface:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"interface\")].image"}]'
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-interface:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"interface\")].image"},{"from":{"kind":"ImageStreamTag","name":"sophia-interface:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"store-api\")].image"}]'
 spec:
   replicas: 1
   selector:
@@ -142,6 +147,30 @@ spec:
           resources:
             requests: { cpu: 20m, memory: 64Mi }
             limits: { cpu: 500m, memory: 256Mi }
+        # API des discussions : n'écoute que dans le pod, derrière nginx.
+        - name: store-api
+          image: sophia-interface:latest
+          workingDir: /mnt/prod
+          command: [python3.12, -m, uvicorn, api.app:app, --host, 127.0.0.1, --port, "8000", --no-access-log]
+          envFrom:
+            - secretRef: { name: sophia-chat-db }
+            - secretRef: { name: sophia-chat-forgejo, optional: true }
+          env:
+            - { name: SOPHIA_FAMILY_ORG, value: famille }
+            - { name: SOPHIA_BRAIN_REPO, value: ORGANISATION/brain }
+            - { name: SOPHIA_PROMOTE_TARGETS, value: '{"famille": "Famille", "projets-perso": "Perso"}' }
+            # Recherche web (PWeb) : serveur sophia-web du sas. Vide = pas de recherche.
+            - { name: SOPHIA_WEB_URL, value: "http://sophia-web.sophia-dmz.svc.cluster.local:8000" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            exec: { command: [python3.12, -c, "import urllib.request,sys; r=urllib.request.Request('http://127.0.0.1:8000/api/store/health', headers={'X-Sophia-User':'sonde'}); sys.exit(0 if urllib.request.urlopen(r, timeout=3).status==200 else 1)"] }
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests: { cpu: 20m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
 ---
 apiVersion: v1
 kind: Service
@@ -172,7 +201,7 @@ spec:
     insecureEdgeTerminationPolicy: Redirect
 ---
 # Entrée : seul le routeur OpenShift, vers oauth2-proxy (nginx :8080 n'est joignable
-# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak et le DNS du cluster.
+# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak, PostgreSQL, Forgejo, le sas web et le DNS du cluster.
 # Ne vise que les pods de l'interface : sophia-notebook, dans le même namespace, n'est pas concerné.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -203,6 +232,25 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: sophia-identity }
       ports:
         - { protocol: TCP, port: 8080 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: postgres-sophia }
+      ports:
+        - { protocol: TCP, port: 5432 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-git }
+      ports:
+        - { protocol: TCP, port: 3000 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-dmz }
+          podSelector:
+            matchLabels: { app: sophia-web }
+      ports:
+        - { protocol: TCP, port: 8000 }
     - to:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: openshift-dns }

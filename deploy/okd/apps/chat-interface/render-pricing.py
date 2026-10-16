@@ -14,7 +14,9 @@ Règles :
   s'il n'existe pas), code retour 0 — un tarif manquant ne bloque pas nginx ;
 - un modèle sans tarif connu est omis : le front garde 0.
 
-Usage : python3 deploy/render-pricing.py
+Usage : python3 deploy/render-pricing.py [--status]
+  --status : code retour 1 si les tarifs n'ont pas pu être lus (pour la boucle de
+             rafraîchissement de deploy/entrypoint.sh) ; sans l'option, toujours 0.
 """
 
 import json
@@ -53,14 +55,25 @@ def extract(info):
     return pricing
 
 
+STATUS = "--status" in sys.argv[1:]
+
+
+def write_atomic(text: str) -> None:
+    """Écriture atomique : nginx ne sert jamais un fichier à moitié écrit."""
+    tmp = OUTPUT.with_name(OUTPUT.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.chmod(0o644)
+    os.replace(tmp, OUTPUT)
+
+
 def keep_previous(reason):
     print(f"[pricing] AVERTISSEMENT: {reason}", file=sys.stderr)
     if not OUTPUT.exists():
-        OUTPUT.write_text("{}\n", encoding="utf-8")
+        write_atomic("{}\n")
         print(f"[pricing] {OUTPUT.name} vide créé : coûts affichés à 0.", file=sys.stderr)
     else:
         print(f"[pricing] {OUTPUT.name} précédent conservé.", file=sys.stderr)
-    return 0
+    return 1 if STATUS else 0
 
 
 def main() -> int:
@@ -79,8 +92,7 @@ def main() -> int:
         return keep_previous("réponse de /v1/model/info illisible (JSON invalide).")
 
     pricing = extract(info)
-    OUTPUT.write_text(json.dumps(pricing, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    OUTPUT.chmod(0o644)
+    write_atomic(json.dumps(pricing, indent=2, sort_keys=True) + "\n")
     for name, p in sorted(pricing.items()):
         print(f"[pricing] {name}: ${p['inputPer1M']} → ${p['outputPer1M']} /M")
     print(f"[pricing] {OUTPUT} généré ({len(pricing)} modèle(s) tarifé(s)).")

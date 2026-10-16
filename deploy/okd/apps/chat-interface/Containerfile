@@ -11,8 +11,12 @@
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6
 
-RUN microdnf install -y nginx python3 \
+RUN microdnf install -y nginx python3 python3.12 python3.12-pip \
  && microdnf clean all
+
+# API des discussions (étape 6b) : conteneur voisin de nginx, même image.
+COPY api/requirements.txt /opt/sophia-api/requirements.txt
+RUN python3.12 -m pip install --no-cache-dir -r /opt/sophia-api/requirements.txt
 
 WORKDIR /mnt/prod
 
@@ -22,6 +26,7 @@ COPY css/ css/
 COPY js/ js/
 COPY images/ images/
 COPY deploy/nginx.conf.in deploy/render-config.py deploy/render-pricing.py deploy/entrypoint.sh deploy/
+COPY api/__init__.py api/app.py api/access.py api/profile.py api/forgejo.py api/websearch.py api/schema.sql api/persona-sophia.md api/
 
 # Le gabarit lit mime.types dans l'environnement pixi du pod de dev.
 # Journaux vers la sortie du conteneur (oc logs), pas dans des fichiers.
