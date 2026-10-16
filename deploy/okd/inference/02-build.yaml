@@ -1,0 +1,61 @@
+# Image llama.cpp (serveur), construite dans sophia-apps puis tirée par sophia-inference.
+# Pourquoi notre propre image (risque R1) : l'image officielle est compilée pour CUDA 12.8,
+# le pilote du nœud (550.90.07) s'arrête à CUDA 12.4. Ici : CUDA 12.4.1, architecture sm_86
+# seule (NVIDIA A2), llama.cpp figé sur un commit vérifié.
+# Lancer : oc start-build llama-server -n sophia-apps --follow   (≈ 15 à 30 min)
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: llama-server
+  namespace: sophia-apps
+  labels: { app: llama-server }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: llama-server
+  namespace: sophia-apps
+  labels: { app: llama-server }
+spec:
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
+  output:
+    to: { kind: ImageStreamTag, name: "llama-server:v0.5.0-cu124" }
+  resources:
+    requests: { cpu: "4", memory: 8Gi }
+    limits: { cpu: "16", memory: 24Gi }
+  strategy:
+    type: Docker
+    dockerStrategy:
+      buildArgs:
+        - { name: LLAMA_REF, value: v0.5.0 }
+        - { name: LLAMA_SHA, value: 7fe450e19305b828c199d602c23a8337aaa1f03b }
+  source:
+    type: Dockerfile
+    dockerfile: |
+      FROM docker.io/nvidia/cuda:12.4.1-devel-ubuntu22.04 AS build
+      ARG LLAMA_REF
+      ARG LLAMA_SHA
+      RUN apt-get update && apt-get install -y --no-install-recommends git cmake build-essential ca-certificates \
+       && rm -rf /var/lib/apt/lists/*
+      RUN git clone --depth 1 --branch "$LLAMA_REF" https://github.com/ggml-org/llama.cpp /src \
+       && test "$(git -C /src rev-parse HEAD)" = "$LLAMA_SHA" || { echo "commit inattendu"; exit 1; }
+      WORKDIR /src
+      # libcuda.so n'existe qu'au lancement (fournie par le pilote) : édition de liens sur le stub.
+      # Interface web désactivée (sinon téléchargée depuis Hugging Face au build) : --no-webui.
+      RUN cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DGGML_NATIVE=OFF \
+            -DBUILD_SHARED_LIBS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+            -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_OPENSSL=OFF \
+            -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,--allow-shlib-undefined" \
+       && cmake --build build --config Release -j 16 --target llama-server
+
+      FROM docker.io/nvidia/cuda:12.4.1-runtime-ubuntu22.04
+      RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl \
+       && rm -rf /var/lib/apt/lists/*
+      COPY --from=build /src/build/bin/llama-server /usr/local/bin/llama-server
+      USER 1001
+      EXPOSE 8080
+      HEALTHCHECK NONE
+      ENTRYPOINT ["/usr/local/bin/llama-server"]

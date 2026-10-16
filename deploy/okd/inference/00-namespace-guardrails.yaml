@@ -1,0 +1,34 @@
+# Garde-fous de sophia-inference (namespace existant, label zone=air-gapped).
+# PriorityClass : le serveur d'inférence passe devant les autres consommateurs du GPU
+# (runner GPU, sondes) et peut les évincer (risque R6).
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-inference-high
+value: 1000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Serveur d'inférence locale SophIA : prioritaire sur le GPU"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: inference-quota
+  namespace: sophia-inference
+spec:
+  hard:
+    limits.memory: 24Gi
+    limits.cpu: "16"         # texte 8 + voix 4 + marge (redémarrages)
+    pods: "4"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: inference-defaults
+  namespace: sophia-inference
+spec:
+  limits:
+    - type: Container
+      default: { cpu: 500m, memory: 512Mi }
+      defaultRequest: { cpu: 50m, memory: 64Mi }

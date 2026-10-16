@@ -1,0 +1,61 @@
+# Inférence locale — texte et voix (`sophia-inference`)
+
+Un modèle de langage servi par le GPU du serveur, et une voix (reconnaissance et synthèse) servie par son CPU, routés par le routeur de modèles comme les modèles distants : **même interface, bascule par simple choix du modèle, aucune donnée ne sort du cluster.** Le namespace n'a **aucune sortie réseau** : les modèles sont déposés depuis le nœud, à des révisions et empreintes figées.
+
+## Choix
+
+| Élément | Choix | Raison |
+|---|---|---|
+| Modèle de texte | **Qwen3.5-9B**, GGUF **Q6_K** (7,5 Go, Apache 2.0) | **appels d'outils fiables** (MCP, skills, multi-agent) : tau2-bench ≈ 87, contre ≈ 36 pour un modèle de taille voisine essayé d'abord ; tient sur une carte de 16 Go avec du contexte |
+| Serveur | llama.cpp (`llama-server`), version figée | API compatible OpenAI, appels d'outils (`--jinja`), discussions en parallèle, cache de prompt |
+| Contexte | 4 discussions × 32 000 tokens | modèle hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token |
+| Raisonnement interne | coupé par défaut (`--reasoning off`), réactivable par requête | mesuré : même fiabilité des outils, boucles deux fois plus rapides |
+| Image | construite dans le cluster, CUDA compatible avec le pilote du nœud | l'image officielle visait une version de CUDA plus récente que le pilote |
+| Accès au GPU | conteneur privilégié, bibliothèque du pilote (`libcuda.so.1`) montée depuis l'hôte, **sans** ressource `nvidia.com/gpu` | sur ce nœud, le crochet du *container toolkit* de l'opérateur NVIDIA échoue ; le *device plugin* est désactivé |
+| Reconnaissance vocale | **Parakeet TDT 0.6B v3** (ONNX int8), CPU | ≈ 5 % d'erreurs en français, 0,4 à 0,6 s par phrase |
+| Synthèse vocale | **Pocket TTS** (modèle français, int8), CPU | premier son en 75 ms, 4,6 fois plus vite que le temps réel ; le GPU reste au texte |
+
+## Mesures (carte d'entrée de gamme de 16 Go, CPU Xeon de 2016)
+
+| Mesure | Résultat |
+|---|---|
+| Appels d'outils (bon outil, arguments JSON valides, résultat exploité) | 8/8 |
+| Une discussion | 16,4 tokens/s, premier token 0,3 s |
+| Quatre discussions simultanées | 9,9 tokens/s chacune, 39 au total |
+| Boucle d'outil (recherche, météo, rappel), sans raisonnement | 4 à 21 s |
+
+## Le service vocal (`sophia-voice`)
+
+Le code n'est pas fourni ; son contrat (API OpenAI, routée par le routeur de modèles) :
+
+| Route | Rôle |
+|---|---|
+| `POST /v1/audio/transcriptions` | audio des navigateurs (webm/opus, mp4/aac, wav) → texte |
+| `POST /v1/audio/speech` | texte → WAV ; voix sur liste blanche, inconnue → voix par défaut |
+| `GET /v1/voices`, `GET /health` | voix disponibles, état |
+
+Règles : **nombres, heures, dates et opérations écrits en lettres avant la synthèse** (le modèle ne lit pas les chiffres) ; Markdown, liens, emojis et annonces d'outils retirés ; audio ≤ 10 Mo et ≤ 120 s, texte ≤ 2 000 caractères ; un traitement à la fois par modèle. Côté interface : la phrase dictée est envoyée, et la réponse est lue à voix haute, phrase par phrase.
+
+Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistrement sous licence libre (`export-voices.sh`, sur le nœud, avec la version « clonage » du modèle). Jamais la voix d'une personne sans son accord.
+
+## Fichiers
+
+| Fichier | Contenu |
+|---|---|
+| `00-namespace-guardrails.yaml` | `PriorityClass`, `ResourceQuota`, `LimitRange` |
+| `01-storage.yaml` | volume local des modèles, monté en lecture seule |
+| `02-build.yaml` | image du serveur de texte |
+| `03-llama-server.yaml` | serveur de texte (GPU) et Service |
+| `04-network.yaml` | tout refusé, sauf le routeur de modèles vers les deux services |
+| `05-voice.yaml` | build et déploiement du service vocal (CPU) |
+| `fetch-voice-models.sh`, `export-voices.sh` | modèles et voix, déposés depuis le nœud |
+| `bench.py` | banc d'essai : appels d'outils, débit seul et à quatre — **contre le serveur seul, jamais en production** |
+
+## Procédure (l'administrateur)
+
+1. Modèle de texte déposé sur le nœud (`curl` à une révision figée, `sha256sum -c`, étiquette SELinux `container_file_t`) ; modèles vocaux : `fetch-voice-models.sh`.
+2. Images : `oc start-build` du serveur de texte et du service vocal.
+3. `00`, `01`, `04`, puis `03` et `05` : `--dry-run=server`, puis `apply`.
+4. Routeur de modèles : alias de texte et de voix, puis ajout des alias aux clés virtuelles restreintes.
+
+**Limites :** 4 discussions à la fois (une cinquième attend) ; 32 000 tokens par discussion ; voix d'un petit modèle sur CPU, correcte mais peu expressive.

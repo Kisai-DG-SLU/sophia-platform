@@ -1,0 +1,91 @@
+# sophia-voice : transcription (Parakeet) et synthèse (Pocket TTS), sur CPU.
+# Code du service non fourni (contrat : README). Image construite dans sophia-apps (build binaire,
+# depuis une copie locale du code), tirée par sophia-inference.
+#   oc start-build sophia-voice -n sophia-apps --from-dir=<code de sophia-voice> --follow
+# Modèles : /var/mnt/models/voice (fetch-voice-models.sh, depuis le nœud), via pvc-models.
+# Pas de GPU : le modèle de texte garde la carte. Pas de sortie réseau (04-network).
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-voice
+  namespace: sophia-apps
+  labels: { app: sophia-voice }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-voice
+  namespace: sophia-apps
+  labels: { app: sophia-voice }
+spec:
+  source: { type: Binary }
+  strategy:
+    type: Docker
+    dockerStrategy: { dockerfilePath: Containerfile }
+  output:
+    to: { kind: ImageStreamTag, name: "sophia-voice:latest" }
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-voice
+  namespace: sophia-inference
+  labels: { app: sophia-voice }
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-voice:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sophia-voice\")].image"}]'
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: sophia-voice } }
+  template:
+    metadata:
+      labels: { app: sophia-voice }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sophia-voice
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-voice:latest
+          ports: [{ name: http, containerPort: 8000 }]
+          env:
+            - { name: DEFAULT_VOICE, value: estelle }
+            - { name: TTS_THREADS, value: "4" }
+            - { name: ASR_THREADS, value: "4" }
+          volumeMounts:
+            - { name: models, mountPath: /models/voice, subPath: voice, readOnly: true }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          startupProbe:                 # chargement des modèles et préchauffage : ≈ 15 s
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+            limits: { cpu: "4", memory: 4Gi }
+      volumes:
+        - name: models
+          persistentVolumeClaim: { claimName: pvc-models, readOnly: true }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-voice
+  namespace: sophia-inference
+  labels: { app: sophia-voice }
+spec:
+  selector: { app: sophia-voice }
+  ports: [{ name: http, port: 8000, targetPort: http }]

@@ -1,0 +1,41 @@
+# Réseau de sophia-inference (zone air-gapped) : tout refusé, sauf LiteLLM → 8080.
+# Aucune sortie : ni Internet, ni le reste du cluster. Les sondes du kubelet (trafic du nœud)
+# restent acceptées par OVN-Kubernetes.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: sophia-inference
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: llama-server-from-litellm
+  namespace: sophia-inference
+spec:
+  podSelector: { matchLabels: { app: llama-server } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-core } }
+          podSelector: { matchLabels: { app: litellm } }
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+# sophia-voice : entrée depuis LiteLLM seulement, comme le serveur de texte.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-voice-from-litellm
+  namespace: sophia-inference
+spec:
+  podSelector: { matchLabels: { app: sophia-voice } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-core } }
+          podSelector: { matchLabels: { app: litellm } }
+      ports: [{ protocol: TCP, port: 8000 }]

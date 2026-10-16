@@ -64,7 +64,7 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 | **Permissions** | roles and confidentiality levels above; alerts by email, SMS or interface | in progress: roles and single sign-on (SSO) operational; memory confidentiality and alerts planned |
 | **Safe external knowledge** | isolated, sanitized web acquisition ([Paranoid Airlock](concepts/04-sas-paranoiaque.en.md)), decoy queries ([Ghost Search](concepts/06-ghost-search.en.md)), cross-validation before ingestion ([Semantic Tribunal](concepts/05-tribunal-semantique.en.md)) | in progress: acquisition airlock operational (self-hosted metasearch, pages reduced to text without scripts, internal addresses refused); decoy queries and tribunal planned |
 | **Leak filter** | before any call to a remote service: allow, anonymize or block — see [DLP Filter](concepts/07-dlp-filter.en.md) | planned |
-| **Inference** | one model per agent through the router; switching between a remote and a local model is a routing change; comparative quality and cost measurement | in progress: router operational, local inference to be deployed |
+| **Inference** | one model per agent through the router; switching between a remote and a local model is a routing change; comparative quality and cost measurement | operational: local model by default on the server's GPU (reliable tool calls), remote models available for long reasoning |
 | **Governance** | cost per token and per project, per-key budgets; log of requests, routing decisions and blocks; after-the-fact analysis | in progress: costs and budgets operational |
 | **Industrialization** | reproducible recipe, multi-tenant environments, reference architecture | planned |
 
@@ -80,7 +80,7 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 | **On-demand tool development** | a need expressed in conversation becomes a project; one agent codes and tests it in the sandbox; another deploys it after human approval | in progress: development environments driven by agents |
 | **Deterministic automation** | workflow engine triggered by agents, and able to call on them at a defined step | planned |
 | **Business tools** | office, graphics, etc., exposed to agents as tools | planned, longer term |
-| **Voice and presence** | speech synthesis and recognition, speech-to-speech, vision; eventually an open-source companion robot for a physical presence in the living space | planned, longer term |
+| **Voice and presence** | speech synthesis and recognition, speech-to-speech, vision; eventually an open-source companion robot for a physical presence in the living space | in progress: local speech recognition and synthesis on CPU (dictation sent, reply read aloud); speech-to-speech, vision and robot planned |
 
 ---
 
