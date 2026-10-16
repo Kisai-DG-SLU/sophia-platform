@@ -59,10 +59,10 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 | **Orchestrator** | main interlocutor: listens, challenges the request, validates the plan (intent, action, report), writes the specification to Git, delegates, turns the agents' results into a readable report. **It never modifies the infrastructure itself** | in progress |
 | **Agent pantheon** | one agent per domain: read-only supervision, sandboxed development, application deployment, infrastructure maintenance. Human approval on deployment and infrastructure — see [Agentic Pantheon](concepts/08-pantheon-agentique.en.md) | in progress: agents deployed |
 | **Asynchronous messaging** | one queue per agent, dead-letter queues, progress events. Rationale: a delegation that codes, tests and fixes exceeds the time limits of a synchronous call | planned |
-| **Projects and conversations** | attachment and promotion of conversations (principle above), history kept and retrievable | in progress: local history in the interface |
+| **Projects and conversations** | attachment and promotion of conversations (principle above), history kept and retrievable; per-project rights (hiding, invitations), attachment requests approved by an adult, a private journal per person | operational: server-side conversations, projects = Git repositories, rights and journal |
 | **Memory** | see the next section | in progress: layers deployed, ingestion to be built |
-| **Permissions** | roles and confidentiality levels above; alerts by email, SMS or interface | planned |
-| **Safe external knowledge** | isolated, sanitized web acquisition ([Paranoid Airlock](concepts/04-sas-paranoiaque.en.md)), decoy queries ([Ghost Search](concepts/06-ghost-search.en.md)), cross-validation before ingestion ([Semantic Tribunal](concepts/05-tribunal-semantique.en.md)) | planned |
+| **Permissions** | roles and confidentiality levels above; alerts by email, SMS or interface | in progress: roles and single sign-on (SSO) operational; memory confidentiality and alerts planned |
+| **Safe external knowledge** | isolated, sanitized web acquisition ([Paranoid Airlock](concepts/04-sas-paranoiaque.en.md)), decoy queries ([Ghost Search](concepts/06-ghost-search.en.md)), cross-validation before ingestion ([Semantic Tribunal](concepts/05-tribunal-semantique.en.md)) | in progress: acquisition airlock operational (self-hosted metasearch, pages reduced to text without scripts, internal addresses refused); decoy queries and tribunal planned |
 | **Leak filter** | before any call to a remote service: allow, anonymize or block — see [DLP Filter](concepts/07-dlp-filter.en.md) | planned |
 | **Inference** | one model per agent through the router; switching between a remote and a local model is a routing change; comparative quality and cost measurement | in progress: router operational, local inference to be deployed |
 | **Governance** | cost per token and per project, per-key budgets; log of requests, routing decisions and blocks; after-the-fact analysis | in progress: costs and budgets operational |
@@ -74,8 +74,8 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 
 | Block | What it does | Status |
 |---|---|---|
-| **Conversation** | multi-model web interface, with displayed cost and history; no key in the browser | in progress |
-| **Search** | memory first; the web through the airlock when information is missing, with consent before storing | planned |
+| **Conversation** | multi-model web interface, with displayed cost and history; no key in the browser; mandatory sign-in, profile and context adapted to each person (current date and time included) | operational |
+| **Search** | memory first; the web through the airlock when information is missing, sources ranked by reliability and cited; forecast data for weather; consent before storing | in progress: web search operational, memory to be built |
 | **Arbiter** | a high-end external model, queried by the agents through the message queue, **after anonymization** by the leak filter | planned |
 | **On-demand tool development** | a need expressed in conversation becomes a project; one agent codes and tests it in the sandbox; another deploys it after human approval | in progress: development environments driven by agents |
 | **Deterministic automation** | workflow engine triggered by agents, and able to call on them at a defined step | planned |
