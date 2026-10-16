@@ -59,10 +59,10 @@ Cinq niveaux de confidentialité, du plus ouvert au plus restreint : `public` > 
 | **Orchestratrice** | interlocutrice principale : écoute, challenge la demande, valide le plan (intention, action, rapport), rédige la spécification dans Git, délègue, traduit le résultat des agents en rapport lisible. **Elle ne modifie jamais l'infrastructure elle-même** | en cours |
 | **Panthéon d'agents** | un agent par domaine : supervision en lecture seule, développement en sandbox, déploiement d'applications, maintenance d'infrastructure. Validation humaine sur le déploiement et l'infrastructure — voir [Panthéon Agentique](concepts/08-pantheon-agentique.md) | en cours : agents déployés |
 | **Communication asynchrone** | une file par agent, file de messages en échec, événements de progression. Motif : une délégation qui code, teste et corrige dépasse les délais d'un appel synchrone | prévu |
-| **Projets et discussions** | rattachement et promotion des discussions (principe ci-dessus), historique conservé et retrouvable | en cours : historique local de l'interface |
+| **Projets et discussions** | rattachement et promotion des discussions (principe ci-dessus), historique conservé et retrouvable ; droits par projet (masquage, invitations), demandes de rattachement validées par un adulte, journal intime par personne | opérationnel : discussions côté serveur, projets = dépôts Git, droits et journal |
 | **Mémoire** | voir la section suivante | en cours : couches déployées, ingestion à construire |
-| **Permissions** | rôles et niveaux de confidentialité ci-dessus ; alertes par mail, SMS ou interface | prévu |
-| **Connaissance externe sûre** | acquisition web isolée et nettoyée ([Sas Paranoïaque](concepts/04-sas-paranoiaque.md)), requêtes leurres ([Ghost Search](concepts/06-ghost-search.md)), validation croisée avant ingestion ([Tribunal Sémantique](concepts/05-tribunal-semantique.md)) | prévu |
+| **Permissions** | rôles et niveaux de confidentialité ci-dessus ; alertes par mail, SMS ou interface | en cours : rôles et authentification unique (SSO) opérationnels ; confidentialité de la mémoire et alertes prévues |
+| **Connaissance externe sûre** | acquisition web isolée et nettoyée ([Sas Paranoïaque](concepts/04-sas-paranoiaque.md)), requêtes leurres ([Ghost Search](concepts/06-ghost-search.md)), validation croisée avant ingestion ([Tribunal Sémantique](concepts/05-tribunal-semantique.md)) | en cours : sas d'acquisition opérationnel (métamoteur auto-hébergé, pages réduites en texte sans script, adresses internes refusées) ; requêtes leurres et tribunal prévus |
 | **Filtre anti-fuite** | avant tout appel à un service distant : autoriser, anonymiser ou bloquer — voir [DLP Filter](concepts/07-dlp-filter.md) | prévu |
 | **Inférence** | un modèle par agent via le routeur ; bascule entre modèle distant et modèle local par simple routage ; mesure comparative de qualité et de coût | en cours : routeur opérationnel, inférence locale à déployer |
 | **Gouvernance** | coût par token et par projet, budgets par clé ; journal des requêtes, des routages et des blocages ; analyse a posteriori | en cours : coûts et budgets opérationnels |
@@ -74,8 +74,8 @@ Cinq niveaux de confidentialité, du plus ouvert au plus restreint : `public` > 
 
 | Brique | Ce qu'elle fait | État |
 |---|---|---|
-| **Discussion** | interface web multi-modèles, avec coût affiché et historique ; aucune clé dans le navigateur | en cours |
-| **Recherche** | la mémoire d'abord ; le web via le sas si l'information manque, avec consentement avant mémorisation | prévu |
+| **Discussion** | interface web multi-modèles, avec coût affiché et historique ; aucune clé dans le navigateur ; connexion obligatoire, profil et contexte adaptés à chaque personne (date et heure comprises) | opérationnel |
+| **Recherche** | la mémoire d'abord ; le web via le sas si l'information manque, sources classées par fiabilité et citées ; données de prévision pour la météo ; consentement avant mémorisation | en cours : recherche web opérationnelle, mémoire à construire |
 | **Arbitre** | un modèle externe de haut niveau, interrogé par les agents via la file de messages, **après anonymisation** par le filtre anti-fuite | prévu |
 | **Développement d'outils à la demande** | un besoin exprimé en discussion devient un projet ; un agent le code et le teste en sandbox ; un autre le déploie après validation humaine | en cours : environnements de développement pilotés par agents |
 | **Automatisation déterministe** | moteur de workflows déclenché par les agents, et pouvant les solliciter à une étape définie | prévu |
