@@ -90,6 +90,7 @@ spec:
             - --cookie-name=_sophia
             - --cookie-secure=true
             - --cookie-refresh=1h
+            - --cookie-expire=2160h          # 90 jours, comme la session Keycloak « Se souvenir de moi »
             - --redirect-url=https://chat.example.org/oauth2/callback
             - --whitelist-domain=chat.example.org
             - --oidc-issuer-url=https://auth.apps.example.org/realms/sophia
@@ -109,6 +110,7 @@ spec:
             - --pass-user-headers=true
             - --skip-provider-button=true
             - --silence-ping-logging=true
+            - --upstream-timeout=300s
           ports:
             - { name: http, containerPort: 4180 }
           volumeMounts:
