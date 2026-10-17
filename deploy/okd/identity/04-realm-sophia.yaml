@@ -27,6 +27,11 @@ spec:
     registrationAllowed: false
     resetPasswordAllowed: false
     rememberMe: true
+    # Sessions : 30 min d'inactivité sans « Se souvenir de moi » (défaut Keycloak) ;
+    # avec, 30 jours d'inactivité et 90 jours au plus. L'accès passe par le VPN, et les
+    # tablettes des enfants ne doivent pas redemander le mot de passe à chaque pause.
+    ssoSessionIdleTimeoutRememberMe: 2592000    # 30 jours
+    ssoSessionMaxLifespanRememberMe: 7776000    # 90 jours
     loginWithEmailAllowed: true
     bruteForceProtected: true
     passwordPolicy: "length(12) and notUsername"
