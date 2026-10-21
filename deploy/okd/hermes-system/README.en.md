@@ -37,6 +37,8 @@ Dionysos can host a coding assistant (Claude Code) for administration. Its `/opt
 
 **What is committed**: allow-list in the repository's `.gitignore` (`.claude.json`, `settings.json`, `history.jsonl`, `projects/`, `agents/`, `commands/`, `skills/`, plugin lists). **Never** `.credentials.json`: authentication goes through the Secret. Transcripts may contain sensitive tool output: the repository must stay private.
 
+**Per-project sessions**: the container runs `ws up` at start (one directory, session, memory and zellij tab per project); the sidecar reports unpushed work. See `assistant/README.en.md`. The assistant pushes with a write token mounted as a file (`${PUSH_SECRET}`, `/var/run/secrets/forgejo-push/`), never as an environment variable.
+
 The manifest's scripts mix shell variables (`$CH`, `$CFG`…) with template variables: render the file with `envsubst` and the **explicit list** of the variables in the table below, never plain `envsubst`.
 
 ## Variable Reference
@@ -66,3 +68,4 @@ Substitute the following variables (via envsubst or Helm) before applying:
 | `${CLAUDE_SECRET}` | Assistant Secret (OAuth token, Forgejo write credentials) | (required for sync) |
 | `${CLAUDE_CODE_VERSION}` | Assistant version installed by `init-claude` | (to pin) |
 | `${CLAUDE_SYNC_INTERVAL}` | History sync interval, in seconds | `900` |
+| `${PUSH_SECRET}` | Secret holding the assistant's Forgejo write token (keys `username`, `password`) | (optional) |

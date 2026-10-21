@@ -1,0 +1,6 @@
+// Configuration zellij de la session « sophia » (ws). Les onglets viennent de ws/projets.tsv.
+default_shell "bash"
+// ws recrée la session et ses onglets au démarrage du conteneur : pas de résurrection zellij
+session_serialization false
+show_startup_tips false
+show_release_notes false

@@ -1,0 +1,291 @@
+#!/bin/bash
+# ws — une session Claude et un onglet zellij par projet (voir README.md).
+#
+#   ws up [--background]   clones, contextes, mémoires, session zellij (au démarrage du conteneur)
+#   ws attach              rejoindre la session zellij
+#   ws list                projets, statut, liens, état git
+#   ws new <nom> <org/dépôt[,org/dépôt…]|-> [--suivi <dossier Brain>] [--lies a,b] [--desc "…"]
+#   ws close <nom> [raison]   fermer sans détruire (refuse s'il reste du travail non poussé)
+#   ws open <nom>          rouvrir un projet fermé
+#   ws check [--here|--log]   travail non commité ou non poussé (hook SessionStart, sidecar)
+set -u
+CFG=${CLAUDE_CONFIG_DIR:-/opt/data/.claude-home/config}
+WS=$CFG/ws
+REG=$WS/projets.tsv
+ROOT=/opt/data/workspaces
+SESSION=${WS_SESSION:-agents}
+ZHOME=/opt/data/.claude-home/home
+FG=${FORGEJO_URL:?FORGEJO_URL non défini}
+TOK=/var/run/secrets/forgejo-push
+BRAIN=${WS_NOTES_REPO:?WS_NOTES_REPO non défini (org/dépôt des notes privées)}
+# Jeton d'écriture (Secret ${PUSH_SECRET} monté en fichier) : jamais en variable, jamais affiché
+HELPER='!f() { echo "username=$(cat /var/run/secrets/forgejo-push/username)"; echo "password=$(cat /var/run/secrets/forgejo-push/token)"; }; f'
+
+# Toujours sans les variables ZELLIJ* héritées : sinon zellij agit sur la session courante
+z() { env -u ZELLIJ -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID HOME="$ZHOME" ZELLIJ_CONFIG_DIR="$WS/zellij" zellij "$@"; }
+g() { git -c safe.directory='*' -c credential.helper= -c credential.helper="$HELPER" "$@"; }
+log() { echo "ws: $*" >&2; }
+die() { log "❌ $*"; exit 1; }
+sync_req() { touch /opt/data/.claude-home/.sync-request 2>/dev/null || true; }
+
+# --- registre ---------------------------------------------------------------
+rows()    { grep -v '^#' "$REG" | grep -v '^[[:space:]]*$'; }
+field()   { rows | awk -F'\t' -v n="$1" -v c="$2" '$1==n {print $c; exit}'; }
+exists()  { rows | awk -F'\t' -v n="$1" '$1==n {f=1} END {exit !f}'; }
+actifs()  { rows | awk -F'\t' '$2=="actif" {print $1}'; }
+dir_of()  { local d; d=$(field "$1" 3); [ "$d" = "-" ] && d=$ROOT/$1; echo "$d"; }
+brain_of(){ echo "$ROOT/$1/brain"; }
+slug()    { echo "$1" | sed 's/[^a-zA-Z0-9]/-/g'; }   # règle de Claude Code
+memdir()  { echo "$CFG/projects/$(slug "$(dir_of "$1")")/memory"; }
+set_status() { # set_status <nom> <statut>
+    local tmp; tmp=$(mktemp)
+    awk -F'\t' -v OFS='\t' -v n="$1" -v s="$2" '/^#/ || NF==0 {print; next} $1==n {$2=s} {print}' "$REG" > "$tmp" && cat "$tmp" > "$REG"; rm -f "$tmp"
+}
+git_dirs() { # dépôts de travail d'un projet (clones + copie de dépôt de notes)
+    local n=$1 d r
+    d=$(dir_of "$n")
+    for r in $(field "$n" 4 | tr ',' ' '); do [ "$r" != "-" ] && [ -d "$d/${r##*/}/.git" ] && echo "$d/${r##*/}"; done
+    [ -d "$(brain_of "$n")/.git" ] && brain_of "$n"
+}
+
+# --- préparation d'un projet -------------------------------------------------
+clone() { # clone <org/dépôt> <destination> [chemin sparse | *]
+    local repo=$1 dest=$2 sparse=${3:-*}
+    if [ -d "$dest/.git" ]; then g -C "$dest" fetch -q origin 2>/dev/null || log "⚠ fetch $repo échoué"; return 0; fi
+    mkdir -p "$(dirname "$dest")"
+    if [ "$sparse" = "*" ]; then g clone -q "$FG/$repo.git" "$dest"
+    else g clone -q --filter=blob:none --sparse "$FG/$repo.git" "$dest" && g -C "$dest" sparse-checkout set "$sparse"; fi \
+        || { log "⚠ clone de $repo échoué"; return 1; }
+    git -C "$dest" config credential.helper "$HELPER"
+    git -C "$dest" config user.name "${WS_GIT_NAME:-Claude Code}"
+    git -C "$dest" config user.email "${WS_GIT_EMAIL:-noreply@anthropic.com}"
+    git -C "$dest" config pull.rebase true
+    git -C "$dest" config rebase.autoStash true
+}
+
+context() { # .claude/CLAUDE.md du projet, régénéré à chaque « ws up »
+    local n=$1 d desc suivi lies r l
+    d=$(dir_of "$n"); desc=$(field "$n" 7); suivi=$(field "$n" 5); lies=$(field "$n" 6)
+    mkdir -p "$d/.claude"
+    {
+        echo "# Session Claude du projet « $n » — fichier généré par ws, ne pas modifier"
+        echo
+        echo "$desc"
+        echo
+        echo "- Répertoire de travail : \`$d\`"
+        for r in $(field "$n" 4 | tr ',' ' '); do [ "$r" != "-" ] && echo "- Dépôt \`$r\` → \`$d/${r##*/}\`"; done
+        if [ "$suivi" = "*" ]; then echo "- dépôt de notes complet → \`$(brain_of "$n")\` (plan global)"
+        elif [ "$suivi" != "-" ]; then echo "- Suivi : \`dépôt de notes/$suivi/\` → \`$(brain_of "$n")/$suivi\` (copie partielle)"; fi
+        echo "- Mémoire de ce projet : \`$(memdir "$n")\`"
+        if [ "$lies" = "*" ]; then echo "- Projets liés : tous (voir la carte dans \`$CFG/CLAUDE.md\`)"
+        elif [ "$lies" != "-" ]; then
+            echo "- Projets liés (lecture ; pour un changement chez eux, écrire dans leur \`notes-entrantes.md\`) :"
+            for l in $(echo "$lies" | tr ',' ' '); do
+                exists "$l" && echo "  - $l ($(field "$l" 2)) : \`$(dir_of "$l")\`, notes : \`$(memdir "$l")/notes-entrantes.md\`"
+            done
+        fi
+        echo
+        echo "Règles communes et carte des projets : \`$CFG/CLAUDE.md\`."
+    } > "$d/.claude/CLAUDE.md"
+}
+
+memory_seed() { # mémoire initiale si absente (rechargée par Claude après chaque /clear)
+    local n=$1 m; m=$(memdir "$n"); mkdir -p "$m"
+    [ -f "$m/notes-entrantes.md" ] || printf '# Notes laissées par les autres projets\n\nAjouter en bas : date, projet émetteur, demande. Les traiter puis les barrer.\n' > "$m/notes-entrantes.md"
+    [ -f "$m/MEMORY.md" ] || printf -- '- [Notes entrantes](notes-entrantes.md) — demandes laissées par les autres projets, à traiter\n' > "$m/MEMORY.md"
+    grep -q 'notes-entrantes.md' "$m/MEMORY.md" || printf -- '- [Notes entrantes](notes-entrantes.md) — demandes laissées par les autres projets, à traiter\n' >> "$m/MEMORY.md"
+}
+
+prepare() { # clones + dépôt de notes + contexte + mémoire
+    local n=$1 d r suivi
+    d=$(dir_of "$n"); suivi=$(field "$n" 5); mkdir -p "$d"
+    for r in $(field "$n" 4 | tr ',' ' '); do [ "$r" != "-" ] && clone "$r" "$d/${r##*/}"; done
+    [ "$suivi" != "-" ] && clone "$BRAIN" "$(brain_of "$n")" "$suivi"
+    context "$n"; memory_seed "$n"
+}
+
+carte() { # bloc généré dans le CLAUDE.md commun
+    local f=$CFG/CLAUDE.md tmp
+    [ -f "$f" ] || return 0
+    tmp=$(mktemp)
+    {
+        echo "<!-- ws:carte -->"
+        echo "| Projet | Statut | Répertoire | Dépôts | Suivi (dépôt de notes) | Liés |"
+        echo "|---|---|---|---|---|---|"
+        rows | while IFS=$'\t' read -r n s d r su l desc; do
+            [ "$d" = "-" ] && d=$ROOT/$n
+            echo "| $n | $s | \`$d\` | $r | $su | $l |"
+        done
+        echo "<!-- /ws:carte -->"
+    } > "$tmp.bloc"
+    awk -v bloc="$tmp.bloc" '
+        /<!-- ws:carte -->/ {while ((getline l < bloc) > 0) print l; skip=1; next}
+        /<!-- \/ws:carte -->/ {skip=0; next}
+        !skip {print}' "$f" > "$tmp" && cat "$tmp" > "$f"
+    rm -f "$tmp" "$tmp.bloc"
+}
+
+# --- zellij -------------------------------------------------------------------
+pane() { # contenu d'un onglet : Claude en attente (Entrée pour lancer), puis un shell
+    echo "        pane name=\"claude · $1\" command=\"bash\" start_suspended=true {"
+    echo "            args \"-c\" \"claude --continue || claude; exec bash\";"
+    echo "        }"
+}
+layout() {
+    local f=$ROOT/.layout.kdl n first=1
+    {
+        echo "layout {"
+        echo "    default_tab_template {"
+        echo "        pane size=1 borderless=true { plugin location=\"zellij:tab-bar\"; }"
+        echo "        children"
+        echo "        pane size=2 borderless=true { plugin location=\"zellij:status-bar\"; }"
+        echo "    }"
+        for n in $(actifs); do
+            if [ $first = 1 ]; then echo "    tab name=\"$n\" cwd=\"$(dir_of "$n")\" focus=true {"; first=0
+            else echo "    tab name=\"$n\" cwd=\"$(dir_of "$n")\" {"; fi
+            pane "$n"
+            echo "    }"
+        done
+        echo "}"
+    } > "$f"
+}
+alive() { z -s "$SESSION" action query-tab-names >/dev/null 2>&1; }
+tab_add() { # onglet ajouté à la session en cours, sans redémarrage
+    local n=$1 f=$ROOT/.tab-$1.kdl
+    alive || return 0
+    { echo "layout {"
+      echo "    pane size=1 borderless=true { plugin location=\"zellij:tab-bar\"; }"
+      pane "$n"
+      echo "    pane size=2 borderless=true { plugin location=\"zellij:status-bar\"; }"
+      echo "}"; } > "$f"
+    z -s "$SESSION" action new-tab --layout "$f" --name "$n" --cwd "$(dir_of "$n")" >/dev/null
+}
+tab_del() {
+    local id
+    alive || return 0
+    id=$(z -s "$SESSION" action list-tabs 2>/dev/null | awk -v n="$1" '$3==n {print $1; exit}')
+    [ -n "$id" ] && z -s "$SESSION" action close-tab-by-id "$id"
+}
+
+# --- état git -----------------------------------------------------------------
+etat() { # lignes « ⚠ » pour un projet (sans réseau : dernières références connues)
+    local n=$1 r mods ahead
+    for r in $(git_dirs "$n"); do
+        mods=$(git -c safe.directory='*' -C "$r" status --porcelain 2>/dev/null | wc -l)
+        ahead=$(git -c safe.directory='*' -C "$r" rev-list --count '@{u}..HEAD' 2>/dev/null || echo "?")
+        [ "$mods" != 0 ] || [ "$ahead" != 0 ] && echo "⚠ $n : ${r#$ROOT/} — $mods fichier(s) modifié(s), $ahead commit(s) non poussé(s)"
+    done
+}
+
+# --- commandes ----------------------------------------------------------------
+cmd_up() {
+    mkdir -p "$ROOT" "$ZHOME" "$WS/zellij"
+    ln -sf "$WS/ws" /opt/data/.claude-home/npm-global/bin/ws 2>/dev/null
+    local n; for n in $(actifs); do prepare "$n"; done
+    carte; layout
+    if ! alive; then
+        z delete-session "$SESSION" >/dev/null 2>&1   # session morte d'un démarrage précédent
+        z --layout "$ROOT/.layout.kdl" attach --create-background "$SESSION" >/dev/null 2>&1 \
+            && log "session zellij « $SESSION » prête ($(actifs | wc -l) onglets)" || log "⚠ session zellij non créée"
+    fi
+    sync_req
+}
+
+cmd_attach() { alive || cmd_up; exec env -u ZELLIJ -u ZELLIJ_SESSION_NAME -u ZELLIJ_PANE_ID HOME="$ZHOME" ZELLIJ_CONFIG_DIR="$WS/zellij" zellij attach "$SESSION"; }
+
+cmd_list() {
+    printf '%-18s %-7s %-48s %s\n' PROJET STATUT LIÉS "ÉTAT GIT"
+    rows | while IFS=$'\t' read -r n s d r su l desc; do
+        e=$( [ "$s" = actif ] && etat "$n" | wc -l || echo -)
+        [ "$e" = 0 ] && e="propre" || { [ "$e" != - ] && e="$e alerte(s)"; }
+        printf '%-18s %-7s %-48s %s\n' "$n" "$s" "$l" "$e"
+    done
+}
+
+cmd_new() {
+    local n=${1:-} repos=${2:-} suivi="" lies="-" desc="" r
+    [ -n "$n" ] && [ -n "$repos" ] || die "usage : ws new <nom> <org/dépôt[,…]|-> [--suivi dossier] [--lies a,b] [--desc \"…\"]"
+    shift 2
+    while [ $# -gt 0 ]; do case $1 in
+        --suivi) suivi=$2; shift 2 ;; --lies) lies=$2; shift 2 ;; --desc) desc=$2; shift 2 ;;
+        *) die "option inconnue : $1" ;; esac; done
+    [[ "$n" =~ ^[A-Za-z0-9._-]+$ ]] || die "nom : lettres, chiffres, . _ -"
+    exists "$n" && die "« $n » existe déjà (statut $(field "$n" 2)) — ws open $n pour le rouvrir"
+    for r in $(echo "$repos" | tr ',' ' '); do
+        [ "$r" = "-" ] && continue
+        curl -sf -o /dev/null -H "Authorization: token $(cat $TOK/token)" "$FG/api/v1/repos/$r" \
+            || die "dépôt $r introuvable : le créer sur Forgejo, puis relancer"
+    done
+    [ -n "$suivi" ] || suivi=$n
+    printf '%s\tactif\t-\t%s\t%s\t%s\t%s\n' "$n" "$repos" "$suivi" "$lies" "${desc:-À décrire}" >> "$REG"
+    prepare "$n"
+    # dossier de suivi créé dans dépôt de notes s'il n'existe pas
+    local b; b=$(brain_of "$n")
+    if [ "$suivi" != "-" ] && [ ! -e "$b/$suivi" ]; then
+        mkdir -p "$b/$suivi" && printf '# %s\n\n%s\n\nSuivis de session : `suivi-session-AAAA-MM-JJ.md`.\n' "$n" "${desc:-À décrire}" > "$b/$suivi/README.md"
+        git -C "$b" add "$suivi/README.md" && git -C "$b" commit -qm "$n : dossier de suivi" && g -C "$b" push -q origin HEAD:main \
+            && log "dossier de suivi dépôt de notes/$suivi créé et poussé" || log "⚠ dossier de suivi créé mais non poussé"
+    fi
+    carte; layout; tab_add "$n"; sync_req
+    log "✓ projet « $n » prêt : $(dir_of "$n")"
+}
+
+cmd_close() {
+    local n=${1:-} raison=${2:-sans raison donnée} d bad r m
+    [ -n "$n" ] || die "usage : ws close <nom> [raison]"
+    exists "$n" || die "projet inconnu : $n"
+    [ "$n" = hub ] && die "le hub ne se ferme pas"
+    [ "$(field "$n" 2)" = actif ] || die "« $n » n'est pas actif"
+    for r in $(git_dirs "$n"); do g -C "$r" fetch -q origin 2>/dev/null; done
+    bad=$(etat "$n"); [ -z "$bad" ] || { echo "$bad" >&2; die "travail non poussé : rien n'est fermé"; }
+    set_status "$n" fermé
+    m=$(memdir "$n"); mkdir -p "$m"
+    printf -- '- Projet fermé le %s : %s. Dépôt et suivi conservés ; « ws open %s » pour le rouvrir.\n' "$(date +%F)" "$raison" "$n" >> "$m/MEMORY.md"
+    tab_del "$n"
+    d=$(dir_of "$n")
+    case $d in "$ROOT/$n") rm -rf -- "$d" ;; *) log "répertoire hors $ROOT conservé : $d" ;; esac
+    rm -f "$ROOT/.tab-$n.kdl"
+    carte; layout; sync_req
+    log "✓ « $n » fermé (mémoire, transcripts, dépôt et suivi conservés)"
+}
+
+cmd_open() {
+    local n=${1:-} m
+    [ -n "$n" ] || die "usage : ws open <nom>"
+    exists "$n" || die "projet inconnu : $n (ws new pour le créer)"
+    [ "$(field "$n" 2)" = fermé ] || die "« $n » n'est pas fermé"
+    set_status "$n" actif
+    m=$(memdir "$n"); mkdir -p "$m"
+    printf -- '- Projet rouvert le %s.\n' "$(date +%F)" >> "$m/MEMORY.md"
+    prepare "$n"; carte; layout; tab_add "$n"; sync_req
+    log "✓ « $n » rouvert : claude --continue reprend sa dernière conversation"
+}
+
+cmd_check() {
+    local mode=${1:-} n out=""
+    if [ "$mode" = --here ]; then
+        for n in $(actifs); do [ "$(dir_of "$n")" = "$PWD" ] && out=$(etat "$n"); done
+        [ -n "$out" ] && printf 'Travail non poussé dans ce projet (à commiter et pousser avant toute recréation du pod) :\n%s\n' "$out"
+        return 0
+    fi
+    for n in $(actifs); do out+=$(etat "$n")$'\n'; done
+    out=$(echo "$out" | sed '/^$/d')
+    if [ "$mode" = --log ]; then
+        [ -d "$ROOT" ] || return 0
+        echo "$out" > "$ROOT/.etat-git"
+        [ -n "$out" ] && echo "$out" | while read -r l; do echo "ws-check $(date -Iseconds) $l"; done
+        return 0
+    fi
+    [ -n "$out" ] && echo "$out" || echo "tout est poussé"
+}
+
+case ${1:-} in
+    up) shift; cmd_up "$@" ;;
+    attach) cmd_attach ;;
+    list|ls) cmd_list ;;
+    new) shift; cmd_new "$@" ;;
+    close) shift; cmd_close "$@" ;;
+    open) shift; cmd_open "$@" ;;
+    check) shift; cmd_check "$@" ;;
+    *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

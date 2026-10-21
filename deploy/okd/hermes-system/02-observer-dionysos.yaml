@@ -143,6 +143,7 @@ spec:
 
           CFG=/opt/data/.claude-home/config
           REQ=/opt/data/.claude-home/.sync-request
+          WS=/opt/data/.claude-home/config/ws/ws
 
           sync() {
             [ -d $CFG/.git ] || return 1
@@ -162,6 +163,8 @@ spec:
               reason=periodic
               [ -e $REQ ] && reason=session-end && rm -f $REQ
               sync $reason || echo "WARN: sync de l'historique Claude échouée"
+              # Travail non poussé dans les clones des projets (perdu à la recréation du pod)
+              [ -x $WS ] && $WS check --log
               last=$now
             fi
             sleep 10 & wait $!
@@ -189,7 +192,15 @@ spec:
       - name: dionysos
         image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
         imagePullPolicy: Always
-        command: ["hermes", "gateway", "run"]
+        # ws up (en arrière-plan) : clones des projets, contextes, session zellij avec un
+        # onglet par projet (voir assistant/README.md) ; puis la passerelle de l'agent.
+        command:
+        - /bin/bash
+        - -c
+        - |
+          WS=/opt/data/.claude-home/config/ws/ws
+          [ -x $WS ] && $WS up > /opt/data/.claude-home/ws-up.log 2>&1 &
+          exec hermes gateway run
         tty: true
         stdin: true
         env:
@@ -231,6 +242,11 @@ spec:
           readOnly: true
         - name: agent-storage
           mountPath: /opt/data
+        # Jeton Forgejo en écriture pour les pushes de l'assistant (fichier seulement, jamais
+        # en variable d'environnement) ; lisible aussi par l'agent du même conteneur
+        - name: forgejo-push
+          mountPath: /var/run/secrets/forgejo-push
+          readOnly: true
 
       volumes:
       - name: host-root
@@ -239,3 +255,14 @@ spec:
           type: Directory
       - name: agent-storage
         emptyDir: {}
+      - name: forgejo-push
+        secret:
+          secretName: ${PUSH_SECRET}
+          optional: true
+          # 0440 : root et le fsGroup imposé par le SCC (l'agent tourne sans être root)
+          defaultMode: 0440
+          items:
+          - key: username
+            path: username
+          - key: password
+            path: token
