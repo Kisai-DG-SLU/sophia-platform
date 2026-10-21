@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: sophia-core
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  # Volume RWO : jamais deux RabbitMQ sur le même répertoire
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      # Nom de nœud RabbitMQ fixe (rabbit@rabbitmq) : il nomme le répertoire de données. Avec le
+      # nom du pod, chaque recréation repartait d'un répertoire vide (files et comptes perdus).
+      hostname: rabbitmq
+      securityContext:
+        # Sans cela, le kubelet rend chaque fichier du volume lisible par le fsGroup à chaque
+        # démarrage du pod : le cookie Erlang passait en 0660 et RabbitMQ refusait de démarrer.
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        # Cookie Erlang fourni par Secret, identique pour tous les nœuds RabbitMQ (cluster
+        # multi-nœuds prévu). Copié en 0400 à chaque démarrage : un Secret monté directement
+        # serait rendu lisible par le fsGroup et appartiendrait à root.
+        - name: erlang-cookie
+          image: docker.io/rabbitmq:4.4.0-management
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              C=/var/lib/rabbitmq/.erlang.cookie
+              cp /run/secrets/rabbitmq/cookie $C.tmp
+              chmod 400 $C.tmp
+              mv -f $C.tmp $C
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+            - name: erlang-cookie
+              mountPath: /run/secrets/rabbitmq
+              readOnly: true
+      containers:
+        - name: rabbitmq
+          image: docker.io/rabbitmq:4.4.0-management
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-admin-creds
+                  key: username
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-admin-creds
+                  key: password
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: /sophia
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            # memory : à garder égal à total_memory_available_override_value (00-config.yaml)
+            limits: { cpu: "1", memory: 1Gi }
+          readinessProbe:
+            tcpSocket: { port: amqp }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: amqp }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+            - name: config
+              mountPath: /etc/rabbitmq/conf.d/20-sophia.conf
+              subPath: 20-sophia.conf
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: rabbitmq-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: pvc-rabbitmq-data
+        # Créé par l'administrateur : oc -n sophia-core create secret generic rabbitmq-erlang-cookie
+        #   --from-literal=cookie="$(openssl rand -hex 32)"
+        - name: erlang-cookie
+          secret:
+            secretName: rabbitmq-erlang-cookie
+            defaultMode: 0440

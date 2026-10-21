@@ -1,0 +1,40 @@
+# Volume dédié à RabbitMQ. Une PVC sans PV désigné se lie au premier PV libre de taille suffisante :
+# dans l'installation de référence, elle avait pris le volume prévu pour les embeddings du RAG.
+# Préalable sur le nœud : sudo mkdir -p /var/lib/sophia/rabbitmq
+#                         sudo chcon -t container_file_t /var/lib/sophia/rabbitmq
+# PV et PVC désignés l'un l'autre (claimRef / volumeName) : aucune autre PVC ne peut le prendre.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-rabbitmq
+  labels: { app: rabbitmq }
+spec:
+  capacity: { storage: 5Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: /var/lib/sophia/rabbitmq
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: [master-0] }   # nom du nœud
+  claimRef:
+    namespace: sophia-core
+    name: pvc-rabbitmq-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-rabbitmq-data
+  namespace: sophia-core
+  labels: { app: rabbitmq }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-rabbitmq
+  resources:
+    requests: { storage: 5Gi }

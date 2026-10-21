@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-from-hermes
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: hermes-system
+      ports:
+        - port: 5672
+          protocol: TCP
+  policyTypes:
+    - Ingress
