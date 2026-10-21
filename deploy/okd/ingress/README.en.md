@@ -32,7 +32,7 @@ Every Route presents a **Let's Encrypt certificate** obtained through **DNS-01**
    ```
    Rollback: `oc patch ingresscontroller default -n openshift-ingress-operator --type=json -p '[{"op":"remove","path":"/spec/defaultCertificate"}]'`.
 6. **Names**: at the DNS provider, A records (not proxied, short TTL) pointing to the server's VPN address, for `*.apps`, the names outside the wildcard and the cluster API.
-7. **Devices**: one WireGuard peer per device, `AllowedIPs` limited to the VPN network, "always on" connection on phones and tablets.
+7. **Devices**: one WireGuard peer per device, `AllowedIPs` limited to the VPN network, "always on" connection on phones and tablets. Server, adding devices and node-side filtering: `../host/wireguard/`.
 
 ## Verification
 

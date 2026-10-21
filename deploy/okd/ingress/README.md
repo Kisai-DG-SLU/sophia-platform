@@ -32,7 +32,7 @@ Toutes les Routes présentent un **certificat Let's Encrypt** obtenu par validat
    ```
    Retour arrière : `oc patch ingresscontroller default -n openshift-ingress-operator --type=json -p '[{"op":"remove","path":"/spec/defaultCertificate"}]'`.
 6. **Noms** : chez le fournisseur DNS, des enregistrements A (non proxifiés, TTL court) vers l'adresse VPN du serveur, pour `*.apps`, les noms hors joker et l'API du cluster.
-7. **Appareils** : un pair WireGuard par appareil, `AllowedIPs` limité au réseau du VPN, connexion « toujours active » sur téléphone et tablette.
+7. **Appareils** : un pair WireGuard par appareil, `AllowedIPs` limité au réseau du VPN, connexion « toujours active » sur téléphone et tablette. Serveur, ajout d'appareils et filtrage sur le nœud : `../host/wireguard/`.
 
 ## Vérification
 

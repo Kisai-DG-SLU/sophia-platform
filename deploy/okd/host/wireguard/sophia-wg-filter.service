@@ -1,0 +1,21 @@
+[Unit]
+Description=SophIA - filtrage du trafic WireGuard (wg0)
+# Chargé avant le réseau : le filtre existe avant que wg0 ne monte.
+Wants=network-pre.target
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/sbin/nft -c -f /etc/sophia/wg-filter.nft
+ExecStart=/usr/sbin/nft -f /etc/sophia/wg-filter.nft
+# Garde-fou : si le nft d'OVN-Kubernetes ne relit pas le ruleset, la table est supprimée
+# et le service passe en échec (le VPN n'est jamais coupé). Code 2 = non vérifiable, toléré.
+ExecStartPost=/bin/sh -c '/etc/sophia/wg-filter-check.sh; [ $$? -ne 1 ]'
+ExecReload=/usr/sbin/nft -f /etc/sophia/wg-filter.nft
+ExecReload=/bin/sh -c '/etc/sophia/wg-filter-check.sh; [ $$? -ne 1 ]'
+ExecStop=-/usr/sbin/nft delete table inet sophia_wg
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

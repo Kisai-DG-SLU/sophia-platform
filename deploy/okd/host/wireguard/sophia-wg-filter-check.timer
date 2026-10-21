@@ -1,0 +1,9 @@
+[Unit]
+Description=SophIA - vérification périodique du filtre wg0 (mises à jour d'OKD)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target
