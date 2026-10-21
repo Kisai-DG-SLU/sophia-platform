@@ -37,6 +37,8 @@ Dionysos peut heberger un assistant de code (Claude Code) pour l'administration.
 
 **Ce qui est versionne** : liste blanche dans le `.gitignore` du depot (`.claude.json`, `settings.json`, `history.jsonl`, `projects/`, `agents/`, `commands/`, `skills/`, listes de plugins). **Jamais** `.credentials.json` : l'authentification passe par le Secret. Les transcripts peuvent contenir des sorties d'outils sensibles : le depot doit rester prive.
 
+**Sessions par projet** : le conteneur lance `ws up` au demarrage (un repertoire, une session, une memoire et un onglet zellij par projet) ; le sidecar releve le travail non pousse. Voir `assistant/README.md`. Les pushes de l'assistant passent par un jeton d'ecriture monte en fichier (`${PUSH_SECRET}`, `/var/run/secrets/forgejo-push/`), jamais en variable d'environnement.
+
 Dans les scripts du manifeste, les variables du shell (`$CH`, `$CFG`…) cotoient les variables du gabarit : rendre le fichier avec `envsubst` et la **liste explicite** des variables du tableau ci-dessous, jamais `envsubst` seul.
 
 ## Reference des variables
@@ -66,3 +68,4 @@ Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 | `${CLAUDE_SECRET}` | Secret de l'assistant (jeton OAuth, identifiants Forgejo en ecriture) | (requis pour la synchronisation) |
 | `${CLAUDE_CODE_VERSION}` | Version de l'assistant installee par `init-claude` | (a fixer) |
 | `${CLAUDE_SYNC_INTERVAL}` | Intervalle de synchronisation de l'historique, en secondes | `900` |
+| `${PUSH_SECRET}` | Secret du jeton Forgejo en ecriture utilise par l'assistant (cles `username`, `password`) | (optionnel) |

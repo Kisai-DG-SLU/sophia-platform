@@ -1,0 +1,12 @@
+# Registre des projets (exemple) — une session Claude et un onglet zellij par projet actif.
+# Colonnes séparées par des TABULATIONS :
+#   nom  statut  répertoire  dépôts  suivi  liés  description
+# statut     : actif | fermé (fermé : pas d'onglet ni de clone, mémoire et transcripts conservés)
+# répertoire : - = /opt/data/workspaces/<nom>
+# dépôts     : org/dépôt séparés par des virgules (- = aucun) ; clonés dans <répertoire>/<dépôt>
+# suivi      : dossier du dépôt de notes (copie partielle dans <répertoire>/brain) ; * = dépôt complet
+# liés       : noms de projets séparés par des virgules (- = aucun)
+# Modifier avec « ws new | close | open », pas à la main (sauf la description).
+hub	actif	-	-	*	*	Transverse : cluster, incidents, plan global, coordination
+infra	actif	-	${ORG_NAME}/${BRAIN_REPO}	plateforme	application	Manifestes réels de l'installation (privés)
+application	actif	-	${ORG_NAME}/application	application	infra	Une application de la plateforme
