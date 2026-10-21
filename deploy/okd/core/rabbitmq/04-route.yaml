@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: rabbitmq
+  namespace: sophia-core
+  labels:
+    app: rabbitmq
+spec:
+  host: ${RABBITMQ_HOST}   # nom DNS vers l'adresse du VPN
+  to:
+    kind: Service
+    name: rabbitmq-svc
+  port:
+    targetPort: management
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect  # HTTP → HTTPS

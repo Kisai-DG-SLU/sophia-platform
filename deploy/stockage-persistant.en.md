@@ -20,7 +20,7 @@ State verified on 2026-09-27, by reading the cluster.
 | Workspace | `${NS_APPS}` | yes | 20Gi | bound, consumer down | preproduction, notebooks, webapps, APIs |
 | LiteLLM | `${NS_CORE}` | no | `emptyDir` | no storage | configuration and logs, nothing to keep |
 | Coding assistant (Dionysos) | `${NS_AGENTS}` | no | `emptyDir` + private Git repository | restored at every pod creation | configuration and history pushed regularly to a dedicated repository (see `okd/hermes-system/`) |
-| RabbitMQ | `${NS_CORE}` | planned | 5Gi requested | pending | inter-agent queues, to be created |
+| RabbitMQ | `${NS_CORE}` | yes | 5Gi | bound by name (`claimRef` + `volumeName`) | inter-agent queues; dedicated volume, see `okd/core/rabbitmq/` |
 | Control agent | `${NS_AGENTS}` | planned | 2Gi requested | pending | control rules, to be created |
 
 Namespaces are variables so the example stays reusable:

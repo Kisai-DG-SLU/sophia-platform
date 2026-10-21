@@ -1,0 +1,17 @@
+# Complète la configuration par défaut de l'image (/etc/rabbitmq/conf.d/10-defaults.conf).
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  namespace: sophia-core
+  labels: { app: rabbitmq }
+data:
+  20-sophia.conf: |
+    # RabbitMQ lit la mémoire du nœud, pas la limite du conteneur : sans cette valeur,
+    # son seuil d'alerte (60 %) ne se déclencherait jamais avant l'OOM. Doit suivre limits.memory.
+    total_memory_available_override_value = 1073741824
+    # Publications suspendues sous 1 Go libre (50 Mo par défaut) ; le volume est sur le disque système
+    disk_free_limit.absolute = 1GB
+    # Journal des files quorum : 512 Mo en mémoire par défaut, presque tout le seuil de 614 Mo
+    raft.wal_max_size_bytes = 67108864
