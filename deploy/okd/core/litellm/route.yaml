@@ -4,7 +4,7 @@ metadata:
   name: litellm-route
   namespace: sophia-core
 spec:
-  host: lite-sophia.kisai.fr
+  host: ${LITELLM_HOST}   # nom DNS vers l'adresse du VPN
   to:
     kind: Service
     name: litellm-svc

@@ -88,7 +88,7 @@ flowchart TB
     DMZ --> COURT[Semantic Court / Validation]
     COURT --> MEM
 
-    GIT --> BRAIN[Guesdon-Brain / sophia-brain / project repos]
+    GIT --> BRAIN[Brain / project repos]
 
     PROD[prod-tenant-* namespaces]
     CORE --> PROD
