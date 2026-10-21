@@ -41,6 +41,8 @@ Dionysos can host a coding assistant (Claude Code) for administration. Its `/opt
 
 The manifest's scripts mix shell variables (`$CH`, `$CFG`…) with template variables: render the file with `envsubst` and the **explicit list** of the variables in the table below, never plain `envsubst`.
 
+The agents' Forgejo credentials (`FORGEJO_USER`, `FORGEJO_TOKEN`) come from a Secret and are **not** template variables: the initContainer hands them to git through a credential helper, never in the remote URL, where they would stay in clear text in `.git/config` (`git remote -v`). `git remote set-url` cleans a volume already initialised with the old URL.
+
 ## Variable Reference
 
 Substitute the following variables (via envsubst or Helm) before applying:

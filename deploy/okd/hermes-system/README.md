@@ -41,6 +41,8 @@ Dionysos peut heberger un assistant de code (Claude Code) pour l'administration.
 
 Dans les scripts du manifeste, les variables du shell (`$CH`, `$CFG`…) cotoient les variables du gabarit : rendre le fichier avec `envsubst` et la **liste explicite** des variables du tableau ci-dessous, jamais `envsubst` seul.
 
+Les identifiants Forgejo des agents (`FORGEJO_USER`, `FORGEJO_TOKEN`) viennent d'un Secret et ne sont **pas** des variables du gabarit : l'initContainer les passe à git par un credential helper, jamais dans l'URL du remote, où ils resteraient en clair dans `.git/config` (`git remote -v`). `git remote set-url` nettoie un volume déjà initialisé avec l'ancienne URL.
+
 ## Reference des variables
 
 Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
