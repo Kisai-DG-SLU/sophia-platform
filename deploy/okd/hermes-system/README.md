@@ -23,6 +23,22 @@ Etant donne que le comportement agentique est enforce par l'infrastructure (RBAC
 
 Les variables d'environnement `${AGENT_MODEL}`, `${OPENAI_API_BASE_URL}` et `${OPENAI_API_KEY}` dans le ConfigMap et les Secrets controlent le modele utilise par chaque agent.
 
+## Assistant de code persistant (Dionysos)
+
+Dionysos peut heberger un assistant de code (Claude Code) pour l'administration. Son volume `/opt/data` est un `emptyDir` : il survit au redemarrage du noeud, pas a la recreation du pod. Pour que l'assistant, sa configuration et son historique survivent, `02-observer-dionysos.yaml` ajoute :
+
+| Element | Role |
+|---|---|
+| initContainer `init-claude` | restaure la configuration et l'historique depuis un depot Git prive dedie (`${CLAUDE_REPO}`), puis installe l'assistant a la version `${CLAUDE_CODE_VERSION}` si elle manque ; idempotent (rejoue apres un redemarrage du noeud sans ecraser le travail local) |
+| sidecar natif `claude-sync` | pousse l'historique toutes les `${CLAUDE_SYNC_INTERVAL}` secondes, a chaque fin de session (un hook `SessionEnd` de l'assistant cree `/opt/data/.claude-home/.sync-request`, couvre `/clear` et la sortie) et a l'arret du pod (`SIGTERM`, `terminationGracePeriodSeconds: 60`) |
+| conteneur `dionysos` | `CLAUDE_CONFIG_DIR`, `PATH`, `npm_config_*`, `DISABLE_AUTOUPDATER` (version figee par l'initContainer), `CLAUDE_CODE_OAUTH_TOKEN` |
+
+**Secret `${CLAUDE_SECRET}`** (cree par l'administrateur, jamais versionne), cles `oauth-token` (jeton de `claude setup-token`), `forgejo-username`, `forgejo-token` (jeton limite a l'ecriture de depots : celui de `${FORGEJO_SECRET_PREFIX}-dionysos` reste en lecture seule). Toutes les references sont `optional` : sans Secret, le pod demarre, seule la synchronisation echoue.
+
+**Ce qui est versionne** : liste blanche dans le `.gitignore` du depot (`.claude.json`, `settings.json`, `history.jsonl`, `projects/`, `agents/`, `commands/`, `skills/`, listes de plugins). **Jamais** `.credentials.json` : l'authentification passe par le Secret. Les transcripts peuvent contenir des sorties d'outils sensibles : le depot doit rester prive.
+
+Dans les scripts du manifeste, les variables du shell (`$CH`, `$CFG`…) cotoient les variables du gabarit : rendre le fichier avec `envsubst` et la **liste explicite** des variables du tableau ci-dessous, jamais `envsubst` seul.
+
 ## Reference des variables
 
 Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
@@ -46,3 +62,7 @@ Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 | `${MODEL_ROUTINE}` | Modele leger pour les sous-agents | `sophia-routine` |
 | `${API_SERVER_KEY}` | Cle API interne pour la communication entre agents | (requis) |
 | `${TELEGRAM_HITL_CHAT_ID}` | ID du chat Telegram pour les approbations HITL | (requis) |
+| `${CLAUDE_REPO}` | Depot Git prive de la configuration et de l'historique de l'assistant de code | `assistant-history` |
+| `${CLAUDE_SECRET}` | Secret de l'assistant (jeton OAuth, identifiants Forgejo en ecriture) | (requis pour la synchronisation) |
+| `${CLAUDE_CODE_VERSION}` | Version de l'assistant installee par `init-claude` | (a fixer) |
+| `${CLAUDE_SYNC_INTERVAL}` | Intervalle de synchronisation de l'historique, en secondes | `900` |

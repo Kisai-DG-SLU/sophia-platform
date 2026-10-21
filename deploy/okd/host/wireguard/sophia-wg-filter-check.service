@@ -1,0 +1,8 @@
+[Unit]
+Description=SophIA - vérifie que le filtre wg0 reste lisible par OVN-Kubernetes
+
+[Service]
+Type=oneshot
+ExecStart=/etc/sophia/wg-filter-check.sh
+# 2 = vérification impossible (OVN pas encore là) : pas une erreur
+SuccessExitStatus=2

@@ -18,6 +18,8 @@ spec:
       hostPID: true
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      # Laisse au sidecar claude-sync le temps du push final
+      terminationGracePeriodSeconds: 60
 
       initContainers:
       - name: init-workspace
@@ -63,6 +65,126 @@ spec:
         - name: agent-storage
           mountPath: /opt/data
 
+      # Claude Code : restauration de la config/historique depuis le dépôt ${CLAUDE_REPO} + installation npm.
+      # Idempotent : rejoué après un redémarrage du nœud alors que l'emptyDir est conservé.
+      - name: init-claude
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export HOME=/tmp
+          git config --global --add safe.directory '*'
+          git config --global credential.helper '!f() { echo "username=${FORGEJO_USER}"; echo "password=${FORGEJO_TOKEN}"; }; f'
+
+          CH=/opt/data/.claude-home
+          CFG=$CH/config
+          mkdir -p $CFG $CH/npm-global $CH/npm-cache
+
+          # Ne pas polluer le dépôt de configuration (${BRAIN_REPO}) de /opt/data
+          if [ -d /opt/data/.git ]; then
+            grep -qxF '.claude-home/' /opt/data/.git/info/exclude 2>/dev/null || echo '.claude-home/' >> /opt/data/.git/info/exclude
+          fi
+
+          if [ -d $CFG/.git ]; then
+            git -C $CFG pull -q --rebase --autostash origin main || { git -C $CFG rebase --abort 2>/dev/null; echo "WARN: pull de l'historique Claude échoué"; }
+          else
+            git -C $CFG init -q -b main
+            git -C $CFG remote add origin ${CLAUDE_REPO_URL}
+            if git -C $CFG fetch -q origin main; then
+              git -C $CFG checkout -q -f -B main FETCH_HEAD
+            else
+              echo "Pas d'historique Claude initial."
+            fi
+          fi
+          git -C $CFG config user.name "${FORGEJO_USER}"
+          git -C $CFG config user.email "${FORGEJO_USER}@sophia.local"
+
+          PKG=$CH/npm-global/lib/node_modules/@anthropic-ai/claude-code/package.json
+          CUR=$(node -p "require('$PKG').version" 2>/dev/null)
+          if [ "$CUR" != "${CLAUDE_CODE_VERSION}" ]; then
+            npm install -g --prefix $CH/npm-global --cache $CH/npm-cache @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} || echo "WARN: installation Claude Code échouée"
+          fi
+          echo "Claude Code $(node -p "require('$PKG').version" 2>/dev/null) prêt"
+        env:
+        - name: CLAUDE_CODE_VERSION
+          value: "${CLAUDE_CODE_VERSION}"
+        - name: CLAUDE_REPO_URL
+          value: "http://${FORGEJO_SERVICE}:3000/${ORG_NAME}/${CLAUDE_REPO}.git"
+        # Token Forgejo avec write:repository (celui de ${FORGEJO_SECRET_PREFIX}-dionysos est en lecture seule)
+        - name: FORGEJO_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${CLAUDE_SECRET}
+              key: forgejo-username
+              optional: true
+        - name: FORGEJO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${CLAUDE_SECRET}
+              key: forgejo-token
+              optional: true
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+
+      # Sidecar natif : push de l'historique Claude toutes les CLAUDE_SYNC_INTERVAL s,
+      # à chaque fin de session (/clear, exit : hook SessionEnd -> .sync-request) et à l'arrêt du pod.
+      - name: claude-sync
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        restartPolicy: Always
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export HOME=/tmp
+          git config --global --add safe.directory '*'
+          git config --global credential.helper '!f() { echo "username=${FORGEJO_USER}"; echo "password=${FORGEJO_TOKEN}"; }; f'
+
+          CFG=/opt/data/.claude-home/config
+          REQ=/opt/data/.claude-home/.sync-request
+
+          sync() {
+            [ -d $CFG/.git ] || return 1
+            cd $CFG
+            git add -A
+            git diff --cached --quiet || git commit -qm "sync $(date -Iseconds) $1"
+            git pull -q --rebase --autostash origin main 2>/dev/null || git rebase --abort 2>/dev/null
+            git push -q origin HEAD:main
+          }
+
+          trap 'sync stop || echo "WARN: push final échoué"; exit 0' TERM INT
+
+          last=0
+          while :; do
+            now=$(date +%s)
+            if [ -e $REQ ] || [ $((now - last)) -ge ${CLAUDE_SYNC_INTERVAL} ]; then
+              reason=periodic
+              [ -e $REQ ] && reason=session-end && rm -f $REQ
+              sync $reason || echo "WARN: sync de l'historique Claude échouée"
+              last=$now
+            fi
+            sleep 10 & wait $!
+          done
+        env:
+        - name: CLAUDE_SYNC_INTERVAL
+          value: "${CLAUDE_SYNC_INTERVAL}"
+        - name: FORGEJO_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${CLAUDE_SECRET}
+              key: forgejo-username
+              optional: true
+        - name: FORGEJO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${CLAUDE_SECRET}
+              key: forgejo-token
+              optional: true
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
+
       containers:
       - name: dionysos
         image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
@@ -74,7 +196,22 @@ spec:
         - name: AGENT_PERSONA
           value: "DIONYSOS"
         - name: PATH
-          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}:/opt/data/.claude-home/npm-global/bin"
+        - name: CLAUDE_CONFIG_DIR
+          value: "/opt/data/.claude-home/config"
+        - name: npm_config_prefix
+          value: "/opt/data/.claude-home/npm-global"
+        - name: npm_config_cache
+          value: "/opt/data/.claude-home/npm-cache"
+        # Version figée par init-claude (CLAUDE_CODE_VERSION)
+        - name: DISABLE_AUTOUPDATER
+          value: "1"
+        - name: CLAUDE_CODE_OAUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${CLAUDE_SECRET}
+              key: oauth-token
+              optional: true
         - name: API_SERVER_ENABLED
           value: "true"
         - name: API_SERVER_HOST

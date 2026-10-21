@@ -1,0 +1,59 @@
+#!/usr/sbin/nft -f
+# SophIA — filtrage du trafic entrant par le VPN (wg0), sur le nœud.
+#
+# Gabarit : à rendre avec envsubst et la liste EXPLICITE des variables (voir README.md) :
+#   envsubst '$VPN_SERVER_IP $VPN_ADMIN_RANGE $GIT_SSH_PORT $GIT_HTTP_PORT' \
+#     < wg-filter.nft > /etc/sophia/wg-filter.nft
+#
+# Principe : la plateforme ne se joint que par le VPN, et le réseau local n'est jamais
+# joignable depuis le VPN. Le FORWARD d'OKD (politique DROP) bloque déjà le réseau local ;
+# ce filtre le garantit indépendamment d'OVN-Kubernetes et limite ce qu'un appareil
+# utilisateur peut joindre sur le nœud lui-même.
+#
+# Plan d'adressage (un pair par appareil, adresse fixe /32) :
+#   adresse VPN du serveur          VPN_SERVER_IP
+#   plage d'administration          VPN_ADMIN_RANGE : tout le nœud, Forgejo SSH et web
+#   plage des utilisateurs          le reste du réseau VPN : HTTP/HTTPS seulement
+#
+# Table à part (inet sophia_wg) : OVN-Kubernetes ne la touche pas. Une règle « drop » est
+# définitive quelle que soit la table ; « accept » laisse les autres tables décider.
+# Rechargement idempotent : la table est déclarée, supprimée puis recréée d'un bloc.
+#
+# ⚠ COMPATIBILITÉ OVN-KUBERNETES — À LIRE AVANT TOUTE MODIFICATION
+# ovnkube-controller relit TOUT le ruleset au démarrage avec le nft embarqué dans son
+# image (1.0.9 en OKD 4.21), plus ancien que celui de l'hôte (1.1.5). Une table que ce
+# vieux nft ne sait pas relire le fait planter (segfault, code 139) : plus de réseau des
+# pods, plus de cluster. Voir README.md, « Compatibilité avec OVN-Kubernetes ».
+#   - INTERDIT : tout set ou map NOMMÉ (« set admins { … } », « @admins »), avec ou sans
+#     intervalles → 139. D'où la plage écrite en dur dans les règles ci-dessous.
+#   - Vérifié lisible : plages et sets anonymes ({ 80, 443 }, a.b.c.d-a.b.c.e),
+#     ct state, ct original ip daddr, ct status, iifname, icmp type, counter, comment.
+#   - Après toute modification ET après chaque mise à jour d'OKD (le nft de l'image OVN
+#     peut changer) : sudo bash test-nft-ovn.sh, puis sudo /etc/sophia/wg-filter-check.sh
+#     (doit répondre 0). Le service et son timer le vérifient aussi automatiquement.
+
+table inet sophia_wg
+delete table inet sophia_wg
+
+table inet sophia_wg {
+    # Trafic destiné au nœud : routeur (80/443, hostNetwork), API du cluster, SSH…
+    chain input {
+        type filter hook input priority filter - 5; policy accept;
+        iifname != "wg0" accept
+        ct state established,related accept
+        ip saddr ${VPN_ADMIN_RANGE} accept comment "administration : tout le nœud"
+        tcp dport { 80, 443 } accept
+        icmp type echo-request accept
+        counter drop comment "VPN utilisateurs : hors 80/443"
+    }
+
+    # Trafic relayé : seulement Forgejo (externalIP du serveur sur le VPN, DNAT vers son
+    # Service) pour l'administration. Tout le reste — réseau local, pods, Services — est refusé.
+    chain forward {
+        type filter hook forward priority filter - 5; policy accept;
+        iifname != "wg0" accept
+        ct state established,related accept
+        ip saddr ${VPN_ADMIN_RANGE} ct original ip daddr ${VPN_SERVER_IP} tcp dport { ${GIT_SSH_PORT}, ${GIT_HTTP_PORT} } accept
+        counter drop comment "VPN : rien de relayé hors Forgejo (admin)"
+    }
+}

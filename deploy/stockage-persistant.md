@@ -19,6 +19,7 @@ Etat verifie le 27/09/2026, par lecture du cluster.
 | Service d'embedding | `${NS_MEMORY}` | oui | 5Gi | lie | cache et modele, pas de corpus |
 | Espace de travail | `${NS_APPS}` | oui | 20Gi | lie, consumer arrete | preproduction, notebooks, webapps, API |
 | LiteLLM | `${NS_CORE}` | non | `emptyDir` | sans stockage | configuration et journaux, rien a conserver |
+| Assistant de code (Dionysos) | `${NS_AGENTS}` | non | `emptyDir` + depot Git prive | restaure a chaque creation du pod | configuration et historique repousses regulierement vers un depot dedie (voir `okd/hermes-system/`) |
 | RabbitMQ | `${NS_CORE}` | prevu | 5Gi demandes | en attente | files inter-agents, a la creation |
 | Agent de controle | `${NS_AGENTS}` | prevu | 2Gi demandes | en attente | regles du controle, a la creation |
 

@@ -36,6 +36,10 @@ Each namespace belongs to a specific security zone.
 
 Network communication between zones is restricted using Kubernetes **NetworkPolicies**.
 
+### Access to the platform: VPN only
+
+The platform is reached through a WireGuard VPN only, including from the local network; the local network is never reachable from the VPN. On the node, a dedicated nftables table, independent from OVN-Kubernetes, tells two ranges apart: **administration** (whole node, Forgejo) and **users** (HTTP/HTTPS only), and forwards nothing but Forgejo for administration. A safeguard checks that this table stays readable by the nft version embedded in OVN-Kubernetes; otherwise it removes the table and raises an alert, never cutting the VPN, the only administration path. See `deploy/okd/host/wireguard/`.
+
 ---
 
 # Air-Gapped Components
