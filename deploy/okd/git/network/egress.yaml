@@ -15,7 +15,7 @@ spec:
       cidrSelector: 172.30.0.0/16 # Autorise la communication avec les autres services OKD
     type: Allow
   - to:
-      cidrSelector: 10.8.0.0/24   # <-- NOUVEAU : Autorise le retour vers ton tunnel WireGuard
+      cidrSelector: ${VPN_NETWORK}   # Retour vers le réseau du VPN (voir okd/host/wireguard/)
     type: Allow
   - to:
       cidrSelector: 0.0.0.0/0     # Bloque tout le reste (Air-Gapped)
