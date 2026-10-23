@@ -5,6 +5,9 @@ metadata:
   namespace: sophia-core
 spec:
   replicas: 1
+  # Volume local RWO : jamais deux Postgres sur le même répertoire de données
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres-sophia
@@ -15,8 +18,10 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: quay.io/sclorg/postgresql-15-c9s:latest
-        imagePullPolicy: Always
+        # Image figée par digest (celle de l'installation de référence) : un redémarrage ne doit
+        # jamais tirer une autre version de Postgres. Montée de version = nouveau digest, choisi.
+        image: quay.io/sclorg/postgresql-15-c9s@sha256:03e655c111aff54b3e18af2e85e79df2aaa6bc9b736878647e95563e662b2ce6
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5432
           protocol: TCP
@@ -31,12 +36,22 @@ spec:
             type: RuntimeDefault
         # -----------------------------------------
         env:
+        # Compte et mot de passe par un Secret, jamais dans le manifeste :
+        #   oc create secret generic postgres-sophia-creds -n sophia-core \
+        #     --from-literal=username=sophia --from-literal=password="$(openssl rand -base64 24)"
         - name: POSTGRESQL_USER
-          value: sophia
+          valueFrom:
+            secretKeyRef: { name: postgres-sophia-creds, key: username }
         - name: POSTGRESQL_PASSWORD
-          value: sophia_password_2026
+          valueFrom:
+            secretKeyRef: { name: postgres-sophia-creds, key: password }
         - name: POSTGRESQL_DATABASE
           value: sophia_db
+        # Bases de LiteLLM, Keycloak, de l'interface et de Temporal (n8n à venir). L'image sclorg dérive
+        # shared_buffers (1/4) et effective_cache_size (1/2) de la limite mémoire.
+        resources:
+          requests: { cpu: 100m, memory: 256Mi }
+          limits: { cpu: "2", memory: 2Gi }
         volumeMounts:
         - mountPath: /var/lib/pgsql/data
           name: storage

@@ -7,10 +7,10 @@ spec:
   source:
     type: Git
     git:
-      uri: http://forgejo-svc.sophia-git.svc:3000/cyclopdev/sophia-brain.git
+      uri: ${CONFIG_REPO_URL}      # dépôt Git interne qui contient ce dossier
     sourceSecret:
       name: forgejo-creds
-    contextDir: config/okd/pod-bases/core/
+    contextDir: deploy/okd/pod-bases/core/
   strategy:
     type: Docker
     dockerStrategy:

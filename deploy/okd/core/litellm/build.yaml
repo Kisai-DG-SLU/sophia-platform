@@ -7,15 +7,18 @@ spec:
   source:
     type: Git
     git:
-      uri: http://forgejo-svc.sophia-git.svc:3000/cyclopdev/sophia-brain.git
+      uri: ${CONFIG_REPO_URL}      # dépôt Git interne qui contient ce dossier
     sourceSecret:
       name: forgejo-creds
-    # Assure-toi que ce chemin correspond à l'emplacement de ton Containerfile
-    contextDir: config/okd/core/litellm
+    contextDir: deploy/okd/core/litellm
   strategy:
     type: Docker
     dockerStrategy:
       dockerfilePath: Containerfile
+  # Le pod de build compte dans le quota de sophia-core (voir ../00-namespace-guardrails.yaml)
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "2", memory: 4Gi }
   output:
     to:
       kind: ImageStreamTag

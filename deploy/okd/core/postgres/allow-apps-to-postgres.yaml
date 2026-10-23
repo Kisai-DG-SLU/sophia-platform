@@ -1,0 +1,23 @@
+# PostgreSQL accepte les applications de sophia-apps, chacune sur sa base et avec son propre compte :
+# l'interface de discussion, puis chaque module (une base par module).
+# S'ajoute aux autres NetworkPolicies de postgres-sophia sans les modifier.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apps-to-postgres
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: postgres-sophia }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-apps }
+          podSelector:
+            matchLabels: { app: sophia-interface }
+        # Un bloc par application qui a sa base (modules privés, voir docs/modules/) :
+        # - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+        #   podSelector: { matchLabels: { app: <application> } }
+      ports:
+        - { protocol: TCP, port: 5432 }
