@@ -1,4 +1,5 @@
-# 1. On bloque tout le trafic sortant de sophia-core, SAUF vers le provider LLM
+# 1. On bloque tout le trafic sortant de sophia-core, sauf les exceptions ci-dessous.
+#    Réseaux des Services et des pods : valeurs par défaut d'OKD (oc get network.config cluster).
 apiVersion: k8s.ovn.org/v1
 kind: EgressFirewall
 metadata:
@@ -11,7 +12,46 @@ spec:
       cidrSelector: 172.30.0.0/16 # Services internes OKD (vital pour le DNS)
   - type: Allow
     to:
-      dnsName: api.deepinfra.com  # L'exception pour l'API de tes LLMs
+      cidrSelector: 10.128.0.0/14 # Pods du cluster
+  # Builds et images : GitHub (ghcr), PyPI, Docker Hub
+  - type: Allow
+    to:
+      dnsName: ghcr.io
+  - type: Allow
+    to:
+      dnsName: pkg-containers.githubusercontent.com
+  - type: Allow
+    to:
+      dnsName: objects.githubusercontent.com
+  - type: Allow
+    to:
+      dnsName: api.deepinfra.com  # fournisseur des modèles distants
+  - type: Allow
+    to:
+      dnsName: pypi.org
+  - type: Allow
+    to:
+      dnsName: files.pythonhosted.org
+  - type: Allow
+    to:
+      dnsName: pypi.python.org
+  - type: Allow
+    to:
+      dnsName: registry-1.docker.io
+  - type: Allow
+    to:
+      dnsName: auth.docker.io
+  - type: Allow
+    to:
+      dnsName: production.cloudflare.docker.com
+  # RabbitMQ lit les clés de signature de Keycloak en HTTPS par le routeur (le nom
+  # résout vers l'adresse du nœud, hors des réseaux autorisés ci-dessus)
+  - type: Allow
+    to:
+      dnsName: ${IDP_HOST}
+    ports:
+    - protocol: TCP
+      port: 443
   - type: Deny
     to:
       cidrSelector: 0.0.0.0/0     # Blocage de tout le reste

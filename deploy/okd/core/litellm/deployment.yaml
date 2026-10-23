@@ -17,6 +17,9 @@ spec:
       - name: build-tiktoken-cache
         image: image-registry.openshift-image-registry.svc:5000/sophia-core/sophia-litellm:latest
         imagePullPolicy: Always
+        resources:
+          requests: { cpu: 50m, memory: 128Mi }
+          limits: { cpu: 500m, memory: 512Mi }
         command:
         - /usr/bin/python3.13
         - -c
@@ -76,8 +79,20 @@ spec:
             type: RuntimeDefault
 
         env:
+        # Références aux secrets (noms, pas valeurs).
+        - name: DEEPINFRA_API_KEY
+          valueFrom:
+            secretKeyRef: { name: llm-api-keys, key: DEEPINFRA_API_KEY }
+        - name: LITELLM_MASTER_KEY
+          valueFrom:
+            secretKeyRef: { name: llm-api-keys, key: LITELLM_MASTER_KEY }
+        - name: PRISMA_CLI_QUERY_ENGINE_TYPE
+          value: binary
+        # INFO, pas DEBUG : en DEBUG, LiteLLM écrit chaque requête entière dans ses journaux
+        # (conversations privées, photos en base64 : 26 Mo en 40 min mesurés) et ralentit les grosses
+        # requêtes — une photo envoyée depuis une tablette dépassait le délai d'oauth2-proxy.
         - name: LITELLM_LOG
-          value: "DEBUG"
+          value: "INFO"
         - name: HOME
           value: "/tmp"
         - name: XDG_CACHE_HOME
@@ -118,6 +133,12 @@ spec:
         envFrom:
         - secretRef:
             name: llm-api-keys
+
+        # 550 Mi au repos (mesuré) ; les photos en base64 gonflent les requêtes. Le plafond CPU borne
+        # aussi à 2 cœurs le gel causé par le comptage de tokens (quadratique) sur une entrée pathologique.
+        resources:
+          requests: { cpu: 250m, memory: 768Mi }
+          limits: { cpu: "2", memory: 2Gi }
 
         volumeMounts:
         - name: config

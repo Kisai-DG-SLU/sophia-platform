@@ -1,0 +1,59 @@
+# Orchestration — `sophia-core`
+
+The heart of the platform: the model router (LiteLLM), the shared PostgreSQL database, the event bus (RabbitMQ) and the durable workflow engine (Temporal). Everything that talks to a model goes through LiteLLM; no application calls a provider directly.
+
+## Components
+
+| Directory | Role |
+|---|---|
+| `litellm/` | model router: stable aliases (`sophia-routine`, `sophia-think`, `sophia-architect`, `sophia-local`, `sophia-stt`, `sophia-tts`), restricted virtual keys, costs |
+| `postgres/` | PostgreSQL 15: databases for LiteLLM, Keycloak, the interface, Temporal and the modules, one account per database |
+| [`rabbitmq/`](rabbitmq/) | agents' event bus, management UI behind Keycloak |
+| [`temporal/`](temporal/) | agents' durable workflows (delegation, recovery after failure) |
+| `network/` | namespace egress (EgressFirewall) and Postgres ingress |
+| `00-namespace-guardrails.yaml` | namespace `ResourceQuota` and `LimitRange` |
+
+## Choices
+
+| Item | Choice | Reason |
+|---|---|---|
+| Model aliases | applications ask for a **role** (`sophia-think`), never a model | changing model or provider only touches `litellm/config.yaml` |
+| Local model | `sophia-local` → llama.cpp server in `sophia-inference`, zero cost, `supports_vision`, `max_input_tokens` 61,440 | same interface as remote models; the cap matches the server's per-conversation window ([`../inference/`](../inference/)) |
+| Voice | `sophia-stt` and `sophia-tts` → voice service in `sophia-inference`, zero cost | voice goes through the same router, keys and logs |
+| Restricted keys | each client (interface, agents) has a key limited to a model list; `add-model-to-keys.py` adds a new alias to it | a new alias is invisible until it is added to the keys that need it |
+| Prices | copied from the provider's API by `sync-pricing.py`, never by hand | the displayed cost follows the real price |
+| LiteLLM logs | `INFO`, not `DEBUG` | in `DEBUG`, every full request (private conversations, base64 photos) lands in the logs and slows down large requests |
+| Guardrails | namespace quota (16 Gi, 12 CPU, 15 pods) and explicit limits on **every** container, builds included | a container without limits gets 512 Mi by default: LiteLLM, Postgres or a build would be OOM-killed. **Apply the limits before the quota** |
+| LiteLLM | 768 Mi requested, at most 2 Gi and 2 CPU | ≈ 550 Mi at rest, photos inflate requests; the CPU cap also bounds a pathological token count freeze |
+| Postgres | image **pinned by digest**, `IfNotPresent`, `Recreate`, 2 Gi | a restart never pulls another version; never two Postgres on the same local volume; the image derives its buffers from the memory limit |
+| Egress | deny all except cluster Services and pods, the remote model provider, the registries and package indexes used by builds, and the identity provider on 443 | RabbitMQ reads Keycloak's signing keys through its public name, which resolves to the node, outside the internal networks |
+
+## Variables
+
+| Variable | Role | Example |
+|---|---|---|
+| `${CONFIG_REPO_URL}` | internal Git repository containing this directory (builds) | `http://git.example.internal/org/platform.git` |
+| `${LITELLM_HOST}` | LiteLLM DNS name, resolved to the VPN address | `llm.example.org` |
+| `${IDP_HOST}` | identity provider's public name | `auth.example.org` |
+
+## Secrets (never committed)
+
+| Secret | Keys |
+|---|---|
+| `llm-api-keys` | `DEEPINFRA_API_KEY`, `LITELLM_MASTER_KEY`, `DATABASE_URL` |
+| `postgres-sophia-creds` | `username`, `password` (`openssl rand -base64 24`) |
+| `forgejo-creds` | build read access to the internal repository |
+
+## Procedure (administrator)
+
+1. Explicit limits first: `litellm/deployment.yaml`, `litellm/build.yaml`, `postgres/instance.yaml` — `--dry-run=server`, then `apply`.
+2. Guardrails: `00-namespace-guardrails.yaml`, then `oc describe quota -n sophia-core`.
+3. Network: `network/policies.yaml`, `postgres/allow-apps-to-postgres.yaml`.
+4. Router: `litellm/config.yaml` (`oc diff` first: only the expected aliases change), restart LiteLLM, then `add-model-to-keys.py` dry-run and with `--apply` for each new alias:
+
+```bash
+oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-local < litellm/add-model-to-keys.py           # dry run
+oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-local --apply < litellm/add-model-to-keys.py   # apply
+```
+
+The script reads the master key from the pod's environment, never prints it, and only touches keys that already list the reference model (`sophia-think`).

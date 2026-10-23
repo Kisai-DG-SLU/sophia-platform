@@ -1,6 +1,6 @@
 # Scripts — Reference
 
-This directory documents the operational scripts found in the internal agent configuration repository (`sophia-brain/scripts/`). These scripts are specific to the live infrastructure and are not reproduced here.
+This directory documents the operational scripts found in the internal agent configuration repository (`scripts/`). These scripts are specific to the live infrastructure and are not reproduced here.
 
 ## Script Inventory
 
