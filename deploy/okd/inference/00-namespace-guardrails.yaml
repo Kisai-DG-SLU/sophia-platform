@@ -18,9 +18,9 @@ metadata:
   namespace: sophia-inference
 spec:
   hard:
-    limits.memory: 24Gi
-    limits.cpu: "16"         # texte 8 + voix 4 + marge (redémarrages)
-    pods: "4"
+    limits.memory: 40Gi      # texte 16 + voix 4 + modèles d'image 13 + marge
+    limits.cpu: "36"         # texte 8 + voix 4 + modèles d'image 17 + marge (redémarrages)
+    pods: "6"
 ---
 apiVersion: v1
 kind: LimitRange

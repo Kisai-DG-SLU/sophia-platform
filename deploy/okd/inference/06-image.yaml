@@ -1,0 +1,152 @@
+# sophia-image-gen : les MODÈLES d'image, sur CPU (zone d'inférence, sans sortie réseau).
+#   - sd-server  : stable-diffusion.cpp (MIT), SDXL-Turbo + TAESDXL, port 1234 ;
+#   - nsfw       : classifieur des images générées (numpy, Apache 2.0), port 8001.
+# L'outil MCP `image` (règles de protection, orchestration) est dans sophia-skills
+# (../skills/04-image.yaml) : seul lui peut joindre ce pod.
+# Code non fourni (contrat : README). Images construites dans sophia-apps (builds binaires) :
+#   oc start-build sophia-image-sd   -n sophia-apps --from-dir=${IMAGE_SRC_DIR} --follow   # ≈ 15 min
+#   oc start-build sophia-image-nsfw -n sophia-apps --from-dir=${IMAGE_SRC_DIR} --follow
+# Modèles : /var/mnt/models/image (fetch-image-models.sh, depuis le nœud), via pvc-models.
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-image-sd
+  namespace: sophia-apps
+  labels: { app: sophia-image-gen }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-image-sd
+  namespace: sophia-apps
+  labels: { app: sophia-image-gen }
+spec:
+  source: { type: Binary }
+  strategy:
+    type: Docker
+    dockerStrategy: { dockerfilePath: Containerfile.sd }
+  output:
+    to: { kind: ImageStreamTag, name: "sophia-image-sd:latest" }
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-image-nsfw
+  namespace: sophia-apps
+  labels: { app: sophia-image-gen }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-image-nsfw
+  namespace: sophia-apps
+  labels: { app: sophia-image-gen }
+spec:
+  source: { type: Binary }
+  strategy:
+    type: Docker
+    dockerStrategy: { dockerfilePath: Containerfile.nsfw }
+  output:
+    to: { kind: ImageStreamTag, name: "sophia-image-nsfw:latest" }
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-image-gen
+  namespace: sophia-inference
+  labels: { app: sophia-image-gen }
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"sophia-image-sd:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sd-server\")].image"},
+       {"from":{"kind":"ImageStreamTag","name":"sophia-image-nsfw:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"nsfw\")].image"}]
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: sophia-image-gen } }
+  template:
+    metadata:
+      labels: { app: sophia-image-gen }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sd-server
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-image-sd:latest
+          # sd-server n'accepte pas « --option=valeur » : option et valeur séparées
+          args: [--listen-ip, 0.0.0.0, --listen-port, "1234",
+                 --model, /models/image/sd_xl_turbo_1.0_fp16.safetensors,
+                 --taesd, /models/image/taesdxl.safetensors, --type, q8_0, --threads, "16"]
+          ports: [{ name: sd, containerPort: 1234 }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: models, mountPath: /models/image, subPath: image, readOnly: true }
+          readinessProbe:
+            tcpSocket: { port: sd }
+            periodSeconds: 15
+            failureThreshold: 20          # chargement du modèle (≈ 7 Go) au démarrage
+          resources:
+            requests: { cpu: "1", memory: 6Gi }
+            limits: { cpu: "16", memory: 12Gi }
+        - name: nsfw
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-image-nsfw:latest
+          ports: [{ name: nsfw, containerPort: 8001 }]
+          env:
+            - { name: NSFW_WEIGHTS, value: /models/image/nsfw/model.safetensors }
+            # Un seul fil de calcul : sinon numpy en lance un par cœur du nœud (40) dans un
+            # conteneur limité à 2 CPU, et le quota le bride (contrôles > 30 s mesurés).
+            - { name: OPENBLAS_NUM_THREADS, value: "1" }
+            - { name: OMP_NUM_THREADS, value: "1" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: models, mountPath: /models/image, subPath: image, readOnly: true }
+          readinessProbe:
+            httpGet: { path: /health, port: nsfw }
+            periodSeconds: 10
+            failureThreshold: 12          # prêt quand les poids (340 Mo) sont chargés
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { cpu: "2", memory: 1Gi }
+      volumes:
+        - name: models
+          persistentVolumeClaim: { claimName: pvc-models, readOnly: true }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-image-gen
+  namespace: sophia-inference
+  labels: { app: sophia-image-gen }
+spec:
+  selector: { app: sophia-image-gen }
+  ports:
+    - { name: sd, port: 1234, targetPort: sd }
+    - { name: nsfw, port: 8001, targetPort: nsfw }
+---
+# Entrée : le serveur MCP sophia-image (sophia-skills) seul.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-image-gen-from-skills
+  namespace: sophia-inference
+spec:
+  podSelector: { matchLabels: { app: sophia-image-gen } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-skills } }
+          podSelector: { matchLabels: { app: sophia-image } }
+      ports:
+        - { protocol: TCP, port: 1234 }
+        - { protocol: TCP, port: 8001 }

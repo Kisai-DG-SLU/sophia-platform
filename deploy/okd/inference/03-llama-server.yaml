@@ -1,8 +1,13 @@
 # Serveur d'inférence locale : llama.cpp, Qwen3.5-9B Q6_K, sur l'A2 (15 Go).
 #
-# Mémoire GPU visée (≈ 13 Go) : poids 7,5 Go + cache de contexte ≈ 4 Gio + tampons.
-# Qwen3.5 est hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token.
-# 131072 tokens au total, partagés entre 4 discussions en parallèle (≈ 32 000 chacune).
+# Mémoire GPU visée (≈ 13,5 Go) : poids 7,5 Go + vision 0,9 Go + cache de contexte ≈ 4,3 Go + tampons
+# (mesuré sans la vision : 11 925 Mio sur 15 356).
+# Qwen3.5 est hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token en
+# 16 bits, ≈ 17 Kio en 8 bits (q8_0). Cache en 8 bits et PARTAGÉ (--kv-unified) : 245 760 tokens
+# dans la même mémoire que les 131 072 en 16 bits d'avant ; une discussion peut en prendre jusqu'à
+# 4 × 61 440 garantis, davantage quand les autres sont courtes. La fenêtre par discussion est
+# bornée côté interface (SOPHIA_CONTEXT_LIMITS, 61 440) : au-delà, la lecture du prompt dépasse
+# la minute sur l'A2.
 # --jinja : gabarit de discussion du modèle, nécessaire aux appels d'outils (MCP, skills).
 # --reasoning off : pas de raisonnement interne par défaut (latence), réactivable par requête.
 # Aucune sortie réseau (04-network) : le serveur ne parle qu'à LiteLLM.
@@ -10,7 +15,7 @@
 # Accès au GPU : « chemin pur » (contournement de l'opérateur NVIDIA, voir README).
 # L'opérateur NVIDIA ne fonctionne pas sur ce nœud (crochet du container toolkit en échec,
 # device plugin désactivé) : pas de ressource nvidia.com/gpu, conteneur privilégié qui voit
-# /dev/nvidia*, et libcuda.so.1 du pilote (550.90.07) montée depuis /var/lib/nvidia-pure.
+# /dev/nvidia*, et libcuda.so.1 du pilote montée depuis /var/lib/nvidia-pure.
 # SCC privileged accordée au compte default de sophia-inference.
 ---
 apiVersion: apps/v1
@@ -41,6 +46,12 @@ spec:
             - /models/qwen3.5-9b/Qwen3.5-9B-Q6_K.gguf
             - --alias
             - sophia-local
+            # Vision : module mmproj de Qwen3.5 (F16, 0,92 Go) sur le GPU ; une image coûte
+            # au plus 2 048 tokens (assez pour lire un devoir, borne la mémoire et le temps).
+            - --mmproj
+            - /models/qwen3.5-9b/mmproj-F16.gguf
+            - --image-max-tokens
+            - "2048"
             - --host
             - 0.0.0.0
             - --port
@@ -48,11 +59,19 @@ spec:
             - --n-gpu-layers
             - "999"
             - --ctx-size
-            - "131072"
+            - "245760"
             - --parallel
             - "4"
+            - --kv-unified
+            - --cache-type-k
+            - q8_0
+            - --cache-type-v
+            - q8_0
+            - --flash-attn            # requis pour un cache V quantifié
+            - "on"
             - --jinja
-            # Raisonnement interne coupé par défaut (mesuré). Une requête
+            # Raisonnement interne coupé par défaut (mesuré : outils 4/4 dans les deux
+            # modes, boucles deux fois plus rapides : 42 s contre 88 s pour la série). Une requête
             # peut le réactiver : chat_template_kwargs {"enable_thinking": true}.
             - --reasoning
             - "off"
