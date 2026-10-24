@@ -79,12 +79,12 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 
 **En cours**
 
-- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique.
-- L'interface comme demandeur du répartiteur ; planificateur des objectifs ouverts.
+- L'interface comme demandeur du répartiteur.
 - API mémoire, pipeline d'ingestion et dimension graphe.
 
 **Prévu**
 
+- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique ; planificateur des objectifs ouverts.
 - Observabilité et workflow « incident » ; supervision, déploiement et maintenance derrière le répartiteur.
 - Tribunal Sémantique, Ghost Search, filtre DLP.
 - Niveaux de confidentialité de la mémoire.
@@ -103,7 +103,7 @@ Le détail est dans la [feuille de route](roadmap.md).
 ## Questions fréquentes
 
 **SophIA est-elle souveraine aujourd'hui ?**
-En grande partie : l'infrastructure, la mémoire, le contrôle d'accès et l'inférence de l'interface et des modules sont locaux. Les agents passent encore par des modèles distants pour les essais ; leur passage au modèle local est en cours, sans rien changer d'autre qu'un routage.
+En grande partie : l'infrastructure, la mémoire, le contrôle d'accès et l'inférence de l'interface et des modules sont locaux. Les agents passent encore par des modèles distants pour les essais ; leur passage au modèle local est prévu, sans rien changer d'autre qu'un routage.
 
 **Faut-il un très gros modèle ?**
 Non. Le confinement, les règles, la validation humaine et la sortie contrainte ne dépendent pas des capacités du modèle. Les tâches sont découpées en petites décisions, à la portée d'un modèle local modeste.
