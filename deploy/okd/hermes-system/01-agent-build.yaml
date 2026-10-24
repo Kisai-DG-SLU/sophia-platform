@@ -57,7 +57,8 @@ spec:
   source:
     type: Dockerfile
     dockerfile: |
-      FROM nousresearch/hermes-agent:latest
+      # Base figée par empreinte : une reconstruction ne change pas de version sans décision
+      FROM docker.io/nousresearch/hermes-agent:${HERMES_AGENT_VERSION}@${HERMES_AGENT_DIGEST}
       USER root
       ENV OC_VERSION=${OC_VERSION:-4.14}
 
