@@ -28,8 +28,10 @@ Navigateur → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ API des
 - **Identité imposée** : `x-litellm-end-user-id` vient d'oauth2-proxy, les en-têtes envoyés par le client sont écrasés. Le routeur suit les dépenses par personne.
 - **Contexte côté serveur** : en production, `v1/chat/completions` passe par l'API des discussions, qui injecte la persona, le profil de la personne et la date avant le routeur ; le navigateur ne peut pas les modifier.
 - **Recherche web** : la boucle d'outils (recherche, lecture de page, météo) tourne dans l'API, contre le sas `sophia-dmz`. Une page ne peut être lue que si son adresse vient d'un résultat de recherche ou d'un message de la personne : une adresse devinée par le modèle est refusée par le code.
+- **Outils en MCP** : l'API est un client MCP ; elle lit la liste des outils de chaque serveur de `SOPHIA_MCP_URLS` (sas web, [outils locaux](../../skills/README.md), modules), affiche l'annonce que chaque outil déclare (icône, libellé), remplit elle-même les paramètres réservés (compte protégé) et insère dans la réponse, après vérification, les images et cartes que l'outil renvoie. Ajouter un outil ne demande aucun changement de l'interface.
+- **Fenêtre de contexte** : bornée par modèle (`SOPHIA_CONTEXT_LIMITS`) ; au-delà, les échanges les plus anciens sont résumés, et un fichier trop gros est refusé avec un message clair.
 - **API des discussions** : écoute sur `127.0.0.1` seulement, derrière nginx ; l'identité vient des en-têtes posés par nginx.
-- **Réseau** : entrée depuis le routeur OpenShift seulement, vers oauth2-proxy ; sortie vers le routeur de modèles, Keycloak, PostgreSQL, Forgejo, le sas web et le DNS.
+- **Réseau** : entrée depuis le routeur OpenShift seulement, vers oauth2-proxy ; sortie vers le routeur de modèles, Keycloak, PostgreSQL, Forgejo, le sas web, les serveurs MCP de `sophia-skills` (et des modules) et le DNS.
 
 ## Prérequis (secrets)
 

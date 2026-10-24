@@ -28,8 +28,10 @@ Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversati
 - **Enforced identity**: `x-litellm-end-user-id` comes from oauth2-proxy; headers sent by the client are overwritten. The router tracks spend per person.
 - **Server-side context**: in production, `v1/chat/completions` goes through the conversation API, which injects the persona, the person's profile and the date before the router; the browser cannot change them.
 - **Web search**: the tool loop (search, page reading, weather) runs in the API, against the `sophia-dmz` airlock. A page can only be read if its address comes from a search result or from the person's message: an address guessed by the model is refused by code.
+- **Tools over MCP**: the API is an MCP client; it reads the tool list of every server in `SOPHIA_MCP_URLS` (web airlock, [local tools](../../skills/README.en.md), modules), shows the announcement each tool declares (icon, label), fills reserved parameters itself (protected account) and inserts into the answer, after checking them, the images and maps the tool returns. Adding a tool requires no interface change.
+- **Context window**: capped per model (`SOPHIA_CONTEXT_LIMITS`); beyond it, the oldest exchanges are summarised, and an oversized file is refused with a clear message.
 - **Conversation API**: listens on `127.0.0.1` only, behind nginx; identity comes from the headers set by nginx.
-- **Network**: ingress from the OpenShift router only, to oauth2-proxy; egress to the model router, Keycloak, PostgreSQL, Forgejo, the web airlock and DNS.
+- **Network**: ingress from the OpenShift router only, to oauth2-proxy; egress to the model router, Keycloak, PostgreSQL, Forgejo, the web airlock, the MCP servers of `sophia-skills` (and of modules) and DNS.
 
 ## Prerequisites (secrets)
 
