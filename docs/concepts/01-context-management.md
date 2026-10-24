@@ -1,58 +1,58 @@
 # Context Management
 
-Le **Context Management** definit la maniere dont SophIA construit, controle et limite le contexte fourni aux modeles d'intelligence artificielle.
+Le **Context Management** définit la manière dont SophIA construit, contrôle et limite le contexte fourni aux modèles d'intelligence artificielle.
 
-Dans la plupart des systemes actuels, le contexte est constitue de maniere implicite a partir de l'historique du chat, d'un RAG approximatif, d'instructions systeme et de quelques outils disponibles. Cette approche fonctionne pour des usages simples mais devient rapidement instable dans des systemes complexes.
+Dans la plupart des systèmes actuels, le contexte est constitué de manière implicite à partir de l'historique du chat, d'un RAG approximatif, d'instructions système et de quelques outils disponibles. Cette approche fonctionne pour des usages simples mais devient rapidement instable dans des systèmes complexes.
 
-SophIA considere le contexte comme une ressource critique qui doit etre explicitement geree.
+SophIA considère le contexte comme une ressource critique qui doit être explicitement gérée.
 
 ---
 
-## Probleme
+## Problème
 
-Les modeles de langage souffrent de plusieurs limitations structurelles :
+Les modèles de langage souffrent de plusieurs limitations structurelles :
 
-- fenetre de contexte limitee
+- fenêtre de contexte limitée
 - perte d'information progressive
-- pollution du contexte par des elements non pertinents
-- difficulte a distinguer les instructions importantes
-- dependance excessive a l'historique conversationnel
+- pollution du contexte par des éléments non pertinents
+- difficulté à distinguer les instructions importantes
+- dépendance excessive à l'historique conversationnel
 
-Dans les systemes multi-agents, ces problemes sont amplifies : accumulation de contexte inutile, duplication d'information, perte de coherence entre agents.
+Dans les systèmes multi-agents, ces problèmes sont amplifiés : accumulation de contexte inutile, duplication d'information, perte de cohérence entre agents.
 
-Sans controle explicite, le systeme devient lent, instable et imprevisible.
+Sans contrôle explicite, le système devient lent, instable et imprévisible.
 
 ---
 
 ## Principe
 
-Le Context Management repose sur une idee simple : le contexte envoye au modele doit etre construit intentionnellement, et non herite passivement d'une conversation.
+Le Context Management repose sur une idée simple : le contexte envoyé au modèle doit être construit intentionnellement, et non hérité passivement d'une conversation.
 
-Le systeme assemble dynamiquement le contexte a partir de plusieurs sources.
+Le système assemble dynamiquement le contexte à partir de plusieurs sources.
 
 ---
 
 ## Sources de contexte
 
-### Instructions systeme
+### Instructions système
 
-Definissent le role de l'agent et les regles generales : role de l'assistant, contraintes de securite, style de reponse attendu.
+Définissent le rôle de l'agent et les règles générales : rôle de l'assistant, contraintes de sécurité, style de réponse attendu.
 
-### Specifications du projet
+### Spécifications du projet
 
-Les specifications decrivent les objectifs du projet. Elles proviennent generalement du Brain.
+Les spécifications décrivent les objectifs du projet. Elles proviennent généralement du Brain.
 
-### Memoire
+### Mémoire
 
-Certaines informations persistantes peuvent etre injectees depuis la memoire : decisions passees, connaissances indexees, resultats de recherches.
+Certaines informations persistantes peuvent être injectées depuis la mémoire : décisions passées, connaissances indexées, résultats de recherches.
 
-### Etat de la tache
+### État de la tâche
 
-Le contexte peut inclure l'etat courant d'une tache : etape en cours, resultat intermediaire, historique limite des actions.
+Le contexte peut inclure l'état courant d'une tâche : étape en cours, résultat intermédiaire, historique limité des actions.
 
 ### Outils disponibles
 
-Les capacites disponibles doivent etre connues du modele : acces a un repository, outils MCP, acces a un workspace.
+Les capacités disponibles doivent être connues du modèle : accès à un repository, outils MCP, accès à un workspace.
 
 ---
 
@@ -60,10 +60,10 @@ Les capacites disponibles doivent etre connues du modele : acces a un repository
 
 Le contexte est construit dynamiquement par l'orchestrateur. Le processus typique est :
 
-1. identification du projet concerne
-2. recuperation des specifications pertinentes
-3. recuperation eventuelle de memoire
-4. selection des outils disponibles
+1. identification du projet concerné
+2. récupération des spécifications pertinentes
+3. récupération éventuelle de mémoire
+4. sélection des outils disponibles
 5. construction du prompt final
 
 Cette construction permet de minimiser le bruit et maximiser la pertinence.
@@ -72,27 +72,27 @@ Cette construction permet de minimiser le bruit et maximiser la pertinence.
 
 ## Limitation volontaire du contexte
 
-Un principe important de SophIA est de limiter volontairement le contexte. Plus de contexte ne signifie pas necessairement de meilleures reponses.
+Un principe important de SophIA est de limiter volontairement le contexte. Plus de contexte ne signifie pas nécessairement de meilleures réponses.
 
-Un contexte trop large peut provoquer une dilution de l'information importante, des erreurs d'interpretation, et une augmentation du cout et de la latence.
+Un contexte trop large peut provoquer une dilution de l'information importante, des erreurs d'interprétation, et une augmentation du coût et de la latence.
 
-Le systeme privilegie donc un contexte cible, structure et limite.
+Le système privilégie donc un contexte ciblé, structuré et limité.
 
 ---
 
 ## Relation avec les autres concepts
 
-Le Context Management est etroitement lie a plusieurs autres mecanismes de l'architecture :
+Le Context Management est étroitement lié à plusieurs autres mécanismes de l'architecture :
 
-- Le **Workspace Management** fournit l'environnement d'execution mais ne constitue pas une source de contexte durable.
-- Le **Project Model** permet d'identifier les sources de contexte pertinentes pour un projet donne.
-- Le **Tribunal Semantique** valide les connaissances avant leur integration dans la memoire.
-- Le **RAG 5D** constitue la structuration de la memoire exploitable comme source de contexte.
+- Le **Workspace Management** fournit l'environnement d'exécution mais ne constitue pas une source de contexte durable.
+- Le **Project Model** permet d'identifier les sources de contexte pertinentes pour un projet donné.
+- Le **Tribunal Sémantique** valide les connaissances avant leur intégration dans la mémoire.
+- Le **RAG 5D** constitue la structuration de la mémoire exploitable comme source de contexte.
 
 ---
 
 ## Objectif
 
-L'objectif du Context Management est de garantir que les modeles disposent des bonnes informations, que le contexte reste maitrise, que les agents restent previsibles et que le systeme reste scalable.
+L'objectif du Context Management est de garantir que les modèles disposent des bonnes informations, que le contexte reste maîtrisé, que les agents restent prévisibles et que le système reste scalable.
 
-Dans SophIA, le contexte n'est pas un effet de bord d'une conversation. Il devient un composant architectural a part entiere.
+Dans SophIA, le contexte n'est pas un effet de bord d'une conversation. Il devient un composant architectural à part entière.

@@ -1,71 +1,71 @@
-# Filtre Anti-Fuite (DLP) : Protection des Donnees Critiques
+# Filtre Anti-Fuite (DLP) : Protection des Données Critiques
 
-Le **DLP Filter** (Data Leak Prevention) est un mecanisme de securite qui detecte, anonymise ou bloque les donnees critiques avant qu'elles ne quittent le perimetre de confiance du systeme.
+Le **DLP Filter** (Data Leak Prevention) est un mécanisme de sécurité qui détecte, anonymise ou bloque les données critiques avant qu'elles ne quittent le périmètre de confiance du système.
 
-Son role est de prevenir la fuite d'informations sensibles vers des modeles distants, des services externes, ou des logs non securises.
+Son rôle est de prévenir la fuite d'informations sensibles vers des modèles distants, des services externes, ou des logs non sécurisés.
 
 ---
 
-## Probleme
+## Problème
 
-Les systemes d'IA modernes peuvent etre amenes a transmettre des donnees a des services externes pour plusieurs raisons : inference via un modele distant, enrichissement de contexte par une API externe, utilisation d'un service de routage de modeles.
+Les systèmes d'IA modernes peuvent être amenés à transmettre des données à des services externes pour plusieurs raisons : inférence via un modèle distant, enrichissement de contexte par une API externe, utilisation d'un service de routage de modèles.
 
-Dans ces echanges, le risque de fuite de donnees sensibles est permanent :
+Dans ces échanges, le risque de fuite de données sensibles est permanent :
 
-- identifiants techniques (cles API, tokens, certificats)
-- donnees personnelles (noms, emails, numeros)
-- propriete intellectuelle (brevets, algorithmes, donnees financieres)
-- secrets industriels (sources, architectures, specifications)
+- identifiants techniques (clés API, tokens, certificats)
+- données personnelles (noms, emails, numéros)
+- propriété intellectuelle (brevets, algorithmes, données financières)
+- secrets industriels (sources, architectures, spécifications)
 
-Un systeme qui ne controle pas ce qui sort de son perimetre expose l'organisation a des risques juridiques, concurrentiels et reglementaires.
+Un système qui ne contrôle pas ce qui sort de son périmètre expose l'organisation à des risques juridiques, concurrentiels et réglementaires.
 
 ---
 
 ## Principe
 
-Le DLP Filter agit comme une barriere de controle au point de sortie du systeme. Tout contenu destine a etre transmis a un service exterieur est intercepte, analyse, et traite selon des regles configurables.
+Le DLP Filter agit comme une barrière de contrôle au point de sortie du système. Tout contenu destiné à être transmis à un service extérieur est intercepté, analysé, et traité selon des règles configurables.
 
 Trois actions sont possibles :
 
-- **Autoriser.** Le contenu ne contient aucune donnee sensible et peut etre transmis.
-- **Anonymiser.** Le contenu contient des donnees sensibles identifiees. Celles-ci sont remplacees par des placeholders avant transmission. Une alerte est enregistree.
-- **Bloquer.** Le contenu contient des donnees critiques qui ne doivent en aucun cas quitter le perimetre. La transmission est interrompue et une alerte est remontee.
+- **Autoriser.** Le contenu ne contient aucune donnée sensible et peut être transmis.
+- **Anonymiser.** Le contenu contient des données sensibles identifiées. Celles-ci sont remplacées par des placeholders avant transmission. Une alerte est enregistrée.
+- **Bloquer.** Le contenu contient des données critiques qui ne doivent en aucun cas quitter le périmètre. La transmission est interrompue et une alerte est remontée.
 
 ---
 
 ## Fonctionnement
 
-### Detection
+### Détection
 
-Le filtre analyse le contenu selon plusieurs methodes :
+Le filtre analyse le contenu selon plusieurs méthodes :
 
-- **Pattern matching.** Detection de formats connus (cles API, adresses email, numeros de carte, IBAN) par expressions regulieres.
-- **Contextuelle.** Analyse semantique pour identifier des donnees qui, sans correspondre a un format connu, sont sensibles par leur contexte.
-- **Statistique.** Detection d'anomalies dans les flux de sortie : volume inhabituel, type de donnees inattendu.
+- **Pattern matching.** Détection de formats connus (clés API, adresses email, numéros de carte, IBAN) par expressions régulières.
+- **Contextuelle.** Analyse sémantique pour identifier des données qui, sans correspondre à un format connu, sont sensibles par leur contexte.
+- **Statistique.** Détection d'anomalies dans les flux de sortie : volume inhabituel, type de données inattendu.
 
-### Decision
+### Décision
 
-Chaque regle de detection est associee a un niveau de criticite qui determine l'action :
+Chaque règle de détection est associée à un niveau de criticité qui détermine l'action :
 
-- Critique : blocage et alerte immediate.
-- Eleve : anonymisation et alerte.
+- Critique : blocage et alerte immédiate.
+- Élevé : anonymisation et alerte.
 - Standard : anonymisation silencieuse.
 - Information : passage et journalisation.
 
 ### Journalisation
 
-Toute interaction avec le DLP Filter est journalisee : contenu intercepte (ou sa signature), regle declenchee, action appliquee, horodatage. Ces journaux sont accessibles pour audit sans reveler les donnees elles-memes (pseudonymisation).
+Toute interaction avec le DLP Filter est journalisée : contenu intercepté (ou sa signature), règle déclenchée, action appliquée, horodatage. Ces journaux sont accessibles pour audit sans révéler les données elles-mêmes (pseudonymisation).
 
 ---
 
 ## Position dans l'architecture
 
-Le DLP Filter opere au niveau de la couche de routage (`sophia-core`), au point d'entree et de sortie des communications avec les modeles distants et les services externes. Il peut etre active ou desactive par namespace, permettant une granularite fine.
+Le DLP Filter opère au niveau de la couche de routage (`sophia-core`), au point d'entrée et de sortie des communications avec les modèles distants et les services externes. Il peut être activé ou désactivé par namespace, permettant une granularité fine.
 
-Il fonctionne en complement du Sas Paranoiaque : la ou le Sas protege des entrees web, le DLP Filter protege des sorties de donnees.
+Il fonctionne en complément du Sas Paranoïaque : là où le Sas protège des entrées web, le DLP Filter protège des sorties de données.
 
 ---
 
 ## Objectif
 
-Garantir qu'aucune donnee sensible ne quitte le perimetre de confiance sans avoir ete detectee, anonymisee ou bloquee, et que chaque incident potentiel est trace et remontable.
+Garantir qu'aucune donnée sensible ne quitte le périmètre de confiance sans avoir été détectée, anonymisée ou bloquée, et que chaque incident potentiel est tracé et remontable.
