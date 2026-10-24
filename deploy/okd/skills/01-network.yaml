@@ -1,0 +1,76 @@
+# Réseau de sophia-skills : tout refusé ; aucune sortie vers Internet (ce qui sort est en DMZ).
+#   entrée  : l'API des discussions (sophia-apps / sophia-interface) → port MCP 8000 ;
+#   sortie  : DNS ; sophia-image → modèles d'image de sophia-inference (1234, 8001).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: sophia-skills
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-from-interface
+  namespace: sophia-skills
+spec:
+  podSelector: { matchExpressions: [{ key: sophia-mcp, operator: In, values: ["true"] }] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+          podSelector: { matchLabels: { app: sophia-interface } }
+      ports: [{ protocol: TCP, port: 8000 }]
+---
+# Un module qui illustre ses contenus (ex. photo de chaque plat d'un module de cuisine) joint l'outil
+# MCP image, et lui seul (ni sophia-geo, ni d'autre serveur MCP de la zone). Un bloc par module.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: image-from-modules
+  namespace: sophia-skills
+spec:
+  podSelector: { matchLabels: { app: sophia-image } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+          podSelector: { matchLabels: { app: ${MODULE_APP} } }
+      ports: [{ protocol: TCP, port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-dns
+  namespace: sophia-skills
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: image-to-inference
+  namespace: sophia-skills
+spec:
+  podSelector: { matchLabels: { app: sophia-image } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-inference } }
+          podSelector: { matchLabels: { app: sophia-image-gen } }
+      ports:
+        - { protocol: TCP, port: 1234 }
+        - { protocol: TCP, port: 8001 }

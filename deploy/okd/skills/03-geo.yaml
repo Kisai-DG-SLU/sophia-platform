@@ -1,0 +1,79 @@
+# SPOut.2 — sophia-geo : lieux, distances, cartes (MCP), données locales en lecture seule.
+# Code non fourni (contrat : README). Image construite dans sophia-apps (build binaire) :
+#   oc start-build sophia-geo -n sophia-apps --from-dir=${GEO_SRC_DIR} --follow
+# Données : /var/mnt/models/skills/geo (fetch-geo-data.sh, depuis le nœud), via pvc-skills-data.
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-geo
+  namespace: sophia-apps
+  labels: { app: sophia-geo }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-geo
+  namespace: sophia-apps
+  labels: { app: sophia-geo }
+spec:
+  source: { type: Binary }
+  strategy:
+    type: Docker
+    dockerStrategy: { dockerfilePath: Containerfile }
+  output:
+    to: { kind: ImageStreamTag, name: "sophia-geo:latest" }
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-geo
+  namespace: sophia-skills
+  labels: { app: sophia-geo }
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-geo:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sophia-geo\")].image"}]'
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: sophia-geo } }
+  template:
+    metadata:
+      labels: { app: sophia-geo, sophia-mcp: "true" }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sophia-geo
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-geo:latest
+          ports: [{ name: http, containerPort: 8000 }]
+          env:
+            - { name: SOPHIA_GEO_DIR, value: /data/geo }
+          volumeMounts:
+            - { name: data, mountPath: /data/geo, subPath: geo, readOnly: true }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+            failureThreshold: 8
+          resources:
+            requests: { cpu: 20m, memory: 320Mi }
+            limits: { cpu: "1", memory: 768Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: pvc-skills-data, readOnly: true }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-geo
+  namespace: sophia-skills
+  labels: { app: sophia-geo }
+spec:
+  selector: { app: sophia-geo }
+  ports: [{ name: http, port: 8000, targetPort: http }]

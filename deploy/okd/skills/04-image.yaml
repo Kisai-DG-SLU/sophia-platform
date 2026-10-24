@@ -1,0 +1,80 @@
+# SPOut.1b — sophia-image : outil MCP `image` (règles de protection avant, classifieur après,
+# une génération à la fois). Les modèles sont dans sophia-inference (../inference/06-image.yaml).
+# Code non fourni (contrat : README). Image construite dans sophia-apps (build binaire) :
+#   oc start-build sophia-image -n sophia-apps --from-dir=${IMAGE_SRC_DIR} --follow
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-image
+  namespace: sophia-apps
+  labels: { app: sophia-image }
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-image
+  namespace: sophia-apps
+  labels: { app: sophia-image }
+spec:
+  source: { type: Binary }
+  strategy:
+    type: Docker
+    dockerStrategy: { dockerfilePath: Containerfile }
+  output:
+    to: { kind: ImageStreamTag, name: "sophia-image:latest" }
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-image
+  namespace: sophia-skills
+  labels: { app: sophia-image }
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-image:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sophia-image\")].image"}]'
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: sophia-image } }
+  template:
+    metadata:
+      labels: { app: sophia-image, sophia-mcp: "true" }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sophia-image
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-image:latest
+          ports: [{ name: http, containerPort: 8000 }]
+          env:
+            - { name: SD_URL, value: "http://sophia-image-gen.sophia-inference.svc.cluster.local:1234" }
+            - { name: NSFW_URL, value: "http://sophia-image-gen.sophia-inference.svc.cluster.local:8001" }
+            - { name: SD_STEPS, value: "1" }
+            - { name: SD_SIZE, value: "512" }
+            - { name: NSFW_SEUIL, value: "0.9" }
+            - { name: SD_MODELE_NOM, value: "SDXL-Turbo (Stability AI, usage non commercial)" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+            failureThreshold: 8
+          resources:
+            requests: { cpu: 20m, memory: 96Mi }
+            limits: { cpu: "1", memory: 384Mi }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-image
+  namespace: sophia-skills
+  labels: { app: sophia-image }
+spec:
+  selector: { app: sophia-image }
+  ports: [{ name: http, port: 8000, targetPort: http }]

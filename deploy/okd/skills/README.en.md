@@ -1,0 +1,76 @@
+# Local tools — MCP servers without Internet (`sophia-skills`)
+
+The "tools" zone of the [architecture](../../../docs/architecture.en.md): MCP servers that the interface (and the agents) offer to the model, and that **compute** instead of letting the model guess — positions, distances, maps, images. None has egress to the Internet: their data is prepared from the node and mounted read-only.
+
+| Zone | What goes there | Network egress |
+|---|---|---|
+| [`sophia-dmz`](../dmz/) | what fetches from outside: web search, page reading, weather | Internet (80/443) only |
+| **`sophia-skills`** | **local tools**: geography, images (protection rules), downloaded official sources | **none** (DNS; image models) |
+| [`sophia-inference`](../inference/) | the models: text, voice, image generator and classifier | none |
+
+```
+interface (chat API) ──MCP :8000──→ sophia-geo    (lieu, distance, carte)   ← /data/geo (read-only)
+                     └─MCP :8000──→ sophia-image  (image) ──→ sophia-image-gen (sophia-inference)
+modules (e.g. cooking) ─MCP :8000──→ sophia-image only        generator :1234, classifier :8001
+```
+
+## Files
+
+| File | Content |
+|---|---|
+| `00-namespace-guardrails.yaml` | `ResourceQuota`, `LimitRange` |
+| `01-network.yaml` | deny all; ingress: the interface → 8000 (pods `sophia-mcp: "true"`), a module → `sophia-image` only; egress: DNS, `sophia-image` → `sophia-image-gen` |
+| `02-storage.yaml` | local PV `/var/mnt/models/skills` (same volume as the models, separate directory) and PVC `pvc-skills-data`, read-only |
+| `03-geo.yaml` | `sophia-geo`: `lieu`, `distance`, `carte` tools |
+| `04-image.yaml` | `sophia-image`: `image` tool; models in [`../inference/06-image.yaml`](../inference/06-image.yaml) |
+| `fetch-geo-data.sh`, `geo_build.py` | geographic data, prepared on the node in a throw-away container; the previous version stays in place if preparation fails |
+
+Each MCP server carries the label `sophia-mcp: "true"`, listens on 8000 (`/mcp`, stateless *streamable HTTP*) and answers on `/health`; the interface adds it to its list of MCP servers.
+
+## Common contract: announcements and display
+
+The servers' code is not provided; their contract:
+
+- each tool declares **its announcement** in its MCP metadata (`sophia/annonce`: icon, label, argument to show — "📍 Lieu: Lyon"): the interface displays it while answering without knowing the tool in advance;
+- `sophia/injecte`: parameters filled in by **the interface** itself, never by the model (e.g. `protected` = protected account, taken from the session);
+- `sophia/delai_s`: the tool's timeout (queueing included);
+- a result may carry `_affichage` (`image/png` in base64 or `image/svg+xml`, with a title): the interface **checks** the content then inserts it as is in the answer; the model only gets the description, not the image;
+- a failure is a readable `error`, which the model reports as is.
+
+## Geography — `sophia-geo`
+
+| Tool | Role |
+|---|---|
+| `lieu` | town, municipality or French postcode: name, country, region, coordinates, population, source; several results if the name is ambiguous |
+| `distance` | great-circle distance between two places |
+| `carte` | **exact** SVG map (real borders, places at their coordinates), optional route and distances, "simple" or "bd" style (old map, comic-book look) |
+
+Open data: French municipalities (official municipalities API), GeoNames (towns over 1,000 inhabitants, French names), Natural Earth country borders. ≈ 230 MB downloaded, ≈ 8 MB kept. Update: rerun `fetch-geo-data.sh`, then restart `sophia-geo`.
+
+## Images — `sophia-image`
+
+`image` tool: the person's request (in French, verbatim) and the English prompt written by the model, a style (`illustration`, `coloriage` (colouring page), `aquarelle` (watercolour), `bd` (comic), `photo`); 512 × 512, one generation at a time on CPU (about ten seconds, a second request waits).
+
+**Deterministic checks, in the server and not in the model:**
+
+1. **before**: rules check **both the request and the prompt** (the model cannot slip in content the person did not ask for); a sexual subject with a child or an underage age: **always refused**; a sexual subject with a named real person: refused; for a **protected account** (child): nothing sexual, no nudity, violence, weapons, horror, drugs, alcohol; a negative prompt is enforced on every generation;
+2. **after**: for a protected account, every image goes through the classifier; above the threshold, a new attempt with another seed, then refusal; **if the classifier is unavailable, nothing is shown** to a protected account;
+3. **on display**: the interface checks the received content again.
+
+Each image comes with the model's name and licence. SDXL-Turbo licence: **non-commercial** use (see [`../inference/`](../inference/)).
+
+## Variables
+
+| Variable | Role |
+|---|---|
+| `${MODULE_APP}` | `app` label of a module allowed to reach the `image` tool (one block per module) |
+| `${NODE_ADDR}` | node administration address (data preparation) |
+| `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | directories with the servers' code (binary builds) |
+
+## Procedure (administrator)
+
+1. Data: copy `fetch-geo-data.sh` and `geo_build.py` to the node, then `sudo bash fetch-geo-data.sh`.
+2. Image models: see [`../inference/`](../inference/).
+3. `00` to `04`: `--dry-run=server`, then `apply`; builds: `oc start-build sophia-geo` and `sophia-image` (`--from-dir`).
+4. Interface: add `http://sophia-geo.sophia-skills.svc:8000/mcp` and `http://sophia-image.sophia-skills.svc:8000/mcp` to its list of MCP servers.
+5. Check: `/health` of both servers is `ok`; from the interface, "distance Paris – Lyon" (≈ 392 km, `distance` tool) and an image on a protected account.
