@@ -1,53 +1,74 @@
 # Architecture SophIA
 
-SophIA (Sovereign Orchestrator Platform for Holistic Intelligence Architecture) est une architecture ouverte et experimentale conque pour orchestrer des systemes d'intelligence artificielle dans un environnement souverain et securise.
+SophIA (Sovereign Orchestrator Platform for Holistic Intelligence Architecture) est une architecture ouverte et expérimentale conçue pour orchestrer des systèmes d'intelligence artificielle dans un environnement souverain et sécurisé.
 
-La plateforme assemble des composants open-source en une infrastructure coherente qui permet aux organisations de deployer, gouverner et exploiter des systemes d'IA tout en preservant le controle de leurs donnees et de leur infrastructure.
+La plateforme assemble des composants open source en une infrastructure cohérente qui permet aux organisations de déployer, gouverner et exploiter des systèmes d'IA tout en préservant le contrôle de leurs données et de leur infrastructure.
 
 ---
 
 ## Principes architecturaux
 
-La conception de SophIA est guidee par plusieurs principes fondamentaux :
+- **Souveraineté** sur les données, les modèles et l'infrastructure ; cible : inférence entièrement locale (voir [Inférence et matériel](concepts/11-inference-materiel.md)).
+- **Indépendance du modèle** : l'architecture ne dépend d'aucun modèle. Chaque agent, étant un pod, peut utiliser un modèle différent, du plus petit modèle local au plus grand. L'intelligence du système réside dans l'architecture, pas dans le modèle.
+- **Le code orchestre, le modèle réfléchit, les règles décident** : analyse par le modèle, décision par des règles, exécution par une compétence déterministe (voir [Automation Déterministe](concepts/09-automation-deterministe.md)).
+- Isolation réseau stricte entre les composants critiques.
+- Intégration modulaire de technologies open source.
+- Déploiement reproductible de l'infrastructure.
+- Auditabilité des interactions avec l'IA.
 
-- Souverainete sur les donnees, les modeles et l'infrastructure
-- **Model-agnostique** : l'architecture ne depend d'aucun modele specifique. Chaque agent, etant un pod autonome, peut utiliser un modele different -- du plus petit modele local au plus grand modele public. L'intelligence du systeme reside dans l'architecture, pas dans le modele.
-- Isolation reseau stricte entre les composants critiques
-- Integration modulaire de technologies open-source
-- Deploiement reproductible de l'infrastructure
-- Auditabilite des interactions IA
-
-L'architecture est conque pour etre **model-agnostique**, **logiciel-agnostique** et **materiel-agnostique**. Chaque composant peut etre remplace par une alternative equivalente, qu'elle soit open-source, proprietaire ou developpee en interne. Les choix effectues dans l'implementation de reference sont des exemples parmi de nombreuses configurations possibles.
+L'architecture est conçue pour être indépendante du **modèle**, du **logiciel** et du **matériel**. Chaque composant peut être remplacé par une alternative équivalente, open source, propriétaire ou développée en interne. Les choix de l'implémentation de référence sont des exemples parmi de nombreuses configurations possibles.
 
 ---
 
 ## Architecture haut niveau
 
-SophIA repose sur une plateforme Kubernetes (OKD / OpenShift). L'architecture suit un modele Hub and Spoke : les services cognitifs centraux sont isoles dans des namespaces dedies, tandis que les environnements de developpement et d'application sont separes dans des zones distinctes.
+SophIA repose sur une plateforme Kubernetes (OKD / OpenShift). Les services centraux sont isolés dans des namespaces dédiés, les environnements de développement et d'application dans des zones distinctes.
 
 ```
-                +-----------------------+
-                |     sophia-core       |
-                |  Orchestration IA     |
-                +-----------+-----------+
-                            |
-        ----------------------------------------------
-        |                    |                       |
-+---------------+   +---------------+      +---------------+
-| sophia-git    |   | sophia-memory |      | sophia-skills |
-| Code & specs  |   | Base vecto.   |      | Serveurs MCP  |
-+---------------+   +---------------+      +---------------+
-                                                    |
-                                              +-----------+
-                                              | inference |
-                                              | modeles   |
-                                              +-----------+
-                                                    |
-                                              +-----------+
-                                              |   DMZ     |
-                                              | web data  |
-                                              +-----------+
+            utilisateurs (VPN, SSO)
+                     |
+          +----------------------+
+          |  interface (apps)    |   couche haute : identité, gardes,
+          |  demandeur           |   réponses courtes, validations
+          +----------+-----------+
+                     | demandes
+          +----------v-----------+        +-------------------+
+          |  sophia-core         |------->| sophia-inference  |
+          |  routeur de modèles  |        | modèles locaux    |
+          |  répartiteur         |        +-------------------+
+          |  workflows, bus      |        +-------------------+
+          +----------+-----------+------->| sophia-memory     |
+                     | missions           | mémoire (RAG)     |
+          +----------v-----------+        +-------------------+
+          |  agents du panthéon  |        +-------------------+
+          |  exécutants          |------->| sophia-skills     |
+          +----------------------+        | outils MCP        |
+                                          +-------------------+
+          sophia-git : code, specs     sophia-dmz : web, nettoyé
 ```
+
+---
+
+## Deux couches
+
+- **Couche haute : l'interface.** Elle porte l'identité des utilisateurs, les gardes, les réponses courtes et les validations humaines. Pour une demande simple, elle comprend la demande en sortie contrainte, et le serveur fabrique l'appel d'outil (en service). Pour ce qu'elle ne sait pas faire seule, elle devient **demandeur** du répartiteur (prévu).
+- **Couche basse : les agents.** Ce sont des **exécutants**, joints par le seul répartiteur. Ils ne se parlent jamais.
+- **Services partagés** : le modèle de langage et la mémoire sont appelés par les deux couches, chacune avec ses propres droits.
+
+---
+
+## Orchestration des agents
+
+| Composant | Rôle | État |
+|---|---|---|
+| **Répartiteur** (`sophia-core`) | point d'entrée unique des demandes ; identité prouvée par jeton de compte de service ; règles déterministes (qui demande quoi à qui, validations, quotas) ; un workflow durable par demande ; filtres de la destination ; validations humaines à deux niveaux | en service |
+| **Temporal** (`sophia-core`) | workflows durables ; **seul client applicatif : le répartiteur** ; l'historique de chaque workflow sert de journal | en service |
+| **RabbitMQ** (`sophia-core`) | **événements** : chaque étape d'une délégation est publiée sur un exchange d'événements par le répartiteur, seul éditeur ; files en lettres mortes | en service ; consommateurs prévus |
+| **Agents autonomes** (Hermes Agent, version figée) | là où une boucle libre avec des outils est le métier : le développement, puis la maintenance et le déploiement avec une liste fermée d'outils et chaque commande approuvée | développement en recette, le reste prévu |
+| **Planificateur** | objectifs ouverts : un workflow en code qui demande au modèle une décision à la fois, la fait valider par des règles et exécuter par le répartiteur | prévu, prototype à comparer à un agent planificateur |
+| **Supervision** | fonctions de lecture déterministes exposées au répartiteur ; l'interprétation revient au modèle dans un workflow | prévu |
+
+Détail : [Panthéon Agentique](concepts/08-pantheon-agentique.md), [Observabilité](concepts/10-observabilite.md).
 
 ---
 
@@ -55,80 +76,76 @@ SophIA repose sur une plateforme Kubernetes (OKD / OpenShift). L'architecture su
 
 ### sophia-core
 
-Couche d'orchestration centrale. Responsabilites : routage des modeles, orchestration des agents, flux d'execution, acces API.
-
-Technologies (exemple) : LiteLLM, moteurs d'orchestration, journalisation et telemetrie.
+Couche d'orchestration centrale : routage des modèles (LiteLLM), répartiteur des délégations, workflows durables (Temporal), bus d'événements (RabbitMQ), base relationnelle.
 
 ### sophia-inference
 
-Environnement d'execution locale des modeles. Responsabilites : hebergement de modeles locaux, inference CPU/GPU, isolation de l'execution.
+Exécution locale des modèles : hébergement, inférence CPU et GPU, isolation sans accès réseau.
 
-Technologies (exemple) : llama.cpp (texte et vision, GPU), stable-diffusion.cpp (images, CPU), modeles vocaux sur CPU. Alternatives : vLLM, Ollama.
+Technologies (exemple) : llama.cpp (texte et vision, GPU), stable-diffusion.cpp (images, CPU), modèles vocaux sur CPU. Alternatives : vLLM, Ollama.
 
 ### sophia-memory
 
-Couche de connaissance persistante. Responsabilites : stockage vectoriel, indexation RAG, persistence des connaissances.
+Connaissance persistante : stockage vectoriel, indexation RAG, embedding. La mémoire est un **service**, appelé par l'interface comme par les agents, chacun selon ses droits.
 
 Technologies (exemple) : Qdrant.
 
 ### sophia-git
 
-Couche de gouvernance des connaissances et du code. Responsabilites : memoire de projet, stockage des specifications, versionnement du code.
+Gouvernance des connaissances et du code : mémoire de projet, spécifications, versionnement.
 
 Technologies (exemple) : Forgejo.
 
 ### sophia-skills
 
-Outils et capacites contextuelles. Responsabilites : serveurs MCP, injection de contexte, execution d'outils pour les agents.
+Outils locaux : serveurs MCP, injection de contexte, outils pour l'interface et les agents.
 
 ### sophia-dmz
 
-Couche d'acquisition web securisee. Responsabilites : extraction web externe, nettoyage, mecanismes anti-tracage.
+Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 
 ---
 
-## Zones de developpement et d'execution
+## Zones de développement et d'exécution
 
-Des namespaces supplementaires fournissent des environnements controles :
-
-| Namespace        | Role                                |
-|------------------|-------------------------------------|
-| sophia-sandbox   | environnements de developpement     |
-| sophia-test      | validation CI/CD                    |
-| sophia-apps      | interfaces utilisateur              |
-| prod-*           | charges de travail locataires       |
+| Namespace | Rôle |
+|---|---|
+| namespace des agents | pods du panthéon, un compte de service et un UID par pod |
+| sophia-sandbox | environnements de développement, clusters enfants par projet |
+| sophia-test | validation CI/CD |
+| sophia-apps | interfaces utilisateur et modules |
+| prod-* | charges de travail des locataires |
 
 ---
 
 ## Plateforme d'infrastructure
 
-L'implementation de reference de l'architecture SophIA fonctionne actuellement sur un cluster Kubernetes mono-noeud (OKD) deploye sur un serveur bare-metal.
+L'implémentation de référence fonctionne sur un cluster Kubernetes mono-nœud (OKD) déployé sur un serveur physique.
 
-Caracteristiques principales :
+- orchestration Kubernetes ;
+- politiques réseau strictes ;
+- stockage persistant local ;
+- conception indépendante du matériel : toute infrastructure qui répond aux exigences peut être substituée.
 
-- Orchestration Kubernetes
-- Politiques reseau strictes via des mecanismes d'isolation
-- Stockage persistant
-- Conception materiel-agnostique (toute infrastructure repondant aux exigences peut etre substituce)
-
-La configuration materielle specifique utilisee pour le Proof of Concept est documentee dans la section deploiement. Elle est intentionnellement non-prescriptive : chaque organisation doit adapter les choix d'infrastructure a son propre contexte, echelle et exigences de securite.
+La configuration matérielle du Proof of Concept est documentée dans la section déploiement ; le partage de la carte graphique et le budget CPU dans [Inférence et matériel](concepts/11-inference-materiel.md). Ces choix ne sont pas prescriptifs : chaque organisation adapte l'infrastructure à son contexte, à son échelle et à ses exigences de sécurité.
 
 ---
 
 ## Architecture anti-hallucination
 
-La plateforme est concue pour restreindre les hallucinations non pas par le modele, mais par l'architecture elle-meme. Les mecanismes suivants sont independants du modele sous-jacent :
+La plateforme restreint les hallucinations par l'architecture, et non par le modèle. Ces mécanismes sont indépendants du modèle sous-jacent :
 
-- **Confinement RBAC** : chaque agent a des permissions strictement minimales. Meme si un agent hallucine une commande destructrice, le cluster Kubernetes la rejette (principe du moindre privilege).
-- **HITL par code** : Athena et Ouranos ont leurs actions de mutation interceptees par un verrou HITL au niveau du terminal. Aucune action critique n'est executee sans validation humaine, quelque soit le modele.
-- **Format de sortie impose** : les sous-agents communiquent exclusivement en JSON strict. Tout ecart de format est detecte et rejete.
-- **Isolation reseau** : les NetworkPolicies empechent tout agent de communiquer en dehors de son perimetre autorise.
-- **Supervision** : Dionysos observe en lecture seule l'ensemble du systeme et peut alerter sur des comportements anormaux.
+- **Confinement RBAC** : chaque agent a des permissions strictement minimales. Si un agent hallucine une commande destructrice hors de son périmètre, le cluster la rejette.
+- **Décision sans modèle** : le répartiteur accepte ou refuse chaque demande selon des règles versionnées qu'aucun modèle ne peut modifier.
+- **Validation humaine imposée par le code** : approbation du plan, puis de chaque commande, par un seul chemin authentifié ; un signal ne porte qu'une décision et une empreinte.
+- **Sortie contrainte** : le modèle répond selon un schéma imposé ; tout écart est rejeté par les règles.
+- **Isolation réseau** : les NetworkPolicies n'ouvrent l'entrée des agents qu'au répartiteur.
+- **Supervision** : la lecture seule de l'ensemble du système permet d'alerter sur un comportement anormal.
 
-Ces mecanismes fonctionnent avec n'importe quel modele, du plus petit (quelques milliards de parametres) au plus grand. L'architecture ne suppose aucune capacite agentique intrinseque du modele -- le comportement agentique est enforce par la structure des pods, le RBAC et les contraintes d'infrastructure.
+Ces mécanismes fonctionnent avec n'importe quel modèle, du plus petit (quelques milliards de paramètres) au plus grand. L'architecture ne suppose aucune capacité agentique du modèle : le comportement est imposé par la structure des pods, le RBAC, les règles et l'infrastructure.
 
 ---
 
 ## Statut
 
-L'architecture est actuellement experimentale. Les composants d'infrastructure initiaux sont operationnels et la documentation est progressivement publiee.
+L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale, l'identité, le répartiteur et ses workflows sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).

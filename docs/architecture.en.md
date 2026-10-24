@@ -8,48 +8,67 @@ The platform assembles open-source components into a coherent infrastructure tha
 
 # Architectural Principles
 
-The design of SOPHIA is guided by several core principles:
+- **Sovereignty** over data, models and infrastructure; target: fully local inference (see [Inference and Hardware](concepts/11-inference-materiel.en.md)).
+- **Model-agnostic**: the architecture depends on no specific model. Each agent, being a pod, can use a different model, from the smallest local model to the largest. The system's intelligence resides in the architecture, not the model.
+- **Code orchestrates, the model thinks, rules decide**: analysis by the model, decision by rules, execution by a deterministic skill (see [Deterministic Automation](concepts/09-automation-deterministe.en.md)).
+- Strict network isolation between critical components.
+- Modular integration of open-source technologies.
+- Reproducible infrastructure deployment.
+- Auditability of AI interactions.
 
-- Sovereignty over data, models and infrastructure
-- **Model-agnostic**: The architecture does not depend on any specific model. Each agent, as an autonomous pod, can use a different model -- from the smallest local model to the largest public one. The system's intelligence resides in the architecture, not the model.
-- Strict network isolation between critical components
-- Modular integration of open-source technologies
-- Reproducible infrastructure deployment
-- Auditability of AI interactions
-
-The architecture is designed to be **model-agnostic**, **software-agnostic**, and **hardware-agnostic**. Each component can be replaced by an equivalent alternative, whether open-source, proprietary, or internally developed. The choices made in the reference implementation (detailed in the deployment documentation) are examples among many possible configurations.
+The architecture is designed to be **model-agnostic**, **software-agnostic**, and **hardware-agnostic**. Each component can be replaced by an equivalent alternative, open-source, proprietary, or internally developed. The choices of the reference implementation are examples among many possible configurations.
 
 ---
 
 # High-Level Architecture
 
-SOPHIA is built on top of a Kubernetes platform (OKD / OpenShift).
-
-The architecture follows a Hub and Spoke model: core cognitive services are isolated in central namespaces, while development and application environments are separated into dedicated zones.
+SOPHIA is built on a Kubernetes platform (OKD / OpenShift). Core services are isolated in dedicated namespaces, development and application environments in separate zones.
 
 ```
-                +-----------------------+
-                |     sophia-core       |
-                |   AI Orchestration    |
-                +-----------+-----------+
-                            |
-        ----------------------------------------------
-        |                    |                       |
-+---------------+   +---------------+      +---------------+
-| sophia-git    |   | sophia-memory |      | sophia-skills |
-| Code & specs  |   | Vector store  |      | MCP servers   |
-+---------------+   +---------------+      +---------------+
-                                                    |
-                                              +-----------+
-                                              | inference |
-                                              | models    |
-                                              +-----------+
-                                                    |
-                                              +-----------+
-                                              |   DMZ     |
-                                              | web data  |
-                                              +-----------+
+            users (VPN, SSO)
+                     |
+          +----------------------+
+          |  interface (apps)    |   top layer: identity, guards,
+          |  requester           |   short answers, approvals
+          +----------+-----------+
+                     | requests
+          +----------v-----------+        +-------------------+
+          |  sophia-core         |------->| sophia-inference  |
+          |  model router        |        | local models      |
+          |  dispatcher          |        +-------------------+
+          |  workflows, bus      |        +-------------------+
+          +----------+-----------+------->| sophia-memory     |
+                     | missions           | memory (RAG)      |
+          +----------v-----------+        +-------------------+
+          |  pantheon agents     |        +-------------------+
+          |  executors           |------->| sophia-skills     |
+          +----------------------+        | MCP tools         |
+                                          +-------------------+
+          sophia-git: code, specs      sophia-dmz: web, sanitized
 ```
+
+---
+
+# Two Layers
+
+- **Top layer: the interface.** It carries user identity, guards, short answers and human approvals. For a simple request, it understands the request in constrained output, and the server builds the tool call (in service). For what it cannot do alone, it becomes a **requester** of the dispatcher (planned).
+- **Bottom layer: the agents.** They are **executors**, reached by the dispatcher only. They never talk to each other.
+- **Shared services**: the language model and memory are called by both layers, each with its own rights.
+
+---
+
+# Agent Orchestration
+
+| Component | Role | Status |
+|---|---|---|
+| **Dispatcher** (`sophia-core`) | single entry point for requests; identity proven by service account token; deterministic rules (who asks what of whom, approvals, quotas); one durable workflow per request; destination filters; two-level human approvals | in service |
+| **Temporal** (`sophia-core`) | durable workflows; **single application client: the dispatcher**; each workflow's history serves as its log | in service |
+| **RabbitMQ** (`sophia-core`) | **events**: each step of a delegation is published on an events exchange by the dispatcher, the only publisher; dead-letter queues | in service; consumers planned |
+| **Autonomous agents** (Hermes Agent, pinned version) | where a free loop with tools is the job: development, then maintenance and deployment with a closed tool list and every command approved | development in acceptance testing, the rest planned |
+| **Planner** | open goals: a workflow in code that asks the model for one decision at a time, has it validated by rules and executed by the dispatcher | planned, prototype to be compared with a planner agent |
+| **Supervision** | deterministic read functions exposed to the dispatcher; interpretation is left to the model inside a workflow | planned |
+
+Details: [Agent Pantheon](concepts/08-pantheon-agentique.en.md), [Observability](concepts/10-observabilite.en.md).
 
 ---
 
@@ -57,127 +76,76 @@ The architecture follows a Hub and Spoke model: core cognitive services are isol
 
 ## sophia-core
 
-Central orchestration layer.
-
-Responsibilities:
-
-- LLM routing
-- agent orchestration
-- execution workflows
-- API access
-
-Technologies (example): LiteLLM, orchestration engines, logging and telemetry
-
----
+Central orchestration layer: model routing (LiteLLM), delegation dispatcher, durable workflows (Temporal), event bus (RabbitMQ), relational database.
 
 ## sophia-inference
 
-Local model execution environment.
-
-Responsibilities:
-
-- hosting local models
-- CPU/GPU-based inference
-- model execution isolation
+Local model execution: hosting, CPU and GPU inference, isolation without network access.
 
 Technologies (example): llama.cpp (text and vision, GPU), stable-diffusion.cpp (images, CPU), voice models on CPU. Alternatives: vLLM, Ollama.
 
----
-
 ## sophia-memory
 
-Persistent knowledge layer.
+Persistent knowledge: vector storage, RAG indexing, embedding. Memory is a **service**, called by the interface as well as by the agents, each according to its rights.
 
-Responsibilities:
-
-- vector storage
-- RAG indexing
-- knowledge persistence
-
-Technologies (example): Qdrant
-
----
+Technologies (example): Qdrant.
 
 ## sophia-git
 
-Knowledge and code governance layer.
+Knowledge and code governance: project memory, specifications, versioning.
 
-Responsibilities:
-
-- project memory
-- specifications storage
-- code versioning
-
-Technologies (example): Forgejo
-
----
+Technologies (example): Forgejo.
 
 ## sophia-skills
 
-Tooling and contextual capabilities.
-
-Responsibilities:
-
-- MCP servers
-- context injection
-- tool execution for agents
-
----
+Local tools: MCP servers, context injection, tools for the interface and the agents.
 
 ## sophia-dmz
 
-Secure web acquisition layer.
-
-Responsibilities:
-
-- external web extraction
-- sanitization
-- anti-tracking mechanisms
+Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 
 ---
 
 # Development and Runtime Zones
 
-Additional namespaces provide controlled environments:
-
-| Namespace      | Role                        |
-| -------------- | --------------------------- |
-| sophia-sandbox | development environments    |
-| sophia-test    | CI/CD validation            |
-| sophia-apps    | user interfaces             |
-| prod-*         | tenant production workloads |
+| Namespace | Role |
+|---|---|
+| agents namespace | pantheon pods, one service account and one UID per pod |
+| sophia-sandbox | development environments, child clusters per project |
+| sophia-test | CI/CD validation |
+| sophia-apps | user interfaces and modules |
+| prod-* | tenant workloads |
 
 ---
 
 # Infrastructure Platform
 
-The reference implementation of the SOPHIA architecture currently runs on a single-node Kubernetes cluster (OKD) deployed on a bare-metal server.
+The reference implementation runs on a single-node Kubernetes cluster (OKD) deployed on a bare-metal server.
 
-Key characteristics:
+- Kubernetes orchestration;
+- strict network policies;
+- local persistent storage;
+- hardware-agnostic design: any infrastructure meeting the requirements can be substituted.
 
-- Kubernetes orchestration
-- strict network policies via isolation mechanisms
-- persistent storage
-- hardware-agnostic design (any infrastructure meeting the requirements can be substituted)
-
-The specific hardware configuration used for the Proof of Concept is documented in the deployment section. It is intentionally non-prescriptive: each organization should adapt the infrastructure choices to its own context, scale, and security requirements.
+The Proof of Concept hardware is documented in the deployment section; sharing the graphics card and the CPU budget in [Inference and Hardware](concepts/11-inference-materiel.en.md). These choices are not prescriptive: each organization adapts the infrastructure to its context, scale and security requirements.
 
 ---
 
 # Anti-Hallucination Architecture
 
-The platform is designed to constrain hallucinations through architecture, not model capability. The following mechanisms work independently of the underlying model:
+The platform constrains hallucinations through architecture, not model capability. These mechanisms work independently of the underlying model:
 
-- **RBAC confinement**: each agent has strictly minimal permissions. Even if an agent hallucinates a destructive command, the Kubernetes cluster rejects it (principle of least privilege).
-- **Code-enforced HITL**: Athena and Ouranos have their mutation actions intercepted by a HITL lock at the terminal level. No critical action is executed without human validation, regardless of the model.
-- **Enforced output format**: sub-agents communicate exclusively in strict JSON. Any format deviation is detected and rejected.
-- **Network isolation**: NetworkPolicies prevent any agent from communicating outside its authorized perimeter.
-- **Supervision**: Dionysos observes the entire system in read-only mode and can alert on abnormal behavior.
+- **RBAC confinement**: each agent has strictly minimal permissions. If an agent hallucinates a destructive command outside its scope, the cluster rejects it.
+- **Decision without a model**: the dispatcher accepts or refuses each request according to versioned rules that no model can change.
+- **Code-enforced human approval**: approval of the plan, then of each command, through a single authenticated path; a signal carries only a decision and a hash.
+- **Constrained output**: the model answers in an imposed schema; any deviation is rejected by the rules.
+- **Network isolation**: NetworkPolicies open the agents' entry to the dispatcher only.
+- **Supervision**: read-only access to the whole system makes it possible to alert on abnormal behavior.
 
-These mechanisms work with any model, from the smallest (a few billion parameters) to the largest. The architecture assumes no intrinsic agentic capability from the model -- agentic behavior is enforced by pod structure, RBAC, and infrastructure constraints.
+These mechanisms work with any model, from the smallest (a few billion parameters) to the largest. The architecture assumes no agentic capability from the model: behavior is enforced by pod structure, RBAC, rules and infrastructure.
 
 ---
 
 # Status
 
-The architecture is currently experimental. Initial infrastructure components are operational and the documentation is progressively being published.
+The architecture is experimental. Infrastructure, model routing, local inference, identity, the dispatcher and its workflows are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).
