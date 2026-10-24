@@ -10,76 +10,68 @@ The goal is to specialize behaviors rather than entrust all tasks to a generalis
 
 In a multi-agent architecture, the main risk is the dilution of responsibilities. An agent capable of doing everything is an agent capable of doing anything.
 
-The Agent Pantheon addresses this problem by applying two strict rules:
+The Agent Pantheon addresses this problem with three rules:
 
 1. **One agent, one domain.** Each agent specializes in one type of task and cannot perform others.
-2. **Minimal rights.** Each agent has the strictly necessary permissions to execute its tasks, and nothing more.
+2. **Minimal rights.** Each agent has the strictly necessary permissions for its tasks, and nothing more. The guarantee comes from the executor's rights, never from the instruction it receives.
+3. **No agent talks to another.** Every request goes through a deterministic component, the **dispatcher**, which decides without a model.
 
-This approach limits the impact of erroneous or malicious behavior: a compromised agent cannot leave its domain.
+**Model-agnostic.** Each agent being a pod, each one can use a different model, or none: agentic behavior (specialization, confinement, output format) is enforced by the infrastructure, not assumed from the model.
 
-**Model-agnostic by design.** Each agent is an independent pod, so each agent can use a different model. An agent could even function without a dedicated agentic model -- agentic behavior (specialization, confinement, output format) is enforced by the Kubernetes infrastructure, not by the model. This means the platform can integrate models of very different sizes and capabilities, or even non-AI tools.
+**Autonomy where it is the job.** An autonomous agent engine (Hermes Agent, pinned version) is only used where a free loop with tools is the work itself. Elsewhere, thinking is a model call inside a workflow written in code (see [Deterministic Automation](09-automation-deterministe.en.md)).
+
+---
+
+## Two layers
+
+| Layer | Who | Role |
+|---|---|---|
+| **Top** | the chat interface, and through it the users | identity, guards, short answers, **human approvals**; it becomes a **requester** of the dispatcher for what it cannot do alone |
+| **Bottom** | the pantheon agents | **executors**, reached by the dispatcher only |
+
+Memory (RAG) and the language model are **services** called by both layers, each with its own rights: they belong to no agent.
 
 ---
 
 ## The agents
 
-The architecture defines four fundamental agent roles. This list is not exhaustive and can be extended according to the organization's needs.
+The architecture defines four fundamental roles, plus a planner. The list can be extended.
 
-### Hephaistos (development)
+| Agent | Domain | Rights | Engine | Status |
+|---|---|---|---|---|
+| **Hephaistos** | development | full powers in its development environment, one child cluster per project; everything it produces is versioned in the Git forge | autonomous agent | in acceptance testing, first executor behind the dispatcher |
+| **Ouranos** | application deployment | limited to the applications namespace | agent, closed tool list, every command approved | planned |
+| **Athena** | platform maintenance | cluster administrator, **every command approved** by a human after the plan is approved | agent, closed tool list (the terminal under approval) | planned |
+| **Dionysos** | supervision | read-only on the whole cluster and on metrics; can alert, never act | deterministic read functions exposed to the dispatcher; interpretation is left to the model, inside a workflow | planned |
+| **Planner** | open goals: break them down, then share them out among agents | no rights of its own: it only makes requests to the dispatcher | workflow in code, one model decision at a time | planned, prototype to be compared with a planner agent |
 
-Agent in charge of developing new tools and components. It operates exclusively in a sterile sandbox environment, isolated from the production system.
+Athena and Dionysos never request anything. Only the planner, or the interface, assigns a mission.
 
-Its scope:
+---
 
-- code creation in an isolated environment
-- test execution in the sandbox
-- submission of validated components to the validation pipeline
+## The dispatcher
 
-It has no access to deployment, persistent memory, or production data.
+The dispatcher is a service without a model, in `sophia-core`. It is the **only client of the durable workflow engine** (Temporal) and the **only publisher of events** (RabbitMQ).
 
-### Ouranos (deployment)
+1. **Request.** A requester sends a type (`lecture` for read, `mission`, `consultation`), a target and a goal in text. A request carries no right, no command, no approval.
+2. **Identity.** It is proven, not declared: the pod presents a short-lived projected service account token, checked against the Kubernetes API. Hence **one service account per agent**.
+3. **Decision.** A versioned rule table, read at startup, says who may ask what of whom, with which approvals and quotas. Everything else is refused and logged. A model cannot change these rules.
+4. **Execution.** One durable workflow per request (its id is the task's) calls the executor once, follows its progress, stops it at the maximum duration. An agent's work is never retried: a retry is a new request.
+5. **Destination filters.** Deterministic workflow steps, chosen by destination: secret detection on supervision answers, leak filter before any output to an external model, semantic tribunal on the way back. A missing or uncertain filter stops the workflow: nothing passes by default.
+6. **Events.** Each step publishes a dated event on the bus, signed by the dispatcher's account; consumers refuse any other publisher.
 
-Agent in charge of deploying and exposing components validated by the validation pipeline.
+**Human approvals.** Two levels: approving the plan before departure, then approving each command. They go through a single path, the workflow engine's interface, restricted to the administration group: the authenticated author of each signal is recorded in the history, and only an approver from the list is accepted. A signal carries only a decision and a hash, never a command. An approval is valid once: nothing is written into a permanent allow list.
 
-Its scope:
-
-- deployment in pre-production and production spaces
-- service exposure through authorized interfaces
-- application of validated configurations
-
-It has no access to source code under development or unvalidated raw data.
-
-### Athena (maintenance)
-
-Agent in charge of platform maintenance and applying fixes.
-
-Its scope:
-
-- component health monitoring
-- application of validated fixes
-- execution of planned maintenance tasks
-
-Athena is subject to a specific security rule: any action impacting the system is subject to an external deterministic script that validates or rejects the operation, independently of the model's decision. This mechanism, called code-enforced Human-In-The-Loop (HITL), guarantees that no critical action is executed based solely on inference.
-
-### Dionysos (supervision)
-
-Agent in charge of overall architecture and agent supervision.
-
-Its scope:
-
-- agent behavior monitoring
-- anomaly and deviation detection
-- alert escalation
-
-Dionysos has read-only access to the entire system. It can alert but cannot act directly on components.
+Status: **in service** for rules, workflow, events and the mission to development (in acceptance testing). **Planned**: the interface as requester, reads to supervision, deployment and maintenance missions, consulting an external model (after the leak filter and the tribunal), mutual TLS.
 
 ---
 
 ## Confinement and isolation
 
-Each agent operates in a dedicated Kubernetes namespace, with NetworkPolicies restricting its incoming and outgoing communications.
-
-Agents cannot communicate directly with each other. Any inter-agent interaction transits through the central orchestrator (`sophia-core`), which applies routing and security rules.
+- **One namespace shared by the agents.** Isolation does not come from the namespace, but from a service account and a UID specific to each pod, from NetworkPolicies that open the agents' entry to the dispatcher only, and from each account's rights.
+- **No agent access to the workflow engine, no write access to the bus.** An executor has no way to reach another agent: no other agent's key, no workflow engine, no bus.
+- **A key per executor**, known to it and to the dispatcher only.
+- **Closed tool list** per agent, checked in non-regression testing: the tools actually given to the model are listed at every update of the agent engine, whose defaults may change.
 
 ---
 
@@ -87,13 +79,13 @@ Agents cannot communicate directly with each other. Any inter-agent interaction 
 
 The Agent Pantheon relies on:
 
-- the orchestrator (`sophia-core`) for routing requests to the appropriate agent
-- workspaces (`sophia-sandbox`) for isolated execution environments
-- MCP tools (`sophia-skills`) for external capabilities
-- the automated and human validation pipeline to validate actions before deployment
+- the dispatcher (`sophia-core`) for any request between layers or between agents;
+- development environments (`sophia-sandbox`) for isolated execution;
+- MCP tools (`sophia-skills`) for local capabilities;
+- human approval, enforced by code, on deployment and infrastructure.
 
 ---
 
 ## Objective
 
-The Agent Pantheon structures the system's intelligence into specialized domains, each isolated, auditable, and independently controlled. This architecture reduces the attack surface, facilitates debugging, and allows progressive evolution by adding or replacing agents without impact on the rest of the system.
+Structure the system's intelligence into specialized domains, each isolated, auditable and controlled independently. The attack surface shrinks to a single component to protect strongly, the dispatcher; an agent can be added, replaced or removed without impact on the rest.
