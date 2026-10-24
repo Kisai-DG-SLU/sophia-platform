@@ -1,0 +1,57 @@
+# Image du répartiteur, construite depuis le code du service (${REPARTITEUR_SRC_DIR} dans le dépôt
+# interne). Aucun déclencheur : un build se lance à la main, après revue du code.
+# Source binaire, pas Git : un clone par le builder (comme « oc start-build --from-repo », qui clone
+# en --recursive) tirerait les sous-modules du dépôt, éventuellement en SSH, et échouerait. L'entrée
+# est une archive « git archive HEAD ${REPARTITEUR_SRC_DIR} » : le code commité seul, sans sous-module
+# ni modification locale ; contextDir s'applique après extraction.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: repartiteur
+  namespace: sophia-core
+---
+# Image de base importée par l'API (contrôleur d'import d'OKD, hors de sophia-core), figée par digest
+# d'index ; le build la tire du registre interne (referencePolicy Local, le registre la récupère
+# lui-même). Le pod de build n'a donc pas à joindre le registre public : l'EgressFirewall de
+# sophia-core n'autorise pas le CDN où le registre sert ses couches (nom qui change au gré des
+# fournisseurs).
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: python
+  namespace: sophia-core
+spec:
+  tags:
+    - name: 3.13.17-slim-trixie
+      from:
+        kind: DockerImage
+        name: docker.io/library/python@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
+      referencePolicy:
+        type: Local
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: repartiteur
+  namespace: sophia-core
+spec:
+  source:
+    type: Binary
+    binary: {}
+    contextDir: ${REPARTITEUR_SRC_DIR}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+      # Remplace le FROM du Containerfile (même image, même digest) par l'ImageStreamTag ci-dessus
+      from:
+        kind: ImageStreamTag
+        name: python:3.13.17-slim-trixie
+  # Le pod de build compte dans le quota de sophia-core
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+  output:
+    to:
+      kind: ImageStreamTag
+      name: repartiteur:latest

@@ -9,7 +9,8 @@ Le cœur de la plateforme : le routeur de modèles (LiteLLM), la base PostgreSQL
 | `litellm/` | routeur de modèles : alias stables (`sophia-routine`, `sophia-think`, `sophia-architect`, `sophia-local`, `sophia-stt`, `sophia-tts`), clés virtuelles restreintes, coûts |
 | `postgres/` | PostgreSQL 15 : bases de LiteLLM, de Keycloak, de l'interface, de Temporal et des modules, un compte par base |
 | [`rabbitmq/`](rabbitmq/) | bus d'événements des agents, interface d'administration derrière Keycloak |
-| [`temporal/`](temporal/) | workflows durables des agents (délégation, reprise après panne) |
+| [`temporal/`](temporal/) | workflows durables des délégations (reprise après panne) |
+| [`repartiteur/`](repartiteur/) | répartiteur des délégations : règles sans modèle, seul client de Temporal, seul éditeur des événements |
 | `network/` | sortie du namespace (EgressFirewall), entrée de Postgres, refus par défaut en entrée (`default-deny-ingress.yaml`) |
 | `00-namespace-guardrails.yaml` | `ResourceQuota` et `LimitRange` du namespace |
 

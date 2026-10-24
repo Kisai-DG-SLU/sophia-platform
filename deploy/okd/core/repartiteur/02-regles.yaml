@@ -1,0 +1,39 @@
+# Règles du répartiteur. Configuration INERTE pour un premier déploiement : aucun demandeur reconnu,
+# aucun exécutant ; toute demande est refusée, avec son motif au journal. Ce qui n'est pas décrit est
+# refusé. Le répartiteur relit ce fichier à son redémarrage seulement ; une erreur arrête le démarrage.
+#
+# Pour ouvrir un chemin, ajouter (exemple : premier exécutant, développement, et Job de recette) :
+#   agents:                                  # compte de service « namespace:nom » -> demandeur
+#     ${AGENT_NAMESPACE}:repartiteur-recette: recette
+#     ${AGENT_NAMESPACE}:sophia-sa: sophia
+#   executants:                              # agent -> api_server et variable de sa clé propre
+#     hephaistos: {url: "http://agent-hephaistos-0.hephaistos.${AGENT_NAMESPACE}.svc:8642", cle_env: CLE_HEPHAISTOS}
+#   regles:
+#     - {type: mission, demandeurs: [recette], cibles: [hephaistos], validation: aucune, duree_max: 300, quota_par_heure: 10}
+# Une mission vers le déploiement ou la maintenance porte « validation: d3a_d3b » ; « approbateurs »
+# liste les sub Keycloak autorisés à approuver (principal des signaux). Un compte partagé par
+# plusieurs pods ne prouve aucune identité : un compte de service par agent.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: repartiteur-regles
+  namespace: sophia-core
+  labels: { app: repartiteur }
+data:
+  regles.yaml: |
+    agents: {}
+    executants: {}
+    regles:
+      - type: lecture
+        demandeurs: [sophia, hephaistos, ouranos]
+        cibles: [dionysos]
+        validation: aucune
+        duree_max: 600
+        quota_par_heure: 30
+        filtres_retour: [secrets]
+      - type: mission
+        demandeurs: [sophia]
+        cibles: [hephaistos]
+        validation: aucune
+        duree_max: 3600
+    approbateurs: []

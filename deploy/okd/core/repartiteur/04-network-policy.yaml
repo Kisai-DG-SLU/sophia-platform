@@ -1,0 +1,37 @@
+# Entrées du répartiteur. Les sorties (Temporal, RabbitMQ, Keycloak, API Kubernetes, exécutants)
+# sont ouvertes par les règles d'entrée de chaque destination et par l'EgressFirewall de sophia-core
+# (../network/policies.yaml).
+# Demandeurs : pods du namespace des agents (leur identité est prouvée par jeton, pas par le réseau).
+# Un pod en réseau de l'hôte ne demande jamais rien : le réseau du nœud n'est pas admis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: repartiteur-ingress
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: repartiteur }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: "${AGENT_NAMESPACE}" }
+      ports:
+        - { protocol: TCP, port: 8443 }
+---
+# RabbitMQ : le répartiteur publie sur sophia.events
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-from-repartiteur
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: rabbitmq }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: repartiteur }
+      ports:
+        - { protocol: TCP, port: 5672 }
