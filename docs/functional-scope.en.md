@@ -43,12 +43,13 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 |---|---|
 | **Everything is a project** | a professional activity, a personal project, a development, a study. A project brings together a **Brain** (memory, specifications), a **Repository** (deliverable) and a **Workspace** (ephemeral, never the source of truth) — see [Project Model](concepts/00-project-model.en.md) |
 | **Conversations are projects** | each new conversation is **attached** to an existing project, to the global conversation project, or opened as a new project. A conversation that grows is **promoted** to a project of its own. Eventually everything is driven through conversation, development included |
-| **Deterministic or model** | a business process runs in a deterministic engine; an agent may trigger it, not drive it — see [Deterministic Automation](concepts/09-automation-deterministe.en.md) |
+| **Deterministic or model** | code orchestrates, the model thinks, rules decide: a business process runs in a deterministic engine; an agent may trigger it, not drive it; a workflow may call on the model at a defined step — see [Deterministic Automation](concepts/09-automation-deterministe.en.md) |
+| **Two layers** | on top, the interface: identity, guards, short answers, human approvals; below, the agents, executors reached by the dispatcher only. The model and memory are services shared by both layers — see [Agentic Pantheon](concepts/08-pantheon-agentique.en.md) |
 | **Answer correctly** | every statement is sourced from memory; an unverified inference is marked as such and remains to be checked |
 | **Controlled enrichment** | every exchange may feed memory, with a confidence level; information from the web is stored only after validation and consent |
-| **Reliability through infrastructure** | minimal rights, human approval enforced by code, strict JSON between agents, network isolation — whatever the model |
+| **Reliability through infrastructure** | minimal rights, decisions by rules without a model, human approval enforced by code, constrained output, network isolation — whatever the model |
 | **Agnosticism** | model, software and hardware are replaceable |
-| **Sovereignty** | target: fully local inference. A remote model remains a routing choice, usable during development |
+| **Sovereignty** | target: fully local inference. A remote model is only a development exception, chosen by routing — see [Inference and Hardware](concepts/11-inference-materiel.en.md) |
 
 ---
 
@@ -56,15 +57,16 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 
 | Function | What it does | Status |
 |---|---|---|
-| **Orchestrator** | main interlocutor: listens, challenges the request, validates the plan (intent, action, report), writes the specification to Git, delegates, turns the agents' results into a readable report. **It never modifies the infrastructure itself** | in progress |
-| **Agent pantheon** | one agent per domain: read-only supervision, sandboxed development, application deployment, infrastructure maintenance. Human approval on deployment and infrastructure — see [Agentic Pantheon](concepts/08-pantheon-agentique.en.md) | in progress: agents deployed |
-| **Asynchronous messaging** | one queue per agent, dead-letter queues, progress events. Rationale: a delegation that codes, tests and fixes exceeds the time limits of a synchronous call | planned |
+| **Orchestrator** | two roles. **The interface**, main interlocutor: listens, understands the request, answers simple requests with tools, collects approvals; for the rest, it becomes a **requester** of the dispatcher. **The planner**, for open goals: a workflow that breaks the goal down one decision at a time, has each step validated by rules and executed by the dispatcher, then turns the result into a readable report; the approved plan is versioned in Git. **Neither modifies the infrastructure itself** | in progress: interface operational for simple requests; requester and planner planned |
+| **Agent pantheon** | one agent per domain, executors reached by the **dispatcher** only, which decides by rules without a model: read-only supervision, autonomous development in one child cluster per project, deployment limited to applications, platform maintenance. Approval of the plan then of each command on deployment and infrastructure — see [Agentic Pantheon](concepts/08-pantheon-agentique.en.md) | in progress: dispatcher in service, development in acceptance testing; supervision, deployment and maintenance planned |
+| **Asynchronous messaging** | one durable workflow per delegation (Temporal, whose only client is the dispatcher), progress events published on a bus (RabbitMQ) by the dispatcher alone, failed messages dead-lettered. Rationale: a delegation that codes, tests and fixes exceeds the time limits of a synchronous call | operational: workflows and events; event consumers planned |
 | **Projects and conversations** | attachment and promotion of conversations (principle above), history kept and retrievable; per-project rights (hiding, invitations), attachment requests approved by an adult, a private journal per person | operational: server-side conversations, projects = Git repositories, rights and journal |
-| **Memory** | see the next section | in progress: layers deployed, ingestion to be built |
+| **Memory** | a service called by the interface as well as by the agents, each according to its rights; writing to long-term memory belongs to the memory service, under the rules of tags and the tribunal. See the next section | in progress: layers deployed, memory API and ingestion to be built |
 | **Permissions** | roles and confidentiality levels above; alerts by email, SMS or interface | in progress: roles and single sign-on (SSO) operational; memory confidentiality and alerts planned |
 | **Safe external knowledge** | isolated, sanitized web acquisition ([Paranoid Airlock](concepts/04-sas-paranoiaque.en.md)), decoy queries ([Ghost Search](concepts/06-ghost-search.en.md)), cross-validation before ingestion ([Semantic Tribunal](concepts/05-tribunal-semantique.en.md)) | in progress: acquisition airlock operational (self-hosted metasearch, pages reduced to text without scripts, internal addresses refused); decoy queries and tribunal planned |
+| **Observability and response** | metrics, alert rules; an alarm becomes a request to the dispatcher, which starts an "incident" workflow: collection, diagnosis, plan, notification, approved execution, no automatic action at first — see [Observability](concepts/10-observabilite.en.md) | in progress: platform metrics; alerts and "incident" workflow planned |
 | **Leak filter** | before any call to a remote service: allow, anonymize or block — see [DLP Filter](concepts/07-dlp-filter.en.md) | planned |
-| **Inference** | one model per agent through the router; switching between a remote and a local model is a routing change; comparative quality and cost measurement | operational: local model by default on the server's GPU (reliable tool calls), remote models available for long reasoning |
+| **Inference** | one model per agent through the router; switching between a remote and a local model is a routing change; comparative quality and cost measurement | operational: local model by default on the server's GPU (reliable tool calls) for the interface and modules; agents still on remote models for testing, move to local and priority to chat planned — see [Inference and Hardware](concepts/11-inference-materiel.en.md) |
 | **Governance** | cost per token and per project, per-key budgets; log of requests, routing decisions and blocks; after-the-fact analysis | in progress: costs and budgets operational |
 | **Industrialization** | reproducible recipe, multi-tenant environments, reference architecture | planned |
 
@@ -115,7 +117,7 @@ Every piece of information carries a set of **tags** defined by the administrato
 
 ## Hardware
 
-The reference implementation runs on a single node with entry-level GPUs — see [POC infrastructure](../deploy/infrastructure.en.md). The intended layout assigns **one family of tasks per card**: language model, embedding, voice and vision. Each card hosts its own models, which isolates the workloads.
+The reference implementation runs on a single node with entry-level GPUs — see [POC infrastructure](../deploy/infrastructure.en.md). The intended layout assigns **one family of tasks per card**: language model, embedding, voice and vision. Each card hosts its own models, which isolates the workloads. Today, a single card carries the language model, shared by chat, modules and agents; voice, images and embedding run on CPU — see [Inference and Hardware](concepts/11-inference-materiel.en.md).
 
 ---
 

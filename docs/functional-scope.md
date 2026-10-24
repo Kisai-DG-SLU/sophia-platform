@@ -43,12 +43,13 @@ Cinq niveaux de confidentialité, du plus ouvert au plus restreint : `public` > 
 |---|---|
 | **Tout est projet** | une activité professionnelle, un projet personnel, un développement, une étude. Un projet réunit un **Brain** (mémoire, spécifications), un **Repository** (livrable) et un **Workspace** (éphémère, jamais source de vérité) — voir [Project Model](concepts/00-project-model.md) |
 | **Les discussions sont des projets** | chaque nouvelle discussion est **rattachée** à un projet existant, au projet global de discussion, ou ouverte en nouveau projet. Une discussion qui s'enrichit est **promue** en projet à part entière. À terme, tout se pilote par la discussion, y compris le développement |
-| **Déterministe ou modèle** | un processus métier s'exécute dans un moteur déterministe ; un agent peut le déclencher, pas le piloter — voir [Automation Déterministe](concepts/09-automation-deterministe.md) |
+| **Déterministe ou modèle** | le code orchestre, le modèle réfléchit, les règles décident : un processus métier s'exécute dans un moteur déterministe ; un agent peut le déclencher, pas le piloter ; un workflow peut solliciter le modèle à une étape définie — voir [Automation Déterministe](concepts/09-automation-deterministe.md) |
+| **Deux couches** | en haut, l'interface : identité, gardes, réponses courtes, validations humaines ; en bas, les agents, exécutants joints par le seul répartiteur. Le modèle et la mémoire sont des services partagés par les deux couches — voir [Panthéon Agentique](concepts/08-pantheon-agentique.md) |
 | **Répondre juste** | toute affirmation est sourcée dans la mémoire ; une inférence non vérifiée est marquée comme telle et reste à vérifier |
 | **Enrichissement contrôlé** | chaque échange peut alimenter la mémoire, avec un niveau de confiance ; une information venue du web n'est mémorisée qu'après validation et consentement |
-| **Fiabilité par l'infrastructure** | droits minimaux, validation humaine imposée par code, JSON strict entre agents, isolation réseau — quel que soit le modèle |
+| **Fiabilité par l'infrastructure** | droits minimaux, décision par des règles sans modèle, validation humaine imposée par code, sortie contrainte, isolation réseau — quel que soit le modèle |
 | **Agnosticisme** | modèle, logiciel et matériel sont remplaçables |
-| **Souveraineté** | cible : inférence entièrement locale. Un modèle distant reste un choix de routage, utilisable pendant le développement |
+| **Souveraineté** | cible : inférence entièrement locale. Un modèle distant n'est qu'une dérogation de développement, choisie par routage — voir [Inférence et matériel](concepts/11-inference-materiel.md) |
 
 ---
 
@@ -56,15 +57,16 @@ Cinq niveaux de confidentialité, du plus ouvert au plus restreint : `public` > 
 
 | Fonction | Ce qu'elle fait | État |
 |---|---|---|
-| **Orchestratrice** | interlocutrice principale : écoute, challenge la demande, valide le plan (intention, action, rapport), rédige la spécification dans Git, délègue, traduit le résultat des agents en rapport lisible. **Elle ne modifie jamais l'infrastructure elle-même** | en cours |
-| **Panthéon d'agents** | un agent par domaine : supervision en lecture seule, développement en sandbox, déploiement d'applications, maintenance d'infrastructure. Validation humaine sur le déploiement et l'infrastructure — voir [Panthéon Agentique](concepts/08-pantheon-agentique.md) | en cours : agents déployés |
-| **Communication asynchrone** | une file par agent, file de messages en échec, événements de progression. Motif : une délégation qui code, teste et corrige dépasse les délais d'un appel synchrone | prévu |
+| **Orchestratrice** | deux rôles. **L'interface**, interlocutrice principale : écoute, comprend la demande, répond aux demandes simples par des outils, recueille les validations ; pour le reste, elle devient **demandeur** du répartiteur. **Le planificateur**, pour les objectifs ouverts : un workflow qui découpe l'objectif une décision à la fois, fait valider chaque étape par des règles et l'exécuter par le répartiteur, puis traduit le résultat en rapport lisible ; le plan validé est versionné dans Git. **Aucun des deux ne modifie l'infrastructure lui-même** | en cours : interface opérationnelle pour les demandes simples ; demandeur et planificateur prévus |
+| **Panthéon d'agents** | un agent par domaine, des exécutants joints par le seul **répartiteur**, qui décide par des règles sans modèle : supervision en lecture seule, développement en autonomie dans un cluster enfant par projet, déploiement limité aux applications, maintenance de la plateforme. Approbation du plan puis de chaque commande sur le déploiement et l'infrastructure — voir [Panthéon Agentique](concepts/08-pantheon-agentique.md) | en cours : répartiteur en service, développement en recette ; supervision, déploiement et maintenance prévus |
+| **Communication asynchrone** | un workflow durable par délégation (Temporal, dont le répartiteur est le seul client), événements de progression publiés sur un bus (RabbitMQ) par le répartiteur seul, messages en échec en lettres mortes. Motif : une délégation qui code, teste et corrige dépasse les délais d'un appel synchrone | opérationnel : workflows et événements ; consommateurs des événements prévus |
 | **Projets et discussions** | rattachement et promotion des discussions (principe ci-dessus), historique conservé et retrouvable ; droits par projet (masquage, invitations), demandes de rattachement validées par un adulte, journal intime par personne | opérationnel : discussions côté serveur, projets = dépôts Git, droits et journal |
-| **Mémoire** | voir la section suivante | en cours : couches déployées, ingestion à construire |
+| **Mémoire** | un service appelé par l'interface comme par les agents, chacun selon ses droits ; l'écriture en mémoire long terme revient au service mémoire, sous les règles des tags et du tribunal. Voir la section suivante | en cours : couches déployées, API mémoire et ingestion à construire |
 | **Permissions** | rôles et niveaux de confidentialité ci-dessus ; alertes par mail, SMS ou interface | en cours : rôles et authentification unique (SSO) opérationnels ; confidentialité de la mémoire et alertes prévues |
 | **Connaissance externe sûre** | acquisition web isolée et nettoyée ([Sas Paranoïaque](concepts/04-sas-paranoiaque.md)), requêtes leurres ([Ghost Search](concepts/06-ghost-search.md)), validation croisée avant ingestion ([Tribunal Sémantique](concepts/05-tribunal-semantique.md)) | en cours : sas d'acquisition opérationnel (métamoteur auto-hébergé, pages réduites en texte sans script, adresses internes refusées) ; requêtes leurres et tribunal prévus |
+| **Observabilité et réaction** | métrologie, règles d'alerte ; une alarme devient une demande au répartiteur, qui lance un workflow « incident » : collecte, diagnostic, plan, notification, exécution approuvée, aucune action automatique au départ — voir [Observabilité](concepts/10-observabilite.md) | en cours : métrologie de la plateforme ; alertes et workflow « incident » prévus |
 | **Filtre anti-fuite** | avant tout appel à un service distant : autoriser, anonymiser ou bloquer — voir [DLP Filter](concepts/07-dlp-filter.md) | prévu |
-| **Inférence** | un modèle par agent via le routeur ; bascule entre modèle distant et modèle local par simple routage ; mesure comparative de qualité et de coût | opérationnel : modèle local par défaut sur le GPU du serveur (appels d'outils fiables), modèles distants au choix pour le raisonnement long |
+| **Inférence** | un modèle par agent via le routeur ; bascule entre modèle distant et modèle local par simple routage ; mesure comparative de qualité et de coût | opérationnel : modèle local par défaut sur le GPU du serveur (appels d'outils fiables) pour l'interface et les modules ; agents encore sur des modèles distants pour les essais, passage en local et priorité à la discussion prévus — voir [Inférence et matériel](concepts/11-inference-materiel.md) |
 | **Gouvernance** | coût par token et par projet, budgets par clé ; journal des requêtes, des routages et des blocages ; analyse a posteriori | en cours : coûts et budgets opérationnels |
 | **Industrialisation** | recette reproductible, environnements multi-locataires, architecture de référence | prévu |
 
@@ -115,7 +117,7 @@ Chaque information porte un jeu de **tags** fixé par l'administrateur (auteur, 
 
 ## Matériel
 
-L'implémentation de référence tourne sur un nœud unique, avec des GPU d'entrée de gamme — voir [Infrastructure POC](../deploy/infrastructure.md). La répartition visée attribue **une famille de tâches par carte** : modèle de langage, embedding, voix et vision. Chaque carte porte ses propres modèles, ce qui isole les charges.
+L'implémentation de référence tourne sur un nœud unique, avec des GPU d'entrée de gamme — voir [Infrastructure POC](../deploy/infrastructure.md). La répartition visée attribue **une famille de tâches par carte** : modèle de langage, embedding, voix et vision. Chaque carte porte ses propres modèles, ce qui isole les charges. Aujourd'hui, une seule carte porte le modèle de langage, partagé entre la discussion, les modules et les agents ; voix, images et embedding tournent sur CPU — voir [Inférence et matériel](concepts/11-inference-materiel.md).
 
 ---
 
