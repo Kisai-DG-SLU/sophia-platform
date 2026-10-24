@@ -1,0 +1,16 @@
+# sophia-apps refuse toute entrée qu'une règle n'ouvre pas.
+#   Entrée seulement : les sorties sont déjà bornées par les règles de chaque application
+#   (routeur de modèles, base relationnelle, outils MCP) et les builds ont besoin des leurs
+#   (forge Git, registres).
+#   Sans effet sur une application qui a sa propre règle d'entrée (exemple :
+#   chat-interface/sophia-interface.yaml) ; ferme tout pod futur sans règle.
+#   Avant d'appliquer : vérifier que chaque application en service a sa règle ; après : codes HTTP
+#   des Routes et parcours dans le navigateur. Retour arrière : supprimer cette NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: sophia-apps
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]

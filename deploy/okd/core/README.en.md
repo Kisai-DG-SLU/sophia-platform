@@ -10,7 +10,7 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 | `postgres/` | PostgreSQL 15: databases for LiteLLM, Keycloak, the interface, Temporal and the modules, one account per database |
 | [`rabbitmq/`](rabbitmq/) | agents' event bus, management UI behind Keycloak |
 | [`temporal/`](temporal/) | agents' durable workflows (delegation, recovery after failure) |
-| `network/` | namespace egress (EgressFirewall) and Postgres ingress |
+| `network/` | namespace egress (EgressFirewall), Postgres ingress, default ingress deny (`default-deny-ingress.yaml`) |
 | `00-namespace-guardrails.yaml` | namespace `ResourceQuota` and `LimitRange` |
 
 ## Choices
@@ -26,12 +26,14 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 | Guardrails | namespace quota (16 Gi, 12 CPU, 15 pods) and explicit limits on **every** container, builds included | a container without limits gets 512 Mi by default: LiteLLM, Postgres or a build would be OOM-killed. **Apply the limits before the quota** |
 | LiteLLM | 768 Mi requested, at most 2 Gi and 2 CPU | ≈ 550 Mi at rest, photos inflate requests; the CPU cap also bounds a pathological token count freeze |
 | Postgres | image **pinned by digest**, `IfNotPresent`, `Recreate`, 2 Gi | a restart never pulls another version; never two Postgres on the same local volume; the image derives its buffers from the memory limit |
+| Ingress | default ingress deny, then one rule per service; the model router (`litellm/network-policy.yaml`) only admits the namespaces of its recorded callers, the ingress router and the node network | without a rule, any pod in the cluster reaches the router and spends its keys; per namespace rather than per pod, to cover ephemeral pods |
 | Egress | deny all except cluster Services and pods, the remote model provider, the registries and package indexes used by builds, and the identity provider on 443 | RabbitMQ reads Keycloak's signing keys through its public name, which resolves to the node, outside the internal networks |
 
 ## Variables
 
 | Variable | Role | Example |
 |---|---|---|
+| `${AGENT_NAMESPACE}` | namespace of the pantheon agents | `agents` |
 | `${CONFIG_REPO_URL}` | internal Git repository containing this directory (builds) | `http://git.example.internal/org/platform.git` |
 | `${LITELLM_HOST}` | LiteLLM DNS name, resolved to the VPN address | `llm.example.org` |
 | `${IDP_HOST}` | identity provider's public name | `auth.example.org` |
@@ -48,7 +50,7 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 
 1. Explicit limits first: `litellm/deployment.yaml`, `litellm/build.yaml`, `postgres/instance.yaml` — `--dry-run=server`, then `apply`.
 2. Guardrails: `00-namespace-guardrails.yaml`, then `oc describe quota -n sophia-core`.
-3. Network: `network/policies.yaml`, `postgres/allow-apps-to-postgres.yaml`.
+3. Network: `network/policies.yaml`, `postgres/allow-apps-to-postgres.yaml`, `litellm/network-policy.yaml`, and **only then** `network/default-deny-ingress.yaml`. Before and after: the router answers through its Route and from each calling namespace; rollback: delete `default-deny-ingress`.
 4. Router: `litellm/config.yaml` (`oc diff` first: only the expected aliases change), restart LiteLLM, then `add-model-to-keys.py` dry-run and with `--apply` for each new alias:
 
 ```bash

@@ -33,6 +33,8 @@ Chaque namespace appartient à une zone de sécurité. Les communications sont r
 | Mémoire | `sophia-memory` | base vectorielle, embedding, graphe | **cible** : refus par défaut à appliquer après l'inventaire des appelants ; la zone n'est pas encore isolée |
 | Développement | `sophia-sandbox` | environnements de développement, clusters enfants | **cible** : refus par défaut à appliquer |
 
+Gabarits : `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` et la règle d'entrée du routeur de modèles, `deploy/okd/core/litellm/network-policy.yaml`.
+
 Chaque refus par défaut est appliqué un namespace à la fois : inventaire des flux légitimes, retour arrière prêt, vérification par le vrai chemin (codes HTTP des Routes, puis parcours dans le navigateur) avant et après.
 
 ### Accès à la plateforme : VPN uniquement

@@ -1,0 +1,30 @@
+# Entrées du routeur de modèles. Sans règle, il est ouvert à tout pod du cluster.
+# Appelants à relever avant d'appliquer (manifestes, règles de sortie, journaux du routeur) :
+#   sophia-apps       : interface et modules, leurs builds ;
+#   ${AGENT_NAMESPACE} : agents du panthéon ; un pod en réseau de l'hôte arrive par le réseau du nœud ;
+#   sophia-sandbox    : environnements de développement ;
+#   sophia-memory     : ingestion (embeddings) ;
+#   routeur d'entrée  : Route d'administration du routeur de modèles (VPN).
+# Par namespace et non par pod : les pods éphémères (builds, Jobs, dev) restent couverts.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-ingress
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: litellm }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: [sophia-apps, "${AGENT_NAMESPACE}", sophia-sandbox, sophia-memory]
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/host-network: "" }
+      ports:
+        - { protocol: TCP, port: 4000 }

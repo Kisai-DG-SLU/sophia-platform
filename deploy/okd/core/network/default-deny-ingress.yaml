@@ -1,0 +1,13 @@
+# sophia-core refuse toute entrée qu'une règle n'ouvre pas. Entrée seulement : les sorties sont
+# bornées par l'EgressFirewall (policies.yaml).
+# Chaque service a sa règle d'entrée (postgres, rabbitmq, temporal, interface Temporal, répartiteur) ;
+# les builds et les Jobs ne reçoivent rien. À appliquer après ../litellm/network-policy.yaml, jamais
+# avant : sans elle, le routeur de modèles deviendrait injoignable.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: sophia-core
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]

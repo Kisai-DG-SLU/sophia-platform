@@ -33,6 +33,8 @@ Each namespace belongs to a security zone. Communication is restricted by Kubern
 | Memory | `sophia-memory` | vector database, embedding, graph | **target**: default deny to apply after the inventory of callers; the zone is not isolated yet |
 | Development | `sophia-sandbox` | development environments, child clusters | **target**: default deny to apply |
 
+Templates: `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` and the model router's ingress rule, `deploy/okd/core/litellm/network-policy.yaml`.
+
 Each default deny is applied one namespace at a time: inventory of legitimate flows, rollback ready, check through the real path (HTTP codes of the Routes, then browser journeys) before and after.
 
 ## Access to the platform: VPN only
