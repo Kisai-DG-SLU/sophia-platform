@@ -79,12 +79,12 @@ SophIA is an experimental architecture under construction. We separate what work
 
 **In progress**
 
-- Pantheon agents on the local model, with priority to chat on the graphics card.
-- The interface as a requester of the dispatcher; planner for open goals.
+- The interface as a requester of the dispatcher.
 - Memory API, ingestion pipeline and graph dimension.
 
 **Planned**
 
+- Pantheon agents on the local model, with priority to chat on the graphics card; planner for open goals.
 - Observability and "incident" workflow; supervision, deployment and maintenance behind the dispatcher.
 - Semantic Tribunal, Ghost Search, DLP filter.
 - Memory confidentiality levels.
@@ -103,7 +103,7 @@ Details are in the [roadmap](roadmap.en.md).
 ## Frequently asked questions
 
 **Is SophIA sovereign today?**
-Largely: infrastructure, memory, access control and inference for the interface and modules are local. Agents still use remote models for testing; their move to the local model is under way, changing nothing but routing.
+Largely: infrastructure, memory, access control and inference for the interface and modules are local. Agents still use remote models for testing; their move to the local model is planned, changing nothing but routing.
 
 **Do you need a very large model?**
 No. Confinement, rules, human approval and constrained output do not depend on the model's capabilities. Tasks are broken into small decisions, within reach of a modest local model.
