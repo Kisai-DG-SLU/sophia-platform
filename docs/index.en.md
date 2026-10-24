@@ -31,7 +31,9 @@ Welcome to the SophIA architecture documentation.
 | 06 | [Ghost Search](concepts/06-ghost-search.en.md) | Decoy queries to obfuscate intentions |
 | 07 | [DLP Filter](concepts/07-dlp-filter.en.md) | Data leak detection and blocking |
 | 08 | [Agentic Pantheon](concepts/08-pantheon-agentique.en.md) | Specialized agents, confinement and isolation |
-| 09 | [Deterministic Automation](concepts/09-automation-deterministe.en.md) | Deterministic workflows with n8n |
+| 09 | [Deterministic Automation](concepts/09-automation-deterministe.en.md) | Code orchestrates, the model thinks, rules decide |
+| 10 | [Observability](concepts/10-observabilite.en.md) | Alarms, "incident" workflow, human approval |
+| 11 | [Inference and Hardware](concepts/11-inference-materiel.en.md) | One card per task family, sharing and priority, CPU budget |
 
 ---
 

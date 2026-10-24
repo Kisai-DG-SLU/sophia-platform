@@ -121,7 +121,7 @@ La documentation est organisee dans le repertoire [`docs/`](docs/index.md).
 - **[Roadmap](docs/roadmap.md)** — Etapes et planification
 - **[Glossaire](docs/glossary.md)** — Lexique des termes
 
-### Concepts architecturaux (10 fiches)
+### Concepts architecturaux (12 fiches)
 
 | Concept | Description |
 |---------|-------------|
@@ -134,7 +134,9 @@ La documentation est organisee dans le repertoire [`docs/`](docs/index.md).
 | [Ghost Search](docs/concepts/06-ghost-search.md) | Requetes leurres pour masquer les intentions |
 | [DLP Filter](docs/concepts/07-dlp-filter.md) | Detection et blocage des fuites de donnees |
 | [Pantheon Agentique](docs/concepts/08-pantheon-agentique.md) | Agents specialises, confinement et isolation |
-| [Automation Deterministe](docs/concepts/09-automation-deterministe.md) | Workflows deterministes avec n8n |
+| [Automation Déterministe](docs/concepts/09-automation-deterministe.md) | Le code orchestre, le modèle réfléchit, les règles décident |
+| [Observabilité](docs/concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
+| [Inférence et matériel](docs/concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
 
 ### Deploiement
 

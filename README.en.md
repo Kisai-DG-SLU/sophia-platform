@@ -130,7 +130,7 @@ Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 - **[Roadmap](docs/roadmap.en.md)** — Milestones and planning
 - **[Glossary](docs/glossary.en.md)** — Terms and definitions
 
-### Architectural Concepts (10 topics)
+### Architectural Concepts (12 topics)
 
 | Concept | Description |
 |---------|-------------|
@@ -143,7 +143,9 @@ Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 | [Ghost Search](docs/concepts/06-ghost-search.en.md) | Decoy queries to obfuscate intentions |
 | [DLP Filter](docs/concepts/07-dlp-filter.en.md) | Data leak detection and blocking |
 | [Agentic Pantheon](docs/concepts/08-pantheon-agentique.en.md) | Specialized agents, confinement and isolation |
-| [Deterministic Automation](docs/concepts/09-automation-deterministe.en.md) | Deterministic workflows with n8n |
+| [Deterministic Automation](docs/concepts/09-automation-deterministe.en.md) | Code orchestrates, the model thinks, rules decide |
+| [Observability](docs/concepts/10-observabilite.en.md) | Alarms, "incident" workflow, human approval |
+| [Inference and Hardware](docs/concepts/11-inference-materiel.en.md) | One card per task family, sharing and priority, CPU budget |
 
 ### Deployment
 

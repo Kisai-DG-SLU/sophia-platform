@@ -31,7 +31,9 @@ Bienvenue dans la documentation de l'architecture SophIA.
 | 06 | [Ghost Search](concepts/06-ghost-search.md) | Requêtes leurres pour masquer les intentions |
 | 07 | [DLP Filter](concepts/07-dlp-filter.md) | Détection et blocage des fuites de données |
 | 08 | [Panthéon Agentique](concepts/08-pantheon-agentique.md) | Agents spécialisés, confinement et isolation |
-| 09 | [Automation Déterministe](concepts/09-automation-deterministe.md) | Workflows déterministes avec n8n |
+| 09 | [Automation Déterministe](concepts/09-automation-deterministe.md) | Le code orchestre, le modèle réfléchit, les règles décident |
+| 10 | [Observabilité](concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
+| 11 | [Inférence et matériel](concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
 
 ---
 
