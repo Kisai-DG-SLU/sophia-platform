@@ -48,10 +48,13 @@ Certain namespaces are intentionally isolated from external networks.
 
 Examples:
 
-- sophia-inference
-- sophia-memory
+| Namespace | State in the reference install |
+|---|---|
+| sophia-inference | **in place**: deny all, ingress from the model router and the image tool only, no egress |
+| sophia-skills | **in place**: no egress besides DNS and image models |
+| sophia-memory | **target**: isolation still to apply |
 
-These namespaces are prevented from accessing the internet to eliminate the risk of data exfiltration.
+These namespaces are prevented from accessing the internet to eliminate the risk of data exfiltration; their models and data are placed from the node, at pinned revisions and checksums.
 
 ---
 
@@ -74,12 +77,12 @@ This prevents malicious scripts or tracking mechanisms from entering the platfor
 
 Sensitive data is protected using several mechanisms:
 
-- encrypted storage volumes
-- strict access control
-- secrets managed through Kubernetes
+- strict access control (SSO, groups, per-client restricted keys)
+- secrets managed through Kubernetes, never in repositories
 - audit logging
+- encrypted storage volumes: **target**, not yet in place in the reference install (unencrypted local volumes)
 
-Persistent data such as vector databases and repository storage are hosted on encrypted volumes.
+Persistent data (vector databases, relational databases, repositories) lives on the server's local volumes; encryption at rest is still to be set up.
 
 ---
 

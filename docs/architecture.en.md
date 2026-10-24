@@ -80,7 +80,7 @@ Responsibilities:
 - CPU/GPU-based inference
 - model execution isolation
 
-Technologies (example): Ollama, llama.cpp
+Technologies (example): llama.cpp (text and vision, GPU), stable-diffusion.cpp (images, CPU), voice models on CPU. Alternatives: vLLM, Ollama.
 
 ---
 

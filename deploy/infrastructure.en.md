@@ -27,11 +27,11 @@ This configuration allows running the entire stack (orchestration, local inferen
 | Component            | POC Example      | Possible Alternatives                        |
 |:---------------------|:-----------------|:---------------------------------------------|
 | Container orchestration | OKD          | Kubernetes, K3s, Rancher, EKS, AKS           |
-| Local inference      | Ollama / llama.cpp | vLLM, LocalAI, custom inference            |
+| Local inference      | llama.cpp        | vLLM, Ollama, LocalAI, custom inference      |
 | Model routing        | LiteLLM          | Portkey, custom gateway                       |
 | Vector database      | Qdrant           | Weaviate, Milvus, Pinecone, FAISS             |
 | Git / versioning     | Forgejo          | Gitea, GitLab CE, GitHub Enterprise           |
-| Workflow engine      | n8n              | Node-RED, StackStorm, Temporal                |
+| Workflow engine      | Temporal (agents), n8n (automations) | Node-RED, StackStorm, Argo Workflows |
 | Relational database  | PostgreSQL       | MariaDB, MySQL                                |
 | Development environment | OpenCode / Jupyter | VS Code Server, Coder, Theia              |
 | Web acquisition      | Paranoia Airlock | Custom tooling, dedicated proxy               |
