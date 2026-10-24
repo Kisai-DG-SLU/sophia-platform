@@ -1,0 +1,45 @@
+# Schémas de Temporal dans postgres-sophia (bases temporal et temporal_visibility, créées
+# par l'administrateur, voir README.md). Rejouable : setup-schema ne crée que les tables de version absentes
+# et ne redescend jamais une version ; update-schema applique les versions manquantes. Même Job à
+# chaque montée de version de Temporal (changer l'image, supprimer l'ancien Job, réappliquer).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-schema-1-32-1
+  namespace: sophia-core
+  labels: { app: temporal-schema }
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 604800   # 7 jours, pour relire les journaux
+  template:
+    metadata:
+      labels: { app: temporal-schema }
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: schema
+          image: docker.io/temporalio/admin-tools:1.32.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              S=/etc/temporal/schema/postgresql/v12
+              for db in temporal:temporal temporal_visibility:visibility; do
+                export SQL_DATABASE=${db%%:*}
+                echo "== $SQL_DATABASE"
+                temporal-sql-tool setup-schema -v 0.0
+                temporal-sql-tool update-schema -d $S/${db##*:}/versioned
+              done
+          env:
+            - { name: SQL_PLUGIN, value: postgres12 }
+            - { name: SQL_HOST, value: postgres-sophia.sophia-core.svc }
+            - { name: SQL_PORT, value: "5432" }
+            - name: SQL_USER
+              valueFrom: { secretKeyRef: { name: temporal-db, key: username } }
+            - name: SQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: temporal-db, key: password } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }

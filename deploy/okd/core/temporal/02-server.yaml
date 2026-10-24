@@ -1,0 +1,172 @@
+# Serveur Temporal : les quatre services (frontend, history, matching, worker) dans un seul
+# pod. Passage à plusieurs nœuds : un Deployment par service (TEMPORAL_SERVICES), même image et même
+# configuration ; les pods se trouvent par la base (table d'appartenance), l'état est dans Postgres.
+# Configuration : modèle embarqué de temporal-server, renseigné par les variables ci-dessous.
+---
+# Configuration dynamique (relue toutes les 60 s, sans redémarrage). Le serveur refuse de démarrer
+# si le fichier n'existe pas ; vide = valeurs par défaut (comme le docker.yaml de référence, vide).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-dynamic-config
+  namespace: sophia-core
+  labels: { app: temporal }
+data:
+  dynamicconfig.yaml: |
+    # Exemple : limiter la taille d'une charge utile à 2 Mo
+    # limit.blobSize.error:
+    #   - value: 2097152
+---
+# TLS : autorité de certification de service d'OKD, injectée par le cluster (clé service-ca.crt).
+# Une par namespace client : sophia-core (serveur entre ses services, interface, Jobs) et
+# hermes-system (agents).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-service-ca
+  namespace: sophia-core
+  labels: { app: temporal }
+  annotations: { service.beta.openshift.io/inject-cabundle: "true" }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-service-ca
+  namespace: hermes-system
+  labels: { app: temporal }
+  annotations: { service.beta.openshift.io/inject-cabundle: "true" }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal
+  namespace: sophia-core
+  labels: { app: temporal }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: temporal }
+  template:
+    metadata:
+      labels: { app: temporal }
+    spec:
+      containers:
+        - name: temporal
+          image: docker.io/temporalio/server:1.32.1
+          env:
+            - { name: DB, value: postgres12 }
+            - { name: POSTGRES_SEEDS, value: postgres-sophia.sophia-core.svc }
+            - { name: DB_PORT, value: "5432" }
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: temporal-db, key: username } }
+            - name: POSTGRES_PWD
+              valueFrom: { secretKeyRef: { name: temporal-db, key: password } }
+            - { name: DBNAME, value: temporal }
+            - { name: VISIBILITY_DBNAME, value: temporal_visibility }
+            # IRRÉVERSIBLE : fixé à la création de la base, ne change plus sans migrer vers un autre
+            # cluster Temporal. Borne la répartition de l'historique entre pods history.
+            - { name: NUM_HISTORY_SHARDS, value: "128" }
+            # Écoute sur toutes les interfaces, s'annonce aux autres services par l'IP du pod
+            - { name: BIND_ON_IP, value: 0.0.0.0 }
+            - name: TEMPORAL_BROADCAST_ADDRESS
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            # chaque appel au frontend porte un jeton Keycloak (realm sophia) ; droits lus dans
+            # le claim « permissions » (namespace:rôle, ex. sophia:write, temporal-system:admin).
+            - { name: TEMPORAL_AUTH_AUTHORIZER, value: default }
+            - { name: TEMPORAL_AUTH_CLAIM_MAPPER, value: default }
+            - { name: TEMPORAL_JWT_PERMISSIONS_CLAIM, value: permissions }
+            # Clés de signature par l'adresse interne de Keycloak (HTTP accepté par Temporal)
+            - { name: TEMPORAL_JWT_KEY_SOURCE1, value: "http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/certs" }
+            - { name: TEMPORAL_JWT_KEY_REFRESH, value: 15m }
+            # Tâches système de Temporal par un frontend interne sans jeton, joignable entre pods
+            # Temporal seulement (7236) — configuration officielle avec autorisation.
+            - { name: USE_INTERNAL_FRONTEND, value: "true" }
+            - { name: TEMPORAL_SERVICES, value: "frontend,internal-frontend,history,matching,worker" }
+            # TLS (dès maintenant, sans attendre plusieurs nœuds) — certificat
+            # de service OKD pour temporal-frontend.sophia-core.svc (Secret temporal-frontend-tls, émis et renouvelé par le
+            # cluster), présenté aux clients ET entre les services (frontend interne, history,
+            # matching) ; ceux-ci vérifient le nom temporal-frontend.sophia-core.svc quelle que soit l'IP jointe.
+            - { name: TEMPORAL_TLS_FRONTEND_CERT, value: /etc/temporal/tls/tls.crt }
+            - { name: TEMPORAL_TLS_FRONTEND_KEY, value: /etc/temporal/tls/tls.key }
+            - { name: TEMPORAL_TLS_SERVER_CERT, value: /etc/temporal/tls/tls.crt }
+            - { name: TEMPORAL_TLS_SERVER_KEY, value: /etc/temporal/tls/tls.key }
+            - { name: TEMPORAL_TLS_SERVER_CA_CERT, value: /etc/temporal/ca/service-ca.crt }
+            - { name: TEMPORAL_TLS_INTERNODE_SERVER_NAME, value: temporal-frontend.sophia-core.svc }
+            - { name: TEMPORAL_TLS_FRONTEND_SERVER_NAME, value: temporal-frontend.sophia-core.svc }
+            # Relit les certificats renouvelés ; avertit 30 j avant l'expiration, erreur à 7 j
+            - { name: TEMPORAL_TLS_REFRESH_INTERVAL, value: 1h }
+            - { name: TEMPORAL_TLS_EXPIRATION_CHECKS_WARNING_WINDOW, value: 720h }
+            - { name: TEMPORAL_TLS_EXPIRATION_CHECKS_ERROR_WINDOW, value: 168h }
+            - { name: TEMPORAL_TLS_EXPIRATION_CHECKS_CHECK_INTERVAL, value: 24h }
+            - { name: LOG_LEVEL, value: info }
+            - { name: DYNAMIC_CONFIG_FILE_PATH, value: /etc/temporal/dynamicconfig/dynamicconfig.yaml }
+            - { name: PROMETHEUS_ENDPOINT, value: "0.0.0.0:9090" }
+            # Pool de connexions PAR SERVICE (4 dans ce pod) : postgres-sophia sert aussi LiteLLM,
+            # Keycloak et l'interface, max_connections = 100 (défaut sclorg). Au plus 4 × (5 + 2) = 28.
+            - { name: SQL_MAX_CONNS, value: "5" }
+            - { name: SQL_MAX_IDLE_CONNS, value: "2" }
+            - { name: SQL_VIS_MAX_CONNS, value: "2" }
+            - { name: SQL_VIS_MAX_IDLE_CONNS, value: "1" }
+          ports:
+            - { name: grpc, containerPort: 7233 }
+            - { name: http, containerPort: 7243 }
+            - { name: history, containerPort: 7234 }
+            - { name: matching, containerPort: 7235 }
+            - { name: worker, containerPort: 7239 }
+            - { name: internal-fe, containerPort: 7236 }
+            - { name: m-internal-fe, containerPort: 6936 }
+            - { name: m-frontend, containerPort: 6933 }
+            - { name: m-history, containerPort: 6934 }
+            - { name: m-matching, containerPort: 6935 }
+            - { name: m-worker, containerPort: 6939 }
+            - { name: metrics, containerPort: 9090 }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1536Mi }
+          volumeMounts:
+            - name: dynamic-config
+              mountPath: /etc/temporal/dynamicconfig
+              readOnly: true
+            - name: tls
+              mountPath: /etc/temporal/tls
+              readOnly: true
+            - name: service-ca
+              mountPath: /etc/temporal/ca
+              readOnly: true
+          readinessProbe:
+            tcpSocket: { port: grpc }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: grpc }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+      volumes:
+        - name: dynamic-config
+          configMap:
+            name: temporal-dynamic-config
+        - name: tls
+          secret:
+            secretName: temporal-frontend-tls
+            defaultMode: 0440
+        - name: service-ca
+          configMap:
+            name: temporal-service-ca
+---
+# Point d'entrée unique des clients (agents, interface) : garde ce nom quand les services seront
+# séparés, il pointera alors sur les seuls pods frontend.
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-frontend
+  namespace: sophia-core
+  labels: { app: temporal }
+  annotations:
+    # Le cluster crée et renouvelle le Secret (tls.crt, tls.key) pour temporal-frontend.sophia-core.svc
+    service.beta.openshift.io/serving-cert-secret-name: temporal-frontend-tls
+spec:
+  selector: { app: temporal }
+  ports:
+    - { name: grpc, port: 7233, targetPort: grpc }
+    - { name: http, port: 7243, targetPort: http }
