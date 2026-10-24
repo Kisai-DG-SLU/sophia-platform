@@ -15,7 +15,7 @@
 
 - **Ingredient table** (under acceptance testing): calories, season and price of each ingredient, to **compute** the cost, calories and season months of recipes instead of estimating them (see below).
 
-Planned: real drive prices in the ingredient table, through the Shopping module's `prix_reference` tool (contract agreed on both sides); checking generation caps on computed values.
+Planned: checking generation caps on computed values.
 
 ## Architecture
 
@@ -91,13 +91,13 @@ A checkbox when creating a party, which implies the surprise menu. Children's ac
 |---|---|
 | Calories | Ciqual table (ANSES, French food agency, open data), versioned with the module; ≈ 3,100 foods with energy, kcal computed from nutrients per the EU labelling regulation when missing (median gap 0.2 % on foods that have both) |
 | Season | ADEME's seasonal fruit and vegetable calendar (73 products, season months) |
-| Price per kilo, weight of a piece | estimated by the model today; real drive prices next |
+| Price | **real drive prices** when the household has already bought the product (the [Shopping module](../courses/documentation.en.md)'s `prix_reference` tool), otherwise estimated by the model; weight of a piece estimated |
 
 - **Rules first**: candidates are found without the model (name words, label before the comma, raw foods first; a small lexicon of compound names: "pomme de terre" (potato) is not "pomme" (apple)); the model (`sophia-local`, temperature 0.1, batches of 8) **chooses among those candidates or none**, and estimates price and weight; an answer outside the candidates is dropped, bounds are checked (€0.2 to €200/kg, 0.1 to 5,000 g).
 - A value **corrected by hand** is never overwritten, neither by the model nor by a drive price.
 - **Computation**: grams per unit (spoon, clove, bunch, pinch, centilitre…); calories and cost **replace the estimate only if everything that counts is known**, the original estimate is kept and comes back if a value is missing; the card marks an estimated value with "≈".
 - **Season**: the months when all the dish's fruit and vegetables are in season; a dish labelled "winter" in the old spreadsheet but made of carrots becomes seasonal in October.
-- **Real prices** (to be wired): weight, volume and pieces are **never converted** — a line by weight takes the price per kilo, by volume the price per litre, a piece the price per piece, otherwise no cost for that line.
+- **Real prices**: `prix_reference` is called once a day with all the recipes' ingredients; checks: a single price key, bounds, a reading less than six months old, and a **processed product** (peeled, tinned, frozen, juice…) **dropped for a fresh fruit or vegetable**. Weight, volume and pieces are **never converted** — a line by volume takes the price per litre, a piece the price per piece, a weight the price per kilo (a piece is weighed with the weight of a piece), otherwise no cost for that line and the recipe's estimate stays. Priority: price entered by hand, then drive price, then estimate.
 - A background task fills in new ingredients (seed, imports, generations) and recomputes recipes: ≈ 250 ingredients in about twenty minutes; 5 rare ingredients without a candidate must be entered by hand.
 
 ## Measurements

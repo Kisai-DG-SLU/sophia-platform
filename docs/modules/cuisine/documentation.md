@@ -15,7 +15,7 @@
 
 - **Table des ingrédients** (en recette) : calories, saison et prix de chaque ingrédient, pour **calculer** le coût, les calories et les mois de saison des recettes au lieu de les estimer (voir ci-dessous).
 
-Prévu : prix réels du drive dans la table des ingrédients, par l'outil `prix_reference` du module Courses (contrat accepté des deux côtés) ; contrôle des plafonds de la génération sur les valeurs calculées.
+Prévu : contrôle des plafonds de la génération sur les valeurs calculées.
 
 ## Architecture
 
@@ -91,13 +91,13 @@ Une case à la création d'une fête, qui implique le menu surprise. Les comptes
 |---|---|
 | Calories | table Ciqual (ANSES, données ouvertes), versionnée avec le module ; ≈ 3 100 aliments avec énergie, kcal calculées des nutriments selon le règlement européen d'étiquetage quand elles manquent (écart médian 0,2 % sur les aliments qui ont les deux) |
 | Saison | calendrier des fruits et légumes de saison de l'ADEME (73 produits, mois de saison) |
-| Prix au kilo, poids d'une pièce | estimés par le modèle aujourd'hui ; prix réels du drive ensuite |
+| Prix | **prix réels du drive** quand le foyer a déjà acheté le produit (outil `prix_reference` du [module Courses](../courses/documentation.md)), sinon estimés par le modèle ; poids d'une pièce estimé |
 
 - **Règles d'abord** : les candidats sont trouvés sans modèle (mots du nom, intitulé avant la virgule, aliments crus d'abord ; petit lexique des noms composés : « pomme de terre » n'est pas « pomme ») ; le modèle (`sophia-local`, température 0,1, lots de 8) **choisit parmi ces candidats ou aucun**, et estime prix et poids ; une réponse hors candidats est écartée, les bornes sont vérifiées (0,2 à 200 €/kg, 0,1 à 5 000 g).
 - Une valeur **corrigée à la main** n'est jamais écrasée, ni par le modèle ni par un prix du drive.
 - **Calcul** : grammes par unité (cuillère, gousse, bouquet, pincée, centilitre…) ; calories et coût **remplacent l'estimation seulement si tout ce qui compte est connu**, l'estimation d'origine est gardée et revient si une donnée manque ; la fiche marque « ≈ » une valeur estimée.
 - **Saison** : les mois où tous les fruits et légumes du plat sont de saison ; un plat noté « hiver » dans l'ancien tableur mais fait de carottes devient de saison en octobre.
-- **Prix réels** (à brancher) : poids, volume et pièces **ne se convertissent jamais** — une ligne en poids prend le prix au kilo, en volume le prix au litre, une pièce le prix à la pièce, sinon pas de coût pour la ligne.
+- **Prix réels** : `prix_reference` est appelé une fois par jour avec tous les ingrédients des recettes ; contrôles : une seule clé de prix, bornes, relevé de moins de six mois, et un **produit transformé** (pelé, conserve, surgelé, jus…) **écarté pour un fruit ou légume frais**. Poids, volume et pièces **ne se convertissent jamais** — une ligne en volume prend le prix au litre, une pièce le prix à la pièce, un poids le prix au kilo (une pièce se pèse avec le poids d'une pièce), sinon pas de coût pour la ligne et l'estimation de la recette reste. Ordre de priorité : prix saisi à la main, puis prix du drive, puis estimation.
 - Une tâche de fond renseigne les nouveaux ingrédients (amorce, imports, générations) et recalcule les recettes : ≈ 250 ingrédients en une vingtaine de minutes ; 5 ingrédients rares sans candidat sont à saisir à la main.
 
 ## Mesures
