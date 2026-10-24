@@ -27,11 +27,11 @@ Cette configuration permet de faire fonctionner l'integralite de la stack (orche
 | Composant | Exemple POC | Alternatives possibles |
 |:----------|:------------|:----------------------|
 | Orchestration conteneurs | OKD | Kubernetes, K3s, Rancher, EKS, AKS |
-| Inference locale | Ollama / llama.cpp | vLLM, LocalAI, inference maison |
+| Inference locale | llama.cpp | vLLM, Ollama, LocalAI, inference maison |
 | Routage de modeles | LiteLLM | Portkey, gateway maison |
 | Base vectorielle | Qdrant | Weaviate, Milvus, Pinecone, FAISS |
 | Git / versionning | Forgejo | Gitea, GitLab CE, GitHub Enterprise |
-| Moteur de workflows | n8n | Node-RED, StackStorm, Temporal |
+| Moteur de workflows | Temporal (agents), n8n (automatisations) | Node-RED, StackStorm, Argo Workflows |
 | Base relationnelle | PostgreSQL | MariaDB, MySQL |
 | Environnement dev | OpenCode / Jupyter | VS Code Server, Coder, Theia |
 | Acquisition web | Sas Paranoiaque | outillage maison, proxy dedie |

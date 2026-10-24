@@ -63,7 +63,7 @@ Technologies (exemple) : LiteLLM, moteurs d'orchestration, journalisation et tel
 
 Environnement d'execution locale des modeles. Responsabilites : hebergement de modeles locaux, inference CPU/GPU, isolation de l'execution.
 
-Technologies (exemple) : Ollama, llama.cpp.
+Technologies (exemple) : llama.cpp (texte et vision, GPU), stable-diffusion.cpp (images, CPU), modeles vocaux sur CPU. Alternatives : vLLM, Ollama.
 
 ### sophia-memory
 

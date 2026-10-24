@@ -41,7 +41,13 @@ La plateforme ne se joint que par un VPN WireGuard, y compris depuis le reseau l
 
 ## Composants air-gapped
 
-Certains namespaces sont intentionnellement isoles des reseaux externes. Parmi les exemples : sophia-inference et sophia-memory. Ces namespaces n'ont pas acces a Internet afin d'eliminer tout risque d'exfiltration de donnees.
+Certains namespaces sont intentionnellement isoles des reseaux externes, afin d'eliminer tout risque d'exfiltration de donnees : leurs modeles et donnees sont deposes depuis le noeud, a des revisions et empreintes figees.
+
+| Namespace | Etat dans l'installation de reference |
+|---|---|
+| sophia-inference | **en place** : tout refuse, entree depuis le routeur de modeles et l'outil d'images seulement, aucune sortie |
+| sophia-skills | **en place** : aucune sortie hors DNS et modeles d'image |
+| sophia-memory | **cible** : isolation a appliquer |
 
 ---
 
@@ -57,12 +63,12 @@ Ce mecanisme empeche les scripts malveillants ou les mecanismes de tracage de pe
 
 Les donnees sensibles sont protegees par plusieurs mecanismes :
 
-- Volumes de stockage chiffres
-- Controle d'acces strict
-- Secrets geres via Kubernetes
+- Controle d'acces strict (SSO, groupes, cles restreintes par client)
+- Secrets geres via Kubernetes, jamais dans les depots
 - Journalisation d'audit
+- Volumes de stockage chiffres : **cible**, pas encore en place dans l'installation de reference (volumes locaux non chiffres)
 
-Les donnees persistantes telles que les bases vectorielles et les depots de code sont hebergees sur des volumes chiffres.
+Les donnees persistantes (bases vectorielles, bases relationnelles, depots de code) sont sur des volumes locaux du serveur ; leur chiffrement au repos est a mettre en place.
 
 ---
 

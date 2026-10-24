@@ -42,7 +42,10 @@ La stack experimentale actuelle inclut :
 
 - **OKD / Kubernetes** : orchestration infrastructurelle
 - **LiteLLM** : couche de routage de modeles unifiee
-- **Ollama** : execution locale de modeles
+- **llama.cpp** : execution locale du modele de langage, vision comprise (GPU) ; voix et generation d'images sur CPU
+- **Keycloak** : identite et SSO de toutes les interfaces
+- **RabbitMQ** et **Temporal** : evenements et workflows durables des agents
+- **Serveurs MCP** : outils locaux (geographie, images) et sas web
 - **Qdrant** : base vectorielle pour les systemes RAG
 - **Forgejo** : versionnement de la memoire et de la documentation du projet
 
@@ -63,7 +66,7 @@ flowchart TB
     WG --> CORE[sophia-core\nOrchestration / LiteLLM]
     WG --> GIT[sophia-git\nForgejo / Project Memory]
 
-    CORE --> INFER[sophia-inference\nModeles Locaux / Ollama]
+    CORE --> INFER[sophia-inference\nModeles Locaux / llama.cpp]
     CORE --> MEM[sophia-memory\nQdrant / Memoire Vectorielle]
     CORE --> SKILLS[sophia-skills\nServeurs MCP / Outils]
     CORE --> DMZ[sophia-dmz\nAcquisition Web Securisee]
