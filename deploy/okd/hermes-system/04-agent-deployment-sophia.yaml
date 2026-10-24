@@ -14,11 +14,15 @@ spec:
       labels:
         app: sophia
     spec:
-      serviceAccountName: ${SERVICE_ACCOUNT}
+      # Compte propre à Sophia, sans aucun droit sur le cluster (12-sophia-sa.yaml), SCC restricted-v2
+      # par défaut. Pas de jeton d'API monté : le seul jeton du pod est le jeton projeté d'audience
+      # « repartiteur », que l'API Kubernetes refuse. Sophia délègue par le répartiteur seulement.
+      serviceAccountName: sophia-sa
+      automountServiceAccountToken: false
 
       initContainers:
       - name: init-workspace
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -66,7 +70,7 @@ spec:
 
       containers:
       - name: sophia
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         imagePullPolicy: Always
         command: ["hermes", "gateway", "run"]
         tty: true
@@ -83,16 +87,15 @@ spec:
           value: "SOPHIA"
         - name: PATH
           value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        # api_server coupé : un agent n'est joint que par le répartiteur, et seulement s'il est
+        # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
-          value: "true"
-        - name: API_SERVER_HOST
-          value: "0.0.0.0"
+          value: "false"
         - name: HERMES_DASHBOARD
           value: "1"
-        - name: API_SERVER_KEY
-          value: ${API_SERVER_KEY}
-        - name: GATEWAY_ALLOW_ALL_USERS
-          value: "true"
+        # UID arbitraire (restricted-v2) : pas d'entrée passwd, HOME vers le volume inscriptible
+        - name: HOME
+          value: /opt/data
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -101,7 +104,21 @@ spec:
         volumeMounts:
         - name: agent-storage
           mountPath: /opt/data
+        # Outil MCP de demande au répartiteur : jeton du demandeur et autorité TLS du répartiteur
+        - name: jeton-repartiteur
+          mountPath: /var/run/secrets/repartiteur
+          readOnly: true
+        - name: repartiteur-ca
+          mountPath: /etc/repartiteur-ca
+          readOnly: true
 
       volumes:
       - name: agent-storage
         emptyDir: {}
+      # Jeton projeté, audience « repartiteur », renouvelé par le kubelet
+      - name: jeton-repartiteur
+        projected:
+          sources:
+          - serviceAccountToken: { audience: repartiteur, expirationSeconds: 3600, path: token }
+      - name: repartiteur-ca
+        configMap: { name: temporal-service-ca }

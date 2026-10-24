@@ -18,7 +18,7 @@ spec:
       serviceAccountName: athena-sa
       initContainers:
       - name: init-workspace
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -62,7 +62,7 @@ spec:
           mountPath: /opt/data
       containers:
       - name: hermes
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -94,16 +94,15 @@ spec:
               key: telegram_bot_token
         - name: TELEGRAM_HITL_CHAT_ID
           value: ${TELEGRAM_HITL_CHAT_ID}
+        # Messagerie : seuls les identifiants listés parlent à l'agent ; sans liste, refus
+        - name: TELEGRAM_ALLOWED_USERS
+          value: ${TELEGRAM_ALLOWED_USERS}
         - name: PATH
           value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        # api_server coupé : un agent n'est joint que par le répartiteur, et seulement s'il est
+        # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
-          value: "true"
-        - name: API_SERVER_HOST
-          value: "0.0.0.0"
-        - name: API_SERVER_KEY
-          value: ${API_SERVER_KEY}
-        - name: GATEWAY_ALLOW_ALL_USERS
-          value: "true"
+          value: "false"
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -145,7 +144,7 @@ spec:
       serviceAccountName: hephaistos-sa
       initContainers:
       - name: init-workspace
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -190,9 +189,40 @@ spec:
         volumeMounts:
         - name: agent-storage
           mountPath: /opt/data
+      # La configuration commune est écrite pour la version des autres agents ; la version de
+      # l'exécutant ne la migre pas d'elle-même. Migration non interactive à chaque démarrage
+      # (idempotente), puis les surcharges propres à l'agent, APRÈS la migration, qui sinon les
+      # remplacerait par ses nouvelles valeurs par défaut.
+      - name: config-migrate
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${EXECUTANT_IMAGE_NAME}@${EXECUTANT_IMAGE_DIGEST}
+        imagePullPolicy: IfNotPresent
+        workingDir: /opt/data
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          /opt/hermes/.venv/bin/python -P -c '
+          import site, sys
+          sys.path[:0] = ["/opt/hermes"]
+          site.addsitedir("/opt/hermes/.venv/lib/python3.14/site-packages")
+          from hermes_cli.config import migrate_config
+          r = migrate_config(interactive=False, quiet=False)
+          print("avertissements :", r["warnings"])
+          '
+          if [ -f surcharges.yaml ]; then
+            yq -i '. *= load("surcharges.yaml")' config.yaml
+          fi
+        env:
+        - { name: HERMES_HOME, value: /opt/data }
+        - { name: HOME, value: /opt/data }
+        volumeMounts:
+        - name: agent-storage
+          mountPath: /opt/data
       containers:
       - name: hermes
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${EXECUTANT_IMAGE_NAME}@${EXECUTANT_IMAGE_DIGEST}
+        imagePullPolicy: IfNotPresent
         command: ["hermes", "gateway", "run"]
         tty: true
         stdin: true
@@ -200,20 +230,26 @@ spec:
         - name: AGENT_PERSONA
           value: "HEPHAISTOS"
         - name: PATH
-          value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
-        - name: API_SERVER_ENABLED
-          value: "true"
-        - name: API_SERVER_HOST
-          value: "0.0.0.0"
+          value: "/opt/hermes/bin:/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        # Exécutant : api_server actif dès qu'une clé d'au moins 16 caractères est présente. Clé propre,
+        # connue du seul répartiteur ; entrée limitée au répartiteur (09-executants-network.yaml).
         - name: API_SERVER_KEY
-          value: ${API_SERVER_KEY}
-        - name: GATEWAY_ALLOW_ALL_USERS
-          value: "true"
+          valueFrom: { secretKeyRef: { name: repartiteur-cle-hephaistos, key: cle } }
+        - { name: API_SERVER_HOST, value: 0.0.0.0 }
+        - { name: API_SERVER_PORT, value: "8642" }
+        - { name: HERMES_HOME, value: /opt/data }
+        - { name: HOME, value: /opt/data }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
         - secretRef:
             name: ${AGENT_SECRET}
+        ports:
+        - { name: api, containerPort: 8642 }
+        readinessProbe:
+          httpGet: { path: /health, port: api }
+          initialDelaySeconds: 20
+          periodSeconds: 10
         volumeMounts:
         - name: agent-storage
           mountPath: /opt/data
@@ -241,7 +277,7 @@ spec:
       serviceAccountName: ouranos-sa
       initContainers:
       - name: init-workspace
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -288,25 +324,23 @@ spec:
           mountPath: /opt/data
       containers:
       - name: hermes
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command: ["hermes", "gateway", "run"]
         tty: true
         stdin: true
         env:
         - name: AGENT_PERSONA
           value: "OURANOS"
+        # Écart connu, correction prévue : « prompt » n'est traité par aucun code, la validation n'est
+        # donc pas imposée. À remplacer par « systematic » (comme athena) avant tout usage.
         - name: REQUIRE_HITL
           value: "prompt"
         - name: PATH
           value: "${AGENT_PATH:-/opt/hermes/.venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+        # api_server coupé : un agent n'est joint que par le répartiteur, et seulement s'il est
+        # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
-          value: "true"
-        - name: API_SERVER_HOST
-          value: "0.0.0.0"
-        - name: API_SERVER_KEY
-          value: ${API_SERVER_KEY}
-        - name: GATEWAY_ALLOW_ALL_USERS
-          value: "true"
+          value: "false"
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}

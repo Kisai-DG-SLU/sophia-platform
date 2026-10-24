@@ -18,12 +18,17 @@ spec:
       hostPID: true
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      # UID propre, distinct de celui des autres agents : en hostPID, un même UID permettrait de lire
+      # par /proc l'environnement et le jeton d'un agent plus privilégié.
+      securityContext:
+        runAsUser: ${OBSERVER_UID}
+        fsGroup: ${OBSERVER_FSGROUP}
       # Laisse au sidecar claude-sync le temps du push final
       terminationGracePeriodSeconds: 60
 
       initContainers:
       - name: init-workspace
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -72,7 +77,7 @@ spec:
       # Claude Code : restauration de la config/historique depuis le dépôt ${CLAUDE_REPO} + installation npm.
       # Idempotent : rejoué après un redémarrage du nœud alors que l'emptyDir est conservé.
       - name: init-claude
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         command:
         - /bin/bash
         - -c
@@ -135,7 +140,7 @@ spec:
       # Sidecar natif : push de l'historique Claude toutes les CLAUDE_SYNC_INTERVAL s,
       # à chaque fin de session (/clear, exit : hook SessionEnd -> .sync-request) et à l'arrêt du pod.
       - name: claude-sync
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         restartPolicy: Always
         command:
         - /bin/bash
@@ -194,7 +199,7 @@ spec:
 
       containers:
       - name: dionysos
-        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}:latest
+        image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
         imagePullPolicy: Always
         # ws up (en arrière-plan) : clones des projets, contextes, session zellij avec un
         # onglet par projet (voir assistant/README.md) ; puis la passerelle de l'agent.
@@ -227,14 +232,10 @@ spec:
               name: ${CLAUDE_SECRET}
               key: oauth-token
               optional: true
+        # api_server coupé : un agent n'est joint que par le répartiteur, et seulement s'il est
+        # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
-          value: "true"
-        - name: API_SERVER_HOST
-          value: "0.0.0.0"
-        - name: API_SERVER_KEY
-          value: ${API_SERVER_KEY}
-        - name: GATEWAY_ALLOW_ALL_USERS
-          value: "true"
+          value: "false"
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}

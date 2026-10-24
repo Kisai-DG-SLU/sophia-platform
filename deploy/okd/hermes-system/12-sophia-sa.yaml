@@ -1,0 +1,10 @@
+# Compte de service propre à Sophia. Aucun RoleBinding ni ClusterRoleBinding : Sophia n'a aucun droit
+# sur le cluster, pas même en lecture ; elle délègue par le répartiteur, qui la reconnaît à ce compte
+# (${AGENT_NAMESPACE}:sophia-sa). SCC restricted-v2 par défaut, sous un UID arbitraire.
+# Un compte par agent : un compte partagé par plusieurs pods ne prouverait aucune identité.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sophia-sa
+  namespace: ${AGENT_NAMESPACE}
+automountServiceAccountToken: false

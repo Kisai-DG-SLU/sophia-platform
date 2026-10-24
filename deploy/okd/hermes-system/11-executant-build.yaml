@@ -1,0 +1,46 @@
+# Image des exécutants : une version récente de Hermes Agent, distincte de l'image des autres agents
+# (ImageStream propre, aucun déclencheur). Elle apporte ce qu'un exécutant derrière le répartiteur
+# exige de l'api_server : reprise du flux d'événements (Last-Event-ID), Idempotency-Key, refus d'une
+# clé faible. Ajouts : outils du métier d'exécutant (oc, yq, jq, envsubst), versions et empreintes
+# vérifiées. Ni terminal partagé ni messagerie : un exécutant n'en a pas l'usage.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: ${EXECUTANT_IMAGE_NAME}
+  namespace: ${AGENT_NAMESPACE}
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ${EXECUTANT_IMAGE_NAME}-build
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ${EXECUTANT_IMAGE_NAME}:v0.22.5
+  strategy:
+    dockerStrategy: {}
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+  source:
+    type: Dockerfile
+    dockerfile: |
+      FROM docker.io/nousresearch/hermes-agent:v0.22.5@sha256:9c5561579f3ffdf333401797094ac3a743738d6c25d40f4331c7bf77b694238d
+      USER root
+      ENV OC_VERSION=4.14.58
+
+      RUN apt-get update && apt-get install -y --no-install-recommends jq gettext-base \
+          && rm -rf /var/lib/apt/lists/*
+
+      RUN curl -fL https://github.com/mikefarah/yq/releases/download/v4.53.2/yq_linux_amd64 -o /usr/local/bin/yq \
+          && echo 'd56bf5c6819e8e696340c312bd70f849dc1678a7cda9c2ad63eebd906371d56b  /usr/local/bin/yq' | sha256sum -c - \
+          && chmod +x /usr/local/bin/yq
+
+      RUN curl -fL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz \
+          && echo '8a0d2d8fea5c2ee8664e54968cb44c59013c3166dfbe4b0d5900491c31e8d520  /tmp/oc.tar.gz' | sha256sum -c - \
+          && tar -xf /tmp/oc.tar.gz -C /usr/local/bin oc kubectl \
+          && rm /tmp/oc.tar.gz
+
+      USER 1000

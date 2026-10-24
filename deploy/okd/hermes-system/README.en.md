@@ -16,10 +16,29 @@ The manifests must be applied sequentially to satisfy dependencies:
 8. `08-services.yaml` — Internal headless services for agent routing
 9. `09-executants-network.yaml` — an executor's `api_server` ingress open to the [dispatcher](../core/repartiteur/) only
 10. `10-recette-repartiteur.yaml` — acceptance Job: a "pong" mission requested from the dispatcher through the real path
+11. `11-executant-build.yaml` — executor image (recent Hermes Agent version, pinned by digest)
+12. `12-sophia-sa.yaml` — Sophia's service account, without any right on the cluster (apply before `04`)
+
+## Pantheon security
+
+Agents are **executors**, reached by the [dispatcher](../core/repartiteur/) only, which decides by rules without a model ([Agent Pantheon](../../../docs/concepts/08-pantheon-agentique.en.md)).
+
+| Point | Implementation | Why |
+|---|---|---|
+| No shared key, no open `api_server` | `api_server` disabled on every agent (`API_SERVER_ENABLED=false`), except on an **executor**: its own key (Secret `repartiteur-cle-<agent>`, known to it and to the dispatcher only), ingress reserved for the dispatcher (`09-executants-network.yaml`) | a shared key let whoever held it start a run on any agent, including the cluster administrator, and answer approvals themselves |
+| Delegation through the dispatcher | Sophia requests through an MCP tool, with her account's projected token (audience `repartiteur`); no agent reaches Temporal or writes to RabbitMQ; Hermes' native delegation (`delegate_task`) is removed from Sophia; on an executor, it stays internal and bounded | a single door to protect, rules no model can change |
+| Account without rights for Sophia | `sophia-sa` (`12-sophia-sa.yaml`): no RBAC binding, `restricted-v2` SCC, no API token mounted | Sophia never modifies the infrastructure herself |
+| One UID per agent | the observer (`hostPID`) runs under its own UID (`${OBSERVER_UID}`), distinct from the other agents' | with `hostPID`, a shared UID allows reading a more privileged agent's environment and token through `/proc` |
+| Restricted messaging | `TELEGRAM_ALLOWED_USERS` on every agent with a bot; no more `GATEWAY_ALLOW_ALL_USERS` | without a list, the gateway would accept any messaging user, over the Internet, outside the VPN |
+| Images pinned by digest | `@${AGENT_IMAGE_DIGEST}`, `@${EXECUTANT_IMAGE_DIGEST}` with `IfNotPresent`; build bases pinned too | a restart never changes image without a decision; changing image = a new digest, then `apply` |
+| Human approval | maintenance: `REQUIRE_HITL=systematic`, every command waits for approval; behind the dispatcher, approval of the plan then of each command (D3a, D3b) through the Temporal UI | **known gap**: on the deployment agent, `prompt` is handled by no code, so approval is not enforced; switching to `systematic` is planned before any use |
+| Executor on a recent version | `11-executant-build.yaml` (Hermes Agent pinned by digest); an initContainer migrates the shared configuration, then applies the agent's overrides (bounds of its internal delegation) | the migration changes defaults: overrides come after it |
+
+Closed tool list: at every Hermes update, list the tools actually given to the model; a default may change from one version to the next.
 
 ## Model Agnosticism
 
-Each agent pod is configured independently via its `AGENT_MODEL` environment variable. Sophia can use a powerful reasoning model (`${MODEL_THINK}`) while her sub-agents run a lighter, faster model (`${MODEL_ROUTINE}`). Each god deployment in `06-gods-deployments.yaml` has its own model configuration.
+Each agent pod is configured independently via its `AGENT_MODEL` environment variable. Sophia can use a powerful reasoning model (`${MODEL_THINK}`) while her sub-agents run a lighter, faster model (`${MODEL_ROUTINE}`). Target: the local model for all, with a "background" alias that leaves priority to chat ([Inference and Hardware](../../../docs/concepts/11-inference-materiel.en.md)). Each god deployment in `06-gods-deployments.yaml` has its own model configuration.
 
 Because agentic behavior is enforced by infrastructure (RBAC, NetworkPolicies, output format validation) rather than the model itself, the architecture works with any model -- from small local models to large public APIs. You can even deploy an agent without any AI backend if its role is purely deterministic.
 
@@ -67,8 +86,11 @@ Substitute the following variables (via envsubst or Helm) before applying:
 | `${GIT_NAMESPACE}` | Git service namespace | `git` |
 | `${MODEL_THINK}` | Reasoning model for Sophia | `sophia-think` |
 | `${MODEL_ROUTINE}` | Lightweight model for sub-agents | `sophia-routine` |
-| `${API_SERVER_KEY}` | Internal API key for agent communication | (required) |
 | `${TELEGRAM_HITL_CHAT_ID}` | Telegram chat ID for HITL approvals | (required) |
+| `${TELEGRAM_ALLOWED_USERS}` | Telegram IDs allowed to talk to the agent (list) | (required if bot) |
+| `${OBSERVER_UID}`, `${OBSERVER_FSGROUP}` | Observer's own UID and group | (to set, outside the other agents' range) |
+| `${EXECUTANT_IMAGE_NAME}`, `${EXECUTANT_IMAGE_DIGEST}` | Executor image and its digest | `hermes-executant`, `sha256:…` |
+| `${HERMES_AGENT_VERSION}`, `${HERMES_AGENT_DIGEST}` | Version and digest of the agent image base | (to set) |
 | `${CLAUDE_REPO}` | Private Git repository for the coding assistant's configuration and history | `assistant-history` |
 | `${CLAUDE_SECRET}` | Assistant Secret (OAuth token, Forgejo write credentials) | (required for sync) |
 | `${CLAUDE_CODE_VERSION}` | Assistant version installed by `init-claude` | (to pin) |
