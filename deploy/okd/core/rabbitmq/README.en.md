@@ -16,7 +16,7 @@ The agents' message bus: each agent receives its requests in its own queue, and 
 | Disk | `disk_free_limit.absolute = 1GB` | publishing paused before the system disk is full (50 MB by default) |
 | Rollout | `Recreate`, one replica | `ReadWriteOnce` volume: never two RabbitMQ on the same directory |
 | Accounts | **definitions imported on every start**: `/sophia` vhost, one account per agent and one for the visualisation relay, permissions; a **secret-free** template in the `ConfigMap`, passwords inserted by an initContainer from a Secret, into an in-memory volume | accounts and permissions are described in the repository and replayed identically; the password is hashed on import; the initContainer fails if a template account has no password |
-| Agent permissions | publish to `sophia.agents` and `sophia.events`; read only its own `sophia.agent.<name>` queue; configure nothing | no write on the default exchange: an agent cannot drop a message into another's queue; the whole topology is declared by the import (see below) |
+| Agent permissions | no write at all; read of its `sophia.agent.<name>` queue, unused since the dispatcher, until it is removed; configure nothing | agents are executors, reached by the dispatcher only, which is the **only publisher** on `sophia.events` (keys `<requester>.delegate.<event>`, through `topic_permissions`) |
 | Visualisation relay | temporary queue (`amq.gen-*`) bound to `sophia.events`, without publishing | live reading of events, unable to emit anything |
 | Internal administrator | in the definitions (Secret `rabbitmq-admin-creds`) | with definitions, RabbitMQ no longer creates `RABBITMQ_DEFAULT_USER` on a fresh volume |
 | Management UI | `rabbitmq_auth_backend_oauth2` plugin: realm tokens, **public PKCE** client `rabbitmq`; **password login disabled** (`management.oauth_disable_basic_auth`) | one identity for every console; agents keep their internal accounts over AMQP (`auth_backends`: OAuth2, then internal) |
@@ -31,12 +31,13 @@ Delegations between agents go through [Temporal](../temporal/); RabbitMQ only ca
 |---|---|---|
 | `sophia.agents` | `direct` exchange | simple message to an agent, routing key = agent name |
 | `sophia.agent.<name>` | quorum queue, one per agent | the agent's mailbox; `sophia-agents` policy: dead letters to `sophia.dlx`, at most 5 deliveries, `at-least-once`, 10,000 messages then **publish rejected** (the publisher gets a *nack*: nothing is silently lost) |
-| `sophia.events` | `topic` exchange | events (delegation started, finished…), key `<agent>.<event>`; read live by the visualisation relay |
+| `sophia.events` | `topic` exchange | events (delegation started, finished…), key `<requester>.delegate.<event>`, published by the dispatcher only; read live by the visualisation relay |
 | `sophia.dlx` → `sophia.dlq` | `fanout` → quorum queue | dead letters; `sophia-dlq` policy: 30 days, 10,000 messages (oldest dropped); read by the administrator |
 
 | Account | configure | write | read |
 |---|---|---|---|
-| agent `<name>` | nothing | `sophia.agents`, `sophia.events` | `sophia.agent.<name>` |
+| agent `<name>` | nothing | nothing | `sophia.agent.<name>` |
+| dispatcher | nothing | `sophia.events` (keys `<requester>.delegate.<event>`) | nothing |
 | visualisation relay | `amq.gen-*` | `amq.gen-*` | `sophia.events`, `amq.gen-*` |
 | administrator | everything | everything | everything |
 
@@ -92,4 +93,4 @@ unset ARGS p
 
 ## Next
 
-Still to do: the message format and the integration into the agents (one Temporal worker per agent, events published to `sophia.events`, task identifier propagated everywhere).
+Delegation events are published by the [dispatcher](../repartiteur/). Still to do: their consumers, and removing the `sophia.agent.<name>` queues and the `sophia.agents` exchange, now unused.

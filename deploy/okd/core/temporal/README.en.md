@@ -10,8 +10,8 @@ Durable execution of delegations between agents: each delegation is a **workflow
 | Shape | one pod, four services (frontend, history, matching, worker) and an internal frontend | a single node today; separable through `TEMPORAL_SERVICES` without touching the database (pods find each other through the membership table) |
 | Database | `temporal` and `temporal_visibility` in the shared PostgreSQL, `temporal` role | no extra database to operate; connection pool capped per service (at most 28) |
 | History shards | **128, irreversible** | set when the database is created: changing it means migrating to another Temporal cluster |
-| Entry point | Service `temporal-frontend:7233` (gRPC) | clients: agents (agents' namespace), UI, admin Jobs, node network |
-| Authorisation | **a Keycloak token on every call**; permissions in the `permissions` claim as `namespace:role` (`sophia:write`, `temporal-system:admin`) | one service account per agent (`sophia:write`), one for administration; no anonymous call |
+| Entry point | Service `temporal-frontend:7233` (gRPC) | clients: the [dispatcher](../repartiteur/) (only application client; agents have no access to Temporal), the UI, admin Jobs |
+| Authorisation | **a Keycloak token on every call**; permissions in the `permissions` claim as `namespace:role` (`sophia:write`, `temporal-system:admin`) | one service account for the dispatcher (`temporal-repartiteur`, `sophia:write`), one for administration; the former per-agent accounts are disabled; no anonymous call; the authenticated author of each signal is recorded in the history (`frontend.enablePrincipalPropagation`) |
 | System tasks | internal frontend (7236) without a token, reachable between Temporal pods only | Temporal's official configuration with authorisation |
 | Encryption | **verified TLS**, clients and between services: OKD service certificate for `temporal-frontend.sophia-core.svc`, renewed by the cluster | traffic stays encrypted the day services run on several nodes; warning 30 days before expiry, error at 7 days |
 | UI | `temporal-ui` behind an **oauth2-proxy** (realm `admin` group), which forwards the ID token | the UI does not filter by group; the server refuses any call without a token |
@@ -23,7 +23,7 @@ Durable execution of delegations between agents: each delegation is a **workflow
 |---|---|
 | `01-schema-job.yaml` | Job creating and updating the schemas (replayable) |
 | `02-server.yaml` | dynamic configuration, certificate authority, server, Services (including the certificate annotation) |
-| `03-network-policy.yaml` | ingress to Temporal (agents, UI, Jobs, node network, between Temporal pods) and to Postgres (Temporal); the UI ingress (router) is in `04-ui.yaml` |
+| `03-network-policy.yaml` | ingress to Temporal (dispatcher, UI, Jobs, between Temporal pods) and to Postgres (Temporal); the UI ingress (router) is in `04-ui.yaml` |
 | `04-ui.yaml` | UI, oauth2-proxy, `edge` Route |
 | `05-namespace-job.yaml` | creates the `sophia` namespace (admin account token) |
 | `06-smoke-test-job.yaml` | acceptance test: call without a token refused, then an end-to-end "hello" workflow |

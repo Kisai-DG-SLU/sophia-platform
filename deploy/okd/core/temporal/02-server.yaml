@@ -13,6 +13,12 @@ metadata:
   labels: { app: temporal }
 data:
   dynamicconfig.yaml: |
+    # Chaque événement de l'historique porte le principal authentifié de l'appelant (sub du jeton
+    # Keycloak). Le répartiteur ne retient un signal (approbation, commande, annulation) que si ce
+    # principal est dans sa liste d'approbateurs : le champ identity, déclaré par le client, ne prouve
+    # rien. Relu par le serveur sans redémarrage.
+    frontend.enablePrincipalPropagation:
+      - value: true
     # Exemple : limiter la taille d'une charge utile à 2 Mo
     # limit.blobSize.error:
     #   - value: 2097152

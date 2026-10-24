@@ -6,13 +6,15 @@ Lancé par l'administrateur depuis son poste (sous VPN), bibliothèque standard 
     python3 deploy/okd/identity/temporal-keycloak.py --dry-run   # lecture seule, liste les actions
     python3 deploy/okd/identity/temporal-keycloak.py             # applique
 
-Crée ce qui manque, ne modifie pas ce qui existe (rejouable) :
+Crée ce qui manque, ne modifie pas ce qui existe, sauf la désactivation ci-dessous (rejouable) :
   - client « temporal » : porte les rôles « namespace:rôle » lus par Temporal ;
   - client scope « temporal-permissions » : ces rôles dans le claim « permissions » des jetons ;
   - scope ajouté par défaut au client « temporal-ui » (interface, via oauth2-proxy) ;
   - groupe « admin » → temporal-system:admin ;
-  - un client à compte de service par agent (sophia:write) et « temporal-admin » (Jobs
-    d'administration, temporal-system:admin).
+  - « temporal-repartiteur » (sophia:write : seul client Temporal applicatif) et
+    « temporal-admin » (Jobs d'administration, temporal-system:admin) ;
+  - les anciens clients par agent (« temporal-<agent> ») sont désactivés, jamais supprimés :
+    les agents n'ont plus accès à Temporal (voir core/repartiteur/). Leurs Secrets sont à supprimer par l'administrateur.
 Le secret de chaque client à compte de service est lu dans Keycloak et posé dans un Secret
 Kubernetes par l'entrée standard d'« oc apply » : jamais affiché, jamais écrit dans un fichier.
 Identifiant et mot de passe administrateur (realm master) demandés sans écho.
@@ -38,10 +40,13 @@ ROLES = {
     "sophia:write": "Temporal : lancer et exécuter des workflows dans sophia (agents)",
     "sophia:read": "Temporal : lecture du namespace sophia",
 }
-AGENTS = ["sophia", "athena", "hephaistos", "ouranos", "dionysos"]
 # client Keycloak -> (rôle Temporal, namespace Kubernetes, nom du Secret)
-SERVICE_CLIENTS = {f"temporal-{a}": ("sophia:write", "hermes-system", f"temporal-agent-{a}") for a in AGENTS}
-SERVICE_CLIENTS["temporal-admin"] = ("temporal-system:admin", "sophia-core", "temporal-admin-client")
+SERVICE_CLIENTS = {
+    "temporal-repartiteur": ("sophia:write", "sophia-core", "temporal-repartiteur"),
+    "temporal-admin": ("temporal-system:admin", "sophia-core", "temporal-admin-client"),
+}
+# Anciens clients par agent, désactivés (Secrets temporal-agent-<agent> de hermes-system)
+RETIRES = [f"temporal-{a}" for a in ["sophia", "athena", "hephaistos", "ouranos", "dionysos"]]
 
 
 class Keycloak:
@@ -207,6 +212,17 @@ def main():
             step(kc.dry_run, f"compte de service {client_id} → {role_name}")
             secret = None
         put_secret(kc.dry_run, namespace, secret_name, client_id, secret)
+
+    # 5. Anciens clients par agent : désactivés (un jeton déjà émis expire seul, 5 min par défaut)
+    for client_id in RETIRES:
+        c = kc.client(client_id)
+        if c is None:
+            print(f"client {client_id} : absent")
+        elif not c.get("enabled", True):
+            print(f"client {client_id} : déjà désactivé")
+        else:
+            step(kc.dry_run, f"client {client_id} : désactivation")
+            kc.call("PUT", f"/clients/{c['id']}", {**c, "enabled": False}, write=True)
 
     print("Terminé." if not kc.dry_run else "Lecture seule : rien n'a été modifié.")
 

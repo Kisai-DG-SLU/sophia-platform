@@ -20,8 +20,10 @@ data:
   #  - DLQ : sophia.dlx (fanout) → sophia.dlq (quorum, 30 j, 10 000 messages), lue par l'administrateur ;
   #    une file d'agent y envoie un message refusé ou livré 5 fois sans ack (at-least-once), et refuse
   #    les publications au-delà de 10 000 messages (l'émetteur reçoit un nack, rien n'est perdu en silence).
-  # Droits : un agent publie sur sophia.agents et sophia.events, ne lit que sa file, ne configure rien
-  # (les clients déclarent en passive=True). Il doit poser user_id = son compte (vérifié par RabbitMQ).
+  # Droits : les agents n'écrivent nulle part (exécutants, joints par le répartiteur seul) ; ils gardent
+  # la lecture de leur file, sans usage, en attendant son retrait.
+  # repartiteur : seul éditeur sur sophia.events, clés <demandeur>.delegate.<événement> seulement
+  # (topic_permissions), user_id toujours posé (vérifié par RabbitMQ), ne configure rien (passive=True).
   # sophia-workflow : relais SSE en direct, file exclusive amq.gen-* liée à sophia.events, sans publier.
   # L'administrateur interne (Secret rabbitmq-admin-creds) y figure aussi : avec des définitions,
   # RabbitMQ ne crée plus RABBITMQ_DEFAULT_USER sur un volume neuf.
@@ -69,6 +71,11 @@ data:
           "name": "sophia-workflow",
           "password": "@PW_sophia-workflow@",
           "tags": []
+        },
+        {
+          "name": "repartiteur",
+          "password": "@PW_repartiteur@",
+          "tags": []
         }
       ],
       "permissions": [
@@ -83,35 +90,35 @@ data:
           "user": "sophia",
           "vhost": "/sophia",
           "configure": "",
-          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "write": "",
           "read": "^sophia\\.agent\\.sophia$"
         },
         {
           "user": "athena",
           "vhost": "/sophia",
           "configure": "",
-          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "write": "",
           "read": "^sophia\\.agent\\.athena$"
         },
         {
           "user": "hephaistos",
           "vhost": "/sophia",
           "configure": "",
-          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "write": "",
           "read": "^sophia\\.agent\\.hephaistos$"
         },
         {
           "user": "ouranos",
           "vhost": "/sophia",
           "configure": "",
-          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "write": "",
           "read": "^sophia\\.agent\\.ouranos$"
         },
         {
           "user": "dionysos",
           "vhost": "/sophia",
           "configure": "",
-          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "write": "",
           "read": "^sophia\\.agent\\.dionysos$"
         },
         {
@@ -120,6 +127,13 @@ data:
           "configure": "^amq\\.gen-.*$",
           "write": "^amq\\.gen-.*$",
           "read": "^(sophia\\.events|amq\\.gen-.*)$"
+        },
+        {
+          "user": "repartiteur",
+          "vhost": "/sophia",
+          "configure": "",
+          "write": "^sophia\\.events$",
+          "read": ""
         }
       ],
       "exchanges": [
@@ -283,6 +297,15 @@ data:
             "max-length": 10000,
             "message-ttl": 2592000000
           }
+        }
+      ],
+      "topic_permissions": [
+        {
+          "user": "repartiteur",
+          "vhost": "/sophia",
+          "exchange": "sophia.events",
+          "write": "^[a-z]+\\.delegate\\.[a-z_]+$",
+          "read": "^$"
         }
       ]
     }
