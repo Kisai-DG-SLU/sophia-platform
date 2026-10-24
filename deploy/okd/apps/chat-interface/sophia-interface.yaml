@@ -110,6 +110,9 @@ spec:
             - --pass-user-headers=true
             - --skip-provider-button=true
             - --silence-ping-logging=true
+            # Délai d'attente du premier octet de réponse : 30 s par défaut, trop court pour une
+            # photo, une première compaction ou un long document (lecture ≈ 420 tokens/s sur le GPU).
+            # Aligné sur nginx (proxy_read_timeout 300s).
             - --upstream-timeout=300s
           ports:
             - { name: http, containerPort: 4180 }
@@ -161,8 +164,18 @@ spec:
             - { name: SOPHIA_FAMILY_ORG, value: famille }
             - { name: SOPHIA_BRAIN_REPO, value: ORGANISATION/brain }
             - { name: SOPHIA_PROMOTE_TARGETS, value: '{"famille": "Famille", "projets-perso": "Perso"}' }
+            # Modèle par défaut (profil sans choix explicite, journal) : inférence locale, rien ne sort du cluster.
+            - { name: SOPHIA_DEFAULT_MODEL, value: sophia-local }
+            # Fenêtre de contexte par modèle, en tokens : au-delà, refus expliqué avant le routeur.
+            # sophia-local : 4 × 61 440 (cache partagé en 8 bits du serveur d'inférence).
+            - { name: SOPHIA_CONTEXT_LIMITS, value: '{"sophia-local": 61440, "sophia-routine": 64000, "sophia-think": 64000, "sophia-architect": 32000}' }
             # Recherche web (PWeb) : serveur sophia-web du sas. Vide = pas de recherche.
             - { name: SOPHIA_WEB_URL, value: "http://sophia-web.sophia-dmz.svc.cluster.local:8000" }
+            # Serveurs MCP dont l'API propose les outils au modèle, dans cet ordre (annonces et affichage :
+            # deploy/okd/skills/README.md). Un module qui expose ses outils s'ajoute à la liste
+            # (ex. http://<module>.sophia-apps.svc.cluster.local:8081/mcp) et à la sortie réseau ci-dessous.
+            - name: SOPHIA_MCP_URLS
+              value: "http://sophia-web.sophia-dmz.svc.cluster.local:8000/mcp,http://sophia-geo.sophia-skills.svc.cluster.local:8000/mcp,http://sophia-image.sophia-skills.svc.cluster.local:8000/mcp"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
@@ -203,7 +216,8 @@ spec:
     insecureEdgeTerminationPolicy: Redirect
 ---
 # Entrée : seul le routeur OpenShift, vers oauth2-proxy (nginx :8080 n'est joignable
-# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak, PostgreSQL, Forgejo, le sas web et le DNS du cluster.
+# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak, PostgreSQL, Forgejo, le sas web, les serveurs
+# MCP de sophia-skills (et des modules) et le DNS du cluster.
 # Ne vise que les pods de l'interface : sophia-notebook, dans le même namespace, n'est pas concerné.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -253,6 +267,19 @@ spec:
             matchLabels: { app: sophia-web }
       ports:
         - { protocol: TCP, port: 8000 }
+    # Serveurs MCP sans Internet (sophia-skills : géographie, images…), port MCP 8000
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-skills }
+          podSelector:
+            matchLabels: { sophia-mcp: "true" }
+      ports:
+        - { protocol: TCP, port: 8000 }
+    # Un module qui expose un serveur MCP (même namespace) : un bloc par module
+    # - to:
+    #     - podSelector: { matchLabels: { app: <module> } }
+    #   ports:
+    #     - { protocol: TCP, port: 8081 }
     - to:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: openshift-dns }
