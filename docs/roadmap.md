@@ -1,71 +1,85 @@
-# Feuille de Route SophIA
+# Feuille de route SophIA
 
-Le projet SophIA evolue progressivement de l'experimentation infrastructurelle vers une plateforme d'IA souveraine complete. Chaque etape ci-dessous correspond a une ou plusieurs phases du plan de travail ; une etape n'est dite « en service » que lorsqu'elle tourne dans l'installation de reference et que sa recette reproductible est publiee dans `deploy/`.
+Le projet SophIA évolue progressivement de l'expérimentation infrastructurelle vers une plateforme d'IA souveraine complète. Chaque étape correspond à une ou plusieurs phases du plan de travail ; une brique n'est dite « en service » que lorsqu'elle tourne dans l'installation de référence **et** que sa recette reproductible est publiée dans `deploy/`.
 
 ---
 
-## Etape 0 : Fondations d'infrastructure
+## Étape 0 : fondations d'infrastructure
 
 En service.
 
-- Serveur bare-metal, cluster OKD a un noeud
-- Acces par VPN uniquement ([`deploy/okd/host/wireguard/`](../deploy/okd/host/wireguard/))
+- Serveur physique, cluster OKD à un nœud
+- Accès par VPN uniquement ([`deploy/okd/host/wireguard/`](../deploy/okd/host/wireguard/))
 - Stockage local persistant ([`deploy/stockage-persistant.md`](../deploy/stockage-persistant.md))
-- Namespaces par zone de securite
+- Namespaces par zone de sécurité, refus par défaut en entrée dans les applications et l'orchestration ([sécurité](security.md))
 
 ---
 
-## Etape 1 : Plateforme centrale
+## Étape 1 : plateforme centrale
 
 En service.
 
-- Routage des modeles par LiteLLM : modeles distants et locaux derriere les memes alias ([`deploy/okd/core/`](../deploy/okd/core/))
-- Inference locale : texte et vision sur GPU, voix et images sur CPU, sans sortie reseau ([`deploy/okd/inference/`](../deploy/okd/inference/))
-- Identite et SSO : Keycloak pour toutes les interfaces ([`deploy/okd/identity/`](../deploy/okd/identity/))
+- Routage des modèles par LiteLLM : modèles distants et locaux derrière les mêmes alias ([`deploy/okd/core/`](../deploy/okd/core/))
+- Inférence locale : texte et vision sur GPU, voix et images sur CPU, sans sortie réseau ([`deploy/okd/inference/`](../deploy/okd/inference/))
+- Identité et SSO : Keycloak pour toutes les interfaces ([`deploy/okd/identity/`](../deploy/okd/identity/))
 - Interface de discussion ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/))
-- Recherche web par un sas isole, premiere brique du Sas Paranoiaque ([`deploy/okd/dmz/`](../deploy/okd/dmz/))
-- Outils MCP locaux : geographie, images avec regles de protection ([`deploy/okd/skills/`](../deploy/okd/skills/))
+- Recherche web par un sas isolé, première brique du Sas Paranoïaque ([`deploy/okd/dmz/`](../deploy/okd/dmz/))
+- Outils MCP locaux : géographie, images avec règles de protection ([`deploy/okd/skills/`](../deploy/okd/skills/))
 - Plateforme Git et assistant de code persistant ([`deploy/okd/hermes-system/`](../deploy/okd/hermes-system/))
 
 ---
 
-## Etape 2 : Agents et memoire
+## Étape 2 : agents et mémoire
 
-En cours.
+En cours. Les travaux suivent cet ordre :
 
-- Communication entre agents : RabbitMQ pour les evenements, Temporal pour les delegations durables ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/))
-- Memoire et RAG (architecture 5+1), ingestion des documents
-- Automatisation deterministe : un agent declenche un workflow, il ne le pilote pas
+| # | Travail | État |
+|---|---|---|
+| 0 | **Bus d'événements et workflows durables** : RabbitMQ (topologie, droits, lettres mortes), Temporal ; **répartiteur** des délégations, seul client de Temporal et seul éditeur des événements ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | en service ; recette publique du répartiteur à venir ; consommateurs des événements à faire |
+| 1 | **Observabilité minimale** et **priorités CPU** : métriques des services, règles d'alerte, classes de priorité, quotas par namespace ([observabilité](concepts/10-observabilite.md), [inférence et matériel](concepts/11-inference-materiel.md)) | à faire |
+| 2 | **Agents sur le modèle local**, avec un alias « de fond » qui laisse la priorité à la discussion | à faire |
+| 3 | **Mémoire (RAG)** : collection et schéma avec les tags, **API mémoire** (droits par tag, écriture long terme par le service mémoire), graphe et ingestion, stockage objet pour les fichiers | à faire, en partie prêt |
+| 4 | **L'interface comme demandeur** du répartiteur, avec un canal de retour pour les validations et les notifications | en conception |
+| 5 | Délégations vers la **supervision** (lecture), le **déploiement** et la **maintenance** (approbations à deux niveaux) ; TLS mutuel | à faire |
+| 6 | **Planificateur** des objectifs ouverts : prototype en workflow, comparé à un agent planificateur sur des objectifs réels | à faire |
+| 7 | **n8n** (avec le premier outil qui en a besoin), **filtre anti-fuite**, **Tribunal Sémantique** | à faire |
+| — | Mesure d'un modèle à experts en hybride carte + mémoire vive, pointe CPU comprise, avant tout changement de modèle | à planifier |
+
+La mémoire passe avant l'interface demandeur et le planificateur : tous deux en ont besoin, comme outil typé et pour l'écriture en mémoire long terme.
+
+Également dans cette étape :
+
 - Modules construits sur la plateforme ([`docs/modules/`](modules/))
-- Gestion des espaces de travail, modele de projet, gestion de contexte
+- Gestion des espaces de travail, modèle de projet, gestion de contexte
 
 ---
 
-## Etape 3 : Securite et gouvernance
+## Étape 3 : sécurité et gouvernance
 
-Travail futur.
+Futur.
 
-- Permissions par roles, tribunal semantique
-- Pipeline de filtrage DLP
-- Chiffrement des volumes, isolation complete de la memoire
-- Journalisation d'audit avancee, flux de verification des connaissances
-
----
-
-## Etape 4 : Ouverture et supervision
-
-Travail futur.
-
-- Ouverture a d'autres utilisateurs
-- Tableau de bord systeme, interface de connaissance
-- Outils de supervision operationnelle
+- Niveaux de confidentialité de la mémoire, permissions par rôle sur la mémoire
+- Refus par défaut dans la mémoire et le développement
+- Volumes chiffrés, isolation complète de la mémoire
+- Journalisation d'audit avancée, historisation brute des échanges, workflows de vérification des connaissances
+- Workflow « incident » : de l'alarme au plan approuvé ([observabilité](concepts/10-observabilite.md))
 
 ---
 
-## Etape 5 : Industrialisation
+## Étape 4 : ouverture et supervision
+
+Futur.
+
+- Ouverture à d'autres utilisateurs
+- Tableau de bord du système, interface de connaissance
+- Arbitre : un modèle extérieur consulté après le filtre anti-fuite
+
+---
+
+## Étape 5 : industrialisation
 
 Long terme.
 
-- Packages de deploiement reproductibles
-- Architecture de reference pour les organisations
-- Support pour les deploiements multi-locataires
+- Paquets de déploiement reproductibles
+- Architecture de référence pour les organisations
+- Déploiements multi-locataires
