@@ -1,0 +1,56 @@
+# Namespace Temporal « sophia » (les workflows des agents), rétention de l'historique des
+# workflows terminés : 30 jours. Rejouable : crée s'il manque, sinon réaligne la rétention.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-namespace-sophia
+  namespace: sophia-core
+  labels: { app: temporal-admin }
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels: { app: temporal-admin }
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: namespace
+          image: docker.io/temporalio/admin-tools:1.32.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              # jeton du compte de service temporal-admin (temporal-system:admin)
+              TOKEN=$(wget -qO- --post-data "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET" \
+                http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/token \
+                | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+              [ -n "$TOKEN" ] || { echo "jeton Keycloak non obtenu" >&2; exit 1; }
+              export TEMPORAL_API_KEY="$TOKEN"
+              # TLS vérifié : autorité de service OKD et nom du certificat
+              T="--address temporal-frontend.sophia-core.svc:7233 --tls --tls-ca-path /etc/temporal/ca/service-ca.crt --tls-server-name temporal-frontend.sophia-core.svc"
+              if temporal operator namespace describe $T --namespace sophia >/dev/null 2>&1; then
+                temporal operator namespace update $T --namespace sophia --retention 720h
+              else
+                temporal operator namespace create $T --namespace sophia --retention 720h \
+                  --description "Délégations entre agents SophIA (P8)"
+              fi
+              temporal operator namespace describe $T --namespace sophia
+          env:
+            - name: CLIENT_ID
+              valueFrom: { secretKeyRef: { name: temporal-admin-client, key: client-id } }
+            - name: CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: temporal-admin-client, key: client-secret } }
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          volumeMounts:
+            - name: service-ca
+              mountPath: /etc/temporal/ca
+              readOnly: true
+      volumes:
+        - name: service-ca
+          configMap:
+            name: temporal-service-ca

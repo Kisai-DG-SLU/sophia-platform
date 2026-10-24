@@ -1,0 +1,141 @@
+# Interface Temporal derrière Keycloak. L'interface ne filtre pas par groupe : un oauth2-proxy
+# devant elle ne laisse entrer que le groupe « admin », comme pour le chat. Navigateur → Keycloak public ;
+# échanges serveur → Keycloak interne. le proxy transmet le jeton d'identité (claim
+# « permissions », groupe admin → temporal-system:admin) et l'interface le relaie au serveur.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-ui
+  namespace: sophia-core
+  labels: { app: temporal-ui }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: temporal-ui }
+  template:
+    metadata:
+      labels: { app: temporal-ui }
+    spec:
+      containers:
+        - name: ui
+          image: docker.io/temporalio/ui:2.56.0
+          env:
+            - { name: TEMPORAL_ADDRESS, value: "temporal-frontend.sophia-core.svc:7233" }
+            - { name: TEMPORAL_UI_PORT, value: "8080" }
+            - { name: TEMPORAL_DEFAULT_NAMESPACE, value: sophia }
+            - { name: TEMPORAL_CORS_ORIGINS, value: "https://temporal.apps.example.org" }
+            # Pas d'Internet depuis sophia-core
+            - { name: TEMPORAL_DISABLE_NEWS_FETCH, value: "true" }
+            - { name: TEMPORAL_NOTIFY_ON_NEW_VERSION, value: "false" }
+            # relaie au serveur l'en-tête posé par oauth2-proxy (jeton d'identité Keycloak)
+            - { name: TEMPORAL_FORWARD_HEADERS, value: Authorization }
+            # TLS vers le serveur ; sans vérification du nom, l'interface accepterait tout certificat
+            - { name: TEMPORAL_TLS_CA, value: /etc/temporal/ca/service-ca.crt }
+            - { name: TEMPORAL_TLS_SERVER_NAME, value: temporal-frontend.sophia-core.svc }
+            - { name: TEMPORAL_TLS_ENABLE_HOST_VERIFICATION, value: "true" }
+          ports:
+            - { name: ui, containerPort: 8080 }
+          volumeMounts:
+            - name: service-ca
+              mountPath: /etc/temporal/ca
+              readOnly: true
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          readinessProbe:
+            tcpSocket: { port: ui }
+            periodSeconds: 10
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
+          args:
+            - --http-address=0.0.0.0:4180
+            - --upstream=http://127.0.0.1:8080/
+            - --reverse-proxy=true
+            - --provider=keycloak-oidc
+            - --client-id=temporal-ui
+            - --client-secret-file=/etc/oauth2/client-secret
+            - --cookie-secret-file=/etc/oauth2/cookie-secret
+            - --cookie-name=_temporal
+            - --cookie-secure=true
+            - --redirect-url=https://temporal.apps.example.org/oauth2/callback
+            - --whitelist-domain=temporal.apps.example.org
+            - --oidc-issuer-url=https://auth.apps.example.org/realms/sophia
+            - --skip-oidc-discovery=true
+            - --login-url=https://auth.apps.example.org/realms/sophia/protocol/openid-connect/auth
+            - --redeem-url=http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/token
+            - --oidc-jwks-url=http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/certs
+            - --scope=openid profile email
+            - --code-challenge-method=S256
+            - --email-domain=*
+            # Administration du moteur de workflows : groupe admin seulement
+            - --allowed-group=admin
+            - --skip-provider-button=true
+            # jeton d'identité vers l'interface (Authorization: Bearer), renouvelé avant
+            # son expiration (5 min dans Keycloak) pour que le serveur ne le refuse pas
+            - --pass-authorization-header=true
+            - --cookie-refresh=4m
+            - --silence-ping-logging=true
+          ports:
+            - { name: proxy, containerPort: 4180 }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /ping, port: proxy }
+            periodSeconds: 10
+          volumeMounts:
+            - name: oauth2
+              mountPath: /etc/oauth2
+              readOnly: true
+      volumes:
+        - name: service-ca
+          configMap:
+            name: temporal-service-ca
+        # Créé par l'administrateur (README.md) : client-secret (Keycloak), cookie-secret
+        - name: oauth2
+          secret:
+            secretName: temporal-ui-oauth2
+            defaultMode: 0440
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-ui
+  namespace: sophia-core
+  labels: { app: temporal-ui }
+spec:
+  selector: { app: temporal-ui }
+  ports:
+    - { name: proxy, port: 4180, targetPort: proxy }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: temporal
+  namespace: sophia-core
+  labels: { app: temporal-ui }
+spec:
+  host: temporal.apps.example.org
+  to: { kind: Service, name: temporal-ui }
+  port: { targetPort: proxy }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+# Seul le routeur joint l'interface, et seulement par oauth2-proxy (4180, pas 8080)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: temporal-ui-from-router
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: temporal-ui }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }
+      ports:
+        - { protocol: TCP, port: 4180 }

@@ -1,0 +1,49 @@
+# Flux de Temporal. Les NetworkPolicies s'additionnent.
+---
+# Temporal : clients gRPC depuis hermes-system (agents), l'interface Temporal, les Jobs
+# d'administration et le réseau du nœud (dionysos en hostNetwork ; jeton obligatoire) ;
+# tous ports entre pods Temporal (appartenance, services internes dont le frontend interne 7236).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: temporal-ingress
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: temporal }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: hermes-system }
+        - podSelector:
+            matchLabels: { app: temporal-ui }
+        # Jobs d'administration (namespace, recette)
+        - podSelector:
+            matchLabels: { app: temporal-admin }
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/host-network: "" }
+      ports:
+        - { protocol: TCP, port: 7233 }
+    - from:
+        - podSelector:
+            matchLabels: { app: temporal }
+---
+# PostgreSQL accepte Temporal et son Job de schémas
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-temporal-to-postgres
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: postgres-sophia }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: temporal }
+        - podSelector:
+            matchLabels: { app: temporal-schema }
+      ports:
+        - { protocol: TCP, port: 5432 }

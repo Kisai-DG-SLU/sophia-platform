@@ -1,0 +1,125 @@
+# Recette de bout en bout : un worker et un workflow « bonjour » dans le namespace sophia,
+# d'abord un appel sans jeton (doit être refusé), puis avec le jeton du compte temporal-admin ;
+# par le SDK Python des agents (temporalio 1.34.0). Passe par frontend, history et matching ;
+# termine en succès seulement si le workflow renvoie la bonne réponse. Rejouable.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-smoke-test
+  namespace: sophia-core
+  labels: { app: temporal-admin }
+data:
+  smoke.py: |
+    import asyncio, json, os, sys, urllib.parse, urllib.request, uuid
+    from datetime import timedelta
+    from temporalio import activity, workflow
+    from temporalio.client import Client
+    from temporalio.service import RPCError, RPCStatusCode, TLSConfig
+    from temporalio.worker import Worker
+
+    @activity.defn
+    async def saluer(nom: str) -> str:
+        return f"Bonjour {nom}"
+
+    @workflow.defn
+    class Recette:
+        @workflow.run
+        async def run(self, nom: str) -> str:
+            return await workflow.execute_activity(
+                saluer, nom, start_to_close_timeout=timedelta(seconds=10))
+
+    def jeton() -> str:
+        # client credentials du compte de service temporal-admin
+        data = urllib.parse.urlencode({"grant_type": "client_credentials",
+                                       "client_id": os.environ["CLIENT_ID"],
+                                       "client_secret": os.environ["CLIENT_SECRET"]}).encode()
+        url = ("http://sophia-keycloak-service.sophia-identity.svc:8080"
+               "/realms/sophia/protocol/openid-connect/token")
+        with urllib.request.urlopen(url, data=data, timeout=10) as r:
+            return json.load(r)["access_token"]
+
+    ADRESSE = "temporal-frontend.sophia-core.svc:7233"
+    # TLS vérifié : autorité de service OKD et nom du certificat
+    TLS = TLSConfig(server_root_ca_cert=open("/etc/temporal/ca/service-ca.crt", "rb").read(),
+                    domain="temporal-frontend.sophia-core.svc")
+
+    async def sans_jeton_refuse() -> bool:
+        # sans jeton, toute lecture du namespace doit être refusée
+        try:
+            anon = await Client.connect(ADRESSE, namespace="sophia", tls=TLS)
+            await anon.count_workflows()
+        except RPCError as e:
+            if e.status in (RPCStatusCode.PERMISSION_DENIED, RPCStatusCode.UNAUTHENTICATED):
+                print("sans jeton : refusé (attendu) —", e.status.name)
+                return True
+            raise
+        print("ÉCHEC : accès sans jeton accepté")
+        return False
+
+    async def main():
+        if not await sans_jeton_refuse():
+            sys.exit(1)
+        # Jeton de 5 min : un worker durable le renouvelle (client.api_key = ...).
+        client = await Client.connect(ADRESSE, namespace="sophia", api_key=jeton(), tls=TLS)
+        file = f"recette-{uuid.uuid4().hex[:8]}"
+        async with Worker(client, task_queue=file, workflows=[Recette], activities=[saluer]):
+            r = await client.execute_workflow(Recette.run, "Sophia", id=file, task_queue=file,
+                                              execution_timeout=timedelta(seconds=60))
+        print("résultat :", r)
+        sys.exit(0 if r == "Bonjour Sophia" else 1)
+
+    # Garde indispensable : le bac à sable du SDK réimporte ce fichier pour valider le workflow
+    if __name__ == "__main__":
+        asyncio.run(main())
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-smoke-test
+  namespace: sophia-core
+  labels: { app: temporal-admin }
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: temporal-admin }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoke
+          image: docker.io/library/python:3.12-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              pip install --quiet --no-cache-dir --target /tmp/py temporalio==1.34.0
+              PYTHONPATH=/tmp/py python /etc/smoke/smoke.py
+          env:
+            - { name: HOME, value: /tmp }
+            - name: CLIENT_ID
+              valueFrom: { secretKeyRef: { name: temporal-admin-client, key: client-id } }
+            - name: CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: temporal-admin-client, key: client-secret } }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          volumeMounts:
+            - name: smoke
+              mountPath: /etc/smoke
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: service-ca
+              mountPath: /etc/temporal/ca
+              readOnly: true
+      volumes:
+        - name: service-ca
+          configMap:
+            name: temporal-service-ca
+        - name: smoke
+          configMap: { name: temporal-smoke-test }
+        - name: tmp
+          emptyDir: {}
