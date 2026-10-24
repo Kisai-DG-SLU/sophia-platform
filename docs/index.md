@@ -13,6 +13,7 @@ Bienvenue dans la documentation de l'architecture SophIA.
 - [Problem Space](problem-space.md) — Problématique adressée par SophIA
 - [Security](security.md) — Modèle de sécurité et isolation
 - [Roadmap](roadmap.md) — Étapes et planification
+- [Modules privés](modules/README.md) — Ce qu'on peut construire avec SophIA : cuisine, courses, école
 - [Glossary](glossary.md) — Lexique des termes
 
 ---
