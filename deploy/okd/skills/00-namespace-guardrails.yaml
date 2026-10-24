@@ -1,0 +1,25 @@
+# sophia-skills (zone « outils ») — serveurs MCP de SophIA sans accès à Internet (docs/architecture.md).
+# Le namespace existe depuis l'installation (pod-security « restricted ») ; on lui ajoute quota et
+# valeurs par défaut, comme sophia-inference.
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: skills-quota
+  namespace: sophia-skills
+spec:
+  hard:
+    limits.memory: 6Gi       # géographie 1 + images 0,5 + sources officielles (à venir) + marge
+    limits.cpu: "8"
+    pods: "8"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: skills-defaults
+  namespace: sophia-skills
+spec:
+  limits:
+    - type: Container
+      default: { cpu: 500m, memory: 512Mi }
+      defaultRequest: { cpu: 20m, memory: 64Mi }

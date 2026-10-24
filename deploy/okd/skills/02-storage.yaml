@@ -1,0 +1,37 @@
+# Données des outils de sophia-skills (géographie aujourd'hui ; sources officielles demain), déposées
+# DEPUIS LE NŒUD dans /var/mnt/models/skills (même LV que les modèles, dossier à part) et montées
+# en lecture seule : les pods de sophia-skills n'ont pas d'accès à Internet.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-skills-data
+  labels: { app: sophia-skills-data }
+spec:
+  capacity: { storage: 20Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: /var/mnt/models/skills
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: [master-0] }
+  claimRef:
+    namespace: sophia-skills
+    name: pvc-skills-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-skills-data
+  namespace: sophia-skills
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-skills-data
+  resources:
+    requests: { storage: 20Gi }
