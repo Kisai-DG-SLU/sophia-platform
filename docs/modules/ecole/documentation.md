@@ -11,7 +11,9 @@
 - **Dictée sur ardoise** et **fiche de lecture** photographiées, lues par le modèle local (vision).
 - Outil `carnet_scolaire` dans la discussion : il ne lit que le journal de l'enfant qui parle ; le verdict (félicitations, encouragements…) est **calculé par le serveur**.
 
-Prévu : publication des contenus sans reconstruction d'image (en correction, voir les leçons), version de partage avec une voix de synthèse libre enregistrée, outils MCP de progression et d'ouverture, carnet servi en MCP avec un jeton signé limité à l'enfant.
+- **Publication des contenus sans reconstruction d'image** : le conteneur `contenus` synchronise les dépôts en lecture seule chaque minute et garde la version en ligne si la nouvelle est invalide (incident corrigé, voir les leçons).
+
+Prévu : version de partage avec une voix de synthèse libre enregistrée, outils MCP de progression et d'ouverture, carnet servi en MCP avec un jeton signé limité à l'enfant.
 
 ## Architecture
 
@@ -54,7 +56,7 @@ Le build **refuse** tout contenu invalide : bonne réponse absente des choix, no
 
 ## Leçons
 
-- **PID 1 et processus zombies** : depuis git 2.47, chaque `git fetch` lance `git maintenance --auto --detach`. Le processus détaché est rattaché au PID 1 du conteneur — ici un processus Node.js, qui ne récolte pas les orphelins. Un zombie par synchronisation, jusqu'à la limite de 4 096 PID : « unable to fork », la synchronisation s'arrête (la version en ligne, elle, reste servie). Correctif à la source : `git -c maintenance.autoDetach=false -c gc.autoDetach=false`, et un test qui vérifie l'absence de `--detach` dans la trace de git ; défense en profondeur : `shareProcessNamespace: true`, pour que le conteneur `pause` récolte les orphelins. Un simple redémarrage ne fait que repousser l'incident.
+- **PID 1 et processus zombies** : depuis git 2.47, chaque `git fetch` lance `git maintenance --auto --detach`. Le processus détaché est rattaché au PID 1 du conteneur — ici un processus Node.js, qui ne récolte pas les orphelins. Un zombie par synchronisation, jusqu'à la limite de 4 096 PID : « unable to fork », la synchronisation s'arrête (la version en ligne, elle, reste servie). Correctif à la source : `git -c maintenance.autoDetach=false -c gc.autoDetach=false`, la maintenance se fait alors sur place, et un test qui vérifie l'absence de `--detach` dans la trace de git (il échoue sans le correctif). Défense en profondeur proposée, pas encore appliquée : `shareProcessNamespace: true`, pour que le conteneur `pause` soit PID 1 et récolte les orphelins. Un simple redémarrage ne fait que repousser l'incident.
 - **Bascule atomique et contenu de secours** : une synchronisation en panne ne casse jamais le site.
 - **UID arbitraire d'OpenShift** : `ssh` exige une entrée dans `/etc/passwd` — d'où `chmod g+w /etc/passwd` dans l'image et des chemins donnés au groupe 0.
 - **Séparer moteur et contenus** : les contenus évoluent par Git, vérifiés avant publication, sans reconstruire l'image.

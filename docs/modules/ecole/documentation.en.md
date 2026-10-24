@@ -11,7 +11,9 @@
 - Photographed **slate dictation** and **reading sheet**, read by the local model (vision).
 - `carnet_scolaire` tool in the chat: it only reads the log of the child who is talking; the verdict (congratulations, encouragement…) is **computed by the server**.
 
-Planned: publishing content without rebuilding the image (being fixed, see lessons), a sharing version with a recorded open-licence synthetic voice, MCP tools for progress and opening, the report book served over MCP with a signed token limited to the child.
+- **Publishing content without rebuilding the image**: the `contenus` container syncs the repositories read-only every minute and keeps the live version if the new one is invalid (incident fixed, see lessons).
+
+Planned: a sharing version with a recorded open-licence synthetic voice, MCP tools for progress and opening, the report book served over MCP with a signed token limited to the child.
 
 ## Architecture
 
@@ -54,7 +56,7 @@ The build **refuses** any invalid content: correct answer missing from the choic
 
 ## Lessons
 
-- **PID 1 and zombie processes**: since git 2.47, every `git fetch` starts `git maintenance --auto --detach`. The detached process is reparented to the container's PID 1 — here a Node.js process, which does not reap orphans. One zombie per sync, up to the 4,096 PID limit: "unable to fork", sync stops (the live version keeps being served). Fix at the source: `git -c maintenance.autoDetach=false -c gc.autoDetach=false`, and a test checking that `--detach` is absent from git's trace; defence in depth: `shareProcessNamespace: true`, so the `pause` container reaps orphans. A plain restart only postpones the incident.
+- **PID 1 and zombie processes**: since git 2.47, every `git fetch` starts `git maintenance --auto --detach`. The detached process is reparented to the container's PID 1 — here a Node.js process, which does not reap orphans. One zombie per sync, up to the 4,096 PID limit: "unable to fork", sync stops (the live version keeps being served). Fix at the source: `git -c maintenance.autoDetach=false -c gc.autoDetach=false`, maintenance then runs in place, and a test checks that `--detach` is absent from git's trace (it fails without the fix). Defence in depth proposed, not applied yet: `shareProcessNamespace: true`, so the `pause` container is PID 1 and reaps orphans. A plain restart only postpones the incident.
 - **Atomic switch and fallback content**: a broken sync never breaks the site.
 - **OpenShift's arbitrary UID**: `ssh` requires an entry in `/etc/passwd` — hence `chmod g+w /etc/passwd` in the image and paths owned by group 0.
 - **Separate engine and content**: content evolves through Git, checked before publication, without rebuilding the image.
