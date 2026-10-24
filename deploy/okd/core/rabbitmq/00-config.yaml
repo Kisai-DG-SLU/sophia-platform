@@ -13,11 +13,16 @@ data:
   # Comptes du vhost /sophia. Gabarit sans secret : l'initContainer « definitions » remplace
   # chaque @PW_<compte>@ par la clé <compte> du Secret rabbitmq-users, et RabbitMQ importe le résultat
   # à chaque démarrage (mot de passe haché à l'import ; comptes absents du fichier non touchés).
-  # Droits provisoires, à revoir avec la topologie des événements :
-  #  - agent : publie sur les exchanges sophia.agents (tâches, routées par nom d'agent) et
-  #    sophia.events (DelegateEvent) ; ne lit et ne configure que ses files sophia.agent.<nom>[.*].
-  #    Pas d'écriture sur l'exchange par défaut : impossible de déposer dans la file d'un autre.
-  #  - sophia-workflow : lecture des événements par une file temporaire (amq.gen-*), sans publier.
+  # RabbitMQ ne porte plus que les événements et les messages simples (les délégations passent
+  # par Temporal). Toute la topologie est ici, déclarée par l'import, aucune par les clients :
+  #  - sophia.agents (direct) : message simple à un agent, clé = nom de l'agent → file quorum
+  #    sophia.agent.<nom> ; sophia.events (topic) : DelegateEvent et autres, clé <agent>.<événement> ;
+  #  - DLQ : sophia.dlx (fanout) → sophia.dlq (quorum, 30 j, 10 000 messages), lue par l'administrateur ;
+  #    une file d'agent y envoie un message refusé ou livré 5 fois sans ack (at-least-once), et refuse
+  #    les publications au-delà de 10 000 messages (l'émetteur reçoit un nack, rien n'est perdu en silence).
+  # Droits : un agent publie sur sophia.agents et sophia.events, ne lit que sa file, ne configure rien
+  # (les clients déclarent en passive=True). Il doit poser user_id = son compte (vérifié par RabbitMQ).
+  # sophia-workflow : relais SSE en direct, file exclusive amq.gen-* liée à sophia.events, sans publier.
   # L'administrateur interne (Secret rabbitmq-admin-creds) y figure aussi : avec des définitions,
   # RabbitMQ ne crée plus RABBITMQ_DEFAULT_USER sur un volume neuf.
   definitions.template.json: |
@@ -77,37 +82,37 @@ data:
         {
           "user": "sophia",
           "vhost": "/sophia",
-          "configure": "^sophia\\.agent\\.sophia(\\..*)?$",
-          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.sophia(\\..*)?)$",
-          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.sophia(\\..*)?)$"
+          "configure": "",
+          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "read": "^sophia\\.agent\\.sophia$"
         },
         {
           "user": "athena",
           "vhost": "/sophia",
-          "configure": "^sophia\\.agent\\.athena(\\..*)?$",
-          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.athena(\\..*)?)$",
-          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.athena(\\..*)?)$"
+          "configure": "",
+          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "read": "^sophia\\.agent\\.athena$"
         },
         {
           "user": "hephaistos",
           "vhost": "/sophia",
-          "configure": "^sophia\\.agent\\.hephaistos(\\..*)?$",
-          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.hephaistos(\\..*)?)$",
-          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.hephaistos(\\..*)?)$"
+          "configure": "",
+          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "read": "^sophia\\.agent\\.hephaistos$"
         },
         {
           "user": "ouranos",
           "vhost": "/sophia",
-          "configure": "^sophia\\.agent\\.ouranos(\\..*)?$",
-          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.ouranos(\\..*)?)$",
-          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.ouranos(\\..*)?)$"
+          "configure": "",
+          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "read": "^sophia\\.agent\\.ouranos$"
         },
         {
           "user": "dionysos",
           "vhost": "/sophia",
-          "configure": "^sophia\\.agent\\.dionysos(\\..*)?$",
-          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.dionysos(\\..*)?)$",
-          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.dionysos(\\..*)?)$"
+          "configure": "",
+          "write": "^(sophia\\.agents|sophia\\.events)$",
+          "read": "^sophia\\.agent\\.dionysos$"
         },
         {
           "user": "sophia-workflow",
@@ -115,6 +120,169 @@ data:
           "configure": "^amq\\.gen-.*$",
           "write": "^amq\\.gen-.*$",
           "read": "^(sophia\\.events|amq\\.gen-.*)$"
+        }
+      ],
+      "exchanges": [
+        {
+          "name": "sophia.agents",
+          "vhost": "/sophia",
+          "type": "direct",
+          "durable": true,
+          "auto_delete": false,
+          "internal": false,
+          "arguments": {}
+        },
+        {
+          "name": "sophia.events",
+          "vhost": "/sophia",
+          "type": "topic",
+          "durable": true,
+          "auto_delete": false,
+          "internal": false,
+          "arguments": {}
+        },
+        {
+          "name": "sophia.dlx",
+          "vhost": "/sophia",
+          "type": "fanout",
+          "durable": true,
+          "auto_delete": false,
+          "internal": false,
+          "arguments": {}
+        }
+      ],
+      "queues": [
+        {
+          "name": "sophia.agent.sophia",
+          "vhost": "/sophia",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {
+            "x-queue-type": "quorum"
+          }
+        },
+        {
+          "name": "sophia.agent.athena",
+          "vhost": "/sophia",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {
+            "x-queue-type": "quorum"
+          }
+        },
+        {
+          "name": "sophia.agent.hephaistos",
+          "vhost": "/sophia",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {
+            "x-queue-type": "quorum"
+          }
+        },
+        {
+          "name": "sophia.agent.ouranos",
+          "vhost": "/sophia",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {
+            "x-queue-type": "quorum"
+          }
+        },
+        {
+          "name": "sophia.agent.dionysos",
+          "vhost": "/sophia",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {
+            "x-queue-type": "quorum"
+          }
+        },
+        {
+          "name": "sophia.dlq",
+          "vhost": "/sophia",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {
+            "x-queue-type": "quorum"
+          }
+        }
+      ],
+      "bindings": [
+        {
+          "source": "sophia.agents",
+          "vhost": "/sophia",
+          "destination": "sophia.agent.sophia",
+          "destination_type": "queue",
+          "routing_key": "sophia",
+          "arguments": {}
+        },
+        {
+          "source": "sophia.agents",
+          "vhost": "/sophia",
+          "destination": "sophia.agent.athena",
+          "destination_type": "queue",
+          "routing_key": "athena",
+          "arguments": {}
+        },
+        {
+          "source": "sophia.agents",
+          "vhost": "/sophia",
+          "destination": "sophia.agent.hephaistos",
+          "destination_type": "queue",
+          "routing_key": "hephaistos",
+          "arguments": {}
+        },
+        {
+          "source": "sophia.agents",
+          "vhost": "/sophia",
+          "destination": "sophia.agent.ouranos",
+          "destination_type": "queue",
+          "routing_key": "ouranos",
+          "arguments": {}
+        },
+        {
+          "source": "sophia.agents",
+          "vhost": "/sophia",
+          "destination": "sophia.agent.dionysos",
+          "destination_type": "queue",
+          "routing_key": "dionysos",
+          "arguments": {}
+        },
+        {
+          "source": "sophia.dlx",
+          "vhost": "/sophia",
+          "destination": "sophia.dlq",
+          "destination_type": "queue",
+          "routing_key": "",
+          "arguments": {}
+        }
+      ],
+      "policies": [
+        {
+          "vhost": "/sophia",
+          "name": "sophia-agents",
+          "pattern": "^sophia\\.agent\\.[a-z-]+$",
+          "apply-to": "quorum_queues",
+          "priority": 10,
+          "definition": {
+            "dead-letter-exchange": "sophia.dlx",
+            "dead-letter-strategy": "at-least-once",
+            "overflow": "reject-publish",
+            "delivery-limit": 5,
+            "max-length": 10000
+          }
+        },
+        {
+          "vhost": "/sophia",
+          "name": "sophia-dlq",
+          "pattern": "^sophia\\.dlq$",
+          "apply-to": "quorum_queues",
+          "priority": 10,
+          "definition": {
+            "overflow": "drop-head",
+            "max-length": 10000,
+            "message-ttl": 2592000000
+          }
         }
       ]
     }
