@@ -35,7 +35,7 @@ En cours. Les travaux suivent cet ordre :
 
 | # | Travail | État |
 |---|---|---|
-| 0 | **Bus d'événements et workflows durables** : RabbitMQ (topologie, droits, lettres mortes), Temporal ; **répartiteur** des délégations, seul client de Temporal et seul éditeur des événements ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | en service ; recette publique du répartiteur à venir ; consommateurs des événements à faire |
+| 0 | **Bus d'événements et workflows durables** : RabbitMQ (topologie, droits, lettres mortes), Temporal ; **répartiteur** des délégations, seul client de Temporal et seul éditeur des événements ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | en service ([`deploy/okd/core/repartiteur/`](../deploy/okd/core/repartiteur/)) ; consommateurs des événements à faire |
 | 1 | **Observabilité minimale** et **priorités CPU** : métriques des services, règles d'alerte, classes de priorité, quotas par namespace ([observabilité](concepts/10-observabilite.md), [inférence et matériel](concepts/11-inference-materiel.md)) | à faire |
 | 2 | **Agents sur le modèle local**, avec un alias « de fond » qui laisse la priorité à la discussion | à faire |
 | 3 | **Mémoire (RAG)** : collection et schéma avec les tags, **API mémoire** (droits par tag, écriture long terme par le service mémoire), graphe et ingestion, stockage objet pour les fichiers | à faire, en partie prêt |
