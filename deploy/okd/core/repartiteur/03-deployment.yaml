@@ -1,0 +1,100 @@
+# Répartiteur : point d'entrée HTTPS des demandes, seul client et seul worker Temporal, seul éditeur
+# des événements de délégation. Une réplique : quotas tenus en mémoire.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: repartiteur
+  namespace: sophia-core
+  labels: { app: repartiteur }
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: repartiteur }
+  template:
+    metadata:
+      labels: { app: repartiteur }
+    spec:
+      priorityClassName: sophia-agents  # classe de priorité « répartiteur et agents », si elle existe
+      serviceAccountName: repartiteur
+      containers:
+        - name: repartiteur
+          # Image construite par 00-build.yaml, figée par empreinte : un nouveau build ne change rien en
+          # service ; la changer = nouveau digest ici, décidé, puis apply. ${REPARTITEUR_DIGEST} :
+          # oc -n sophia-core get istag repartiteur:latest -o jsonpath='{.image.metadata.name}'
+          image: image-registry.openshift-image-registry.svc:5000/sophia-core/repartiteur@${REPARTITEUR_DIGEST}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: https, containerPort: 8443 }
+          env:
+            - { name: REPARTITEUR_CONFIG, value: /etc/repartiteur/regles/regles.yaml }
+            - { name: TLS_DIR, value: /etc/repartiteur/tls }
+            # Temporal : jeton client credentials du client Keycloak temporal-repartiteur
+            # (sophia:write), renouvelé avant expiration ; TLS vérifié par l'autorité de service d'OKD.
+            - { name: TEMPORAL_ADRESSE, value: "temporal-frontend.sophia-core.svc:7233" }
+            - { name: TEMPORAL_CA, value: /etc/temporal/ca/service-ca.crt }
+            - name: KEYCLOAK_TOKEN_URL
+              value: http://sophia-keycloak-service.sophia-identity.svc:8080/realms/sophia/protocol/openid-connect/token
+            - name: CLIENT_ID
+              valueFrom: { secretKeyRef: { name: temporal-repartiteur, key: client-id } }
+            - name: CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: temporal-repartiteur, key: client-secret } }
+            # RabbitMQ : compte repartiteur, seul éditeur sur sophia.events. Le mot de passe est
+            # la clé « repartiteur » du Secret rabbitmq-users (hexadécimal : rien à encoder dans l'URL).
+            - { name: RABBITMQ_UTILISATEUR, value: repartiteur }
+            - name: RABBITMQ_MOT_DE_PASSE
+              valueFrom: { secretKeyRef: { name: rabbitmq-users, key: repartiteur } }
+            - name: RABBITMQ_URL
+              value: "amqp://repartiteur:$(RABBITMQ_MOT_DE_PASSE)@rabbitmq-svc.sophia-core.svc:5672/%2Fsophia"
+            # Clés des exécutants : une variable par exécutant de la configuration (cle_env). Même
+            # valeur que le Secret du même nom dans le namespace des agents, monté chez l'exécutant seul.
+            # Exemple, avec le premier exécutant :
+            # - name: CLE_HEPHAISTOS
+            #   valueFrom: { secretKeyRef: { name: repartiteur-cle-hephaistos, key: cle } }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          readinessProbe:
+            httpGet: { path: /sante, port: https, scheme: HTTPS }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /sante, port: https, scheme: HTTPS }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: regles, mountPath: /etc/repartiteur/regles, readOnly: true }
+            - { name: tls, mountPath: /etc/repartiteur/tls, readOnly: true }
+            - { name: service-ca, mountPath: /etc/temporal/ca, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: regles
+          configMap: { name: repartiteur-regles }
+        # Certificat de service (Service repartiteur ci-dessous) ; renouvelé par le cluster, relu au
+        # redémarrage du pod seulement.
+        - name: tls
+          secret: { secretName: repartiteur-tls }
+        - name: service-ca
+          configMap: { name: temporal-service-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+---
+# https://repartiteur.sophia-core.svc:8443 — demandeurs du namespace des agents, autorité de service
+# d'OKD (ConfigMap temporal-service-ca, injecté dans ce namespace).
+apiVersion: v1
+kind: Service
+metadata:
+  name: repartiteur
+  namespace: sophia-core
+  labels: { app: repartiteur }
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: repartiteur-tls
+spec:
+  selector: { app: repartiteur }
+  ports:
+    - { name: https, port: 8443, targetPort: https }

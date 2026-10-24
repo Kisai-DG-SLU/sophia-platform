@@ -1,0 +1,75 @@
+# Recette par le vrai chemin : un pod du namespace des agents demande une mission au répartiteur avec
+# le jeton projeté de son compte de service (audience « repartiteur »), comme le fera tout demandeur.
+# Chemin éprouvé : TLS du répartiteur, TokenReview, règles, workflow Temporal, api_server de l'exécutant
+# (Hermes Agent, routeur de modèles réel), événements RabbitMQ, lecture du résultat.
+# Contrôle négatif d'abord : une demande sans règle est refusée (403).
+# Rejouer : oc -n ${AGENT_NAMESPACE} delete job recette-repartiteur, puis oc apply de ce fichier.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: repartiteur-recette
+  namespace: ${AGENT_NAMESPACE}
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: recette-repartiteur
+  namespace: ${AGENT_NAMESPACE}
+  labels: { app: recette-repartiteur }
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: recette-repartiteur }
+    spec:
+      serviceAccountName: repartiteur-recette
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+        - name: recette
+          # Toute image du namespace des agents qui contient Python et httpx (ici, celle des agents)
+          image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /opt/hermes/.venv/bin/python
+            - -c
+            - |
+              import sys, time, httpx
+              jeton = open("/var/run/secrets/repartiteur/token").read().strip()
+              c = httpx.Client(base_url="https://repartiteur.sophia-core.svc:8443", timeout=30,
+                               verify="/etc/ca/service-ca.crt", headers={"Authorization": f"Bearer {jeton}"})
+              r = c.post("/v1/demandes", json={"type": "lecture", "cible": "dionysos", "objectif": "contrôle"})
+              print("sans règle :", r.status_code, r.json())
+              if r.status_code != 403:
+                  sys.exit("ÉCHEC : une demande sans règle n'a pas été refusée")
+              r = c.post("/v1/demandes", json={"type": "mission", "cible": "hephaistos",
+                         "objectif": "Réponds exactement par le mot pong, sans exécuter aucune commande ni aucun outil."})
+              print("mission :", r.status_code, r.json())
+              if r.status_code != 202:
+                  sys.exit("ÉCHEC : mission non acceptée")
+              tid = r.json()["task_id"]
+              for _ in range(60):
+                  e = c.get(f"/v1/demandes/{tid}").json()
+                  if e.get("etat") in ("terminée", "échouée"):
+                      break
+                  time.sleep(5)
+              print("résultat :", e)
+              ok = e.get("etat") == "terminée" and "pong" in (e.get("resultat") or "").lower()
+              print("RECETTE", "RÉUSSIE" if ok else "ÉCHOUÉE")
+              sys.exit(0 if ok else 1)
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          volumeMounts:
+            - { name: jeton, mountPath: /var/run/secrets/repartiteur, readOnly: true }
+            - { name: ca, mountPath: /etc/ca, readOnly: true }
+      volumes:
+        # Jeton projeté, audience « repartiteur », court : il ne vaut que pour le répartiteur
+        - name: jeton
+          projected:
+            sources:
+              - serviceAccountToken: { audience: repartiteur, expirationSeconds: 600, path: token }
+        - name: ca
+          configMap: { name: temporal-service-ca }

@@ -14,6 +14,8 @@ The manifests must be applied sequentially to satisfy dependencies:
 6. `06-gods-deployments.yaml` — Athena, Hephaistos, Ouranos deployments
 7. `07-network-policies.yaml` — Network policies for zero-trust isolation
 8. `08-services.yaml` — Internal headless services for agent routing
+9. `09-executants-network.yaml` — an executor's `api_server` ingress open to the [dispatcher](../core/repartiteur/) only
+10. `10-recette-repartiteur.yaml` — acceptance Job: a "pong" mission requested from the dispatcher through the real path
 
 ## Model Agnosticism
 
@@ -52,6 +54,7 @@ Substitute the following variables (via envsubst or Helm) before applying:
 | `${AGENT_NAMESPACE}` | Agent system namespace | `hermes-system` |
 | `${INTERNAL_REGISTRY}` | Internal image registry URL | `image-registry.openshift-image-registry.svc:5000` |
 | `${AGENT_IMAGE_NAME}` | Agent image stream name | `hermes-agent-oc` |
+| `${AGENT_IMAGE_DIGEST}` | Digest of the agent image (dispatcher acceptance test) | `sha256:…` |
 | `${SERVICE_ACCOUNT}` | Main agent service account | `hermes-sa` |
 | `${AGENT_CONFIG_MAP}` | ConfigMap name | `hermes-behavior-config` |
 | `${AGENT_SECRET}` | Agent secret name | `hermes-agent-secret` |

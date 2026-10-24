@@ -10,6 +10,7 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 | `postgres/` | PostgreSQL 15: databases for LiteLLM, Keycloak, the interface, Temporal and the modules, one account per database |
 | [`rabbitmq/`](rabbitmq/) | agents' event bus, management UI behind Keycloak |
 | [`temporal/`](temporal/) | agents' durable workflows (delegation, recovery after failure) |
+| [`repartiteur/`](repartiteur/) | delegation dispatcher: rules without a model, only Temporal client, only event publisher |
 | `network/` | namespace egress (EgressFirewall), Postgres ingress, default ingress deny (`default-deny-ingress.yaml`) |
 | `00-namespace-guardrails.yaml` | namespace `ResourceQuota` and `LimitRange` |
 

@@ -1,0 +1,22 @@
+# Entrée des exécutants : l'api_server d'un agent (8642) n'est joignable que par le répartiteur
+# (sophia-core, app=repartiteur). La règle n'isole que l'exécutant qu'elle sélectionne (ses sorties ne
+# changent pas) ; les autres agents ne sont pas concernés. Une NetworkPolicy ne s'applique pas à un pod
+# en réseau de l'hôte : un tel pod ne doit pas servir d'exécutant sans autre protection.
+# Chaque exécutant suivant (déploiement, maintenance) : une règle comme celle-ci.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hephaistos-api
+  namespace: ${AGENT_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels: { app: hephaistos }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: repartiteur }
+      ports:
+        - { protocol: TCP, port: 8642 }

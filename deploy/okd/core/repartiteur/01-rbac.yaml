@@ -1,0 +1,21 @@
+# Compte de service du répartiteur. TokenReview (identité des demandeurs) demande
+# system:auth-delegator, rôle de cluster standard (tokenreviews et subjectaccessreviews en création,
+# rien d'autre). Le répartiteur ne lit ni Secret ni ressource du cluster.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: repartiteur
+  namespace: sophia-core
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: repartiteur-tokenreview
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: repartiteur
+    namespace: sophia-core
