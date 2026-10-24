@@ -16,7 +16,7 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (manual approval) |
 | `02-network.yaml` | PostgreSQL accepts the identity namespace; Keycloak only accepts the router, the applications namespace and itself |
 | `03-keycloak.yaml` | Keycloak instance and Route |
-| `04-realm-sophia.yaml` | realm: groups, password policy, first OIDC client (PKCE, secret through a *placeholder*) |
+| `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*) |
 
 ## Procedure
 
@@ -39,6 +39,6 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 ## Pitfalls we hit
 
 - **A list provided in the import replaces the realm defaults.** Declaring `clientScopes` to add one scope removes `profile`, `email`, `basic`… and sign-in fails with `invalid_scope`. Add, do not redefine: the group mapper is carried by the client.
-- **The import only applies when the realm is created.** To replay a fixed import: delete the realm, delete the `KeycloakRealmImport` resource, apply again.
+- **The import only applies when the realm is created.** To replay a fixed import: delete the realm, delete the `KeycloakRealmImport` resource, apply again. On an existing realm, a client added to the file is imported on its own from the console (*Clients → Import client*); the file remains the reference for a fresh install.
 
-Client application example: [chat interface](../apps/chat-interface/README.en.md).
+Client applications: [chat interface](../apps/chat-interface/README.en.md), [RabbitMQ](../core/rabbitmq/README.en.md), [Temporal](../core/temporal/README.en.md). Keycloak accepts Temporal's pods from `sophia-core` (signing keys, service account tokens): `02-network.yaml`.
