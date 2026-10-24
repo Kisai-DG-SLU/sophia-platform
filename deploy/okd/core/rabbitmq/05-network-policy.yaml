@@ -17,3 +17,47 @@ spec:
           protocol: TCP
   policyTypes:
     - Ingress
+---
+# Interface d'administration (15672) depuis le routeur ; l'accès passe par Keycloak
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-management-from-router
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/ingress: ""
+      ports:
+        - port: 15672
+          protocol: TCP
+  policyTypes:
+    - Ingress
+---
+# L'assistant de code (dionysos) tourne en hostNetwork ; son trafic n'est pas vu comme venant de
+# hermes-system mais du réseau du nœud. Tout processus du nœud peut donc joindre 5672 : l'accès
+# reste soumis au compte et à ses droits sur /sophia.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-from-host-network
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/host-network: ""
+      ports:
+        - port: 5672
+          protocol: TCP
+  policyTypes:
+    - Ingress

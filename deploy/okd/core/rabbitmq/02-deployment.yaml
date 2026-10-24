@@ -49,6 +49,50 @@ spec:
             - name: erlang-cookie
               mountPath: /run/secrets/rabbitmq
               readOnly: true
+        # Définitions (vhost, comptes, droits) complétées par les mots de passe du Secret,
+        # dans un volume en mémoire. Échoue si un compte du gabarit n'a pas sa clé dans le Secret.
+        - name: definitions
+          image: docker.io/rabbitmq:4.4.0-management
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              OUT=/run/rabbitmq-definitions/definitions.json
+              # Valeur insérée telle quelle dans une chaîne JSON (\ et " échappés), puis dans sed
+              put() {
+                [ -n "$2" ] || { echo "valeur vide ou absente pour $1" >&2; exit 1; }
+                v=$(printf '%s' "$2" | sed -e 's/[\\"]/\\&/g' -e 's/[|&\\]/\\&/g'); sed -i "s|$1|$v|g" $OUT.tmp
+              }
+              cp /etc/rabbitmq-template/definitions.template.json $OUT.tmp
+              put @ADMIN_USER@ "$(cat /run/secrets/rabbitmq-admin/username)"
+              put @ADMIN_PW@ "$(cat /run/secrets/rabbitmq-admin/password)"
+              for f in /run/secrets/rabbitmq-users/*; do
+                put "@PW_$(basename "$f")@" "$(cat "$f")"
+              done
+              if grep -q '@[A-Z]*_[^@]*@' $OUT.tmp; then
+                echo "valeur manquante (Secret rabbitmq-users ou rabbitmq-admin-creds) :" >&2
+                grep -o '@[A-Z]*_[^@]*@' $OUT.tmp >&2
+                exit 1
+              fi
+              chmod 400 $OUT.tmp
+              mv -f $OUT.tmp $OUT
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          volumeMounts:
+            - name: config
+              mountPath: /etc/rabbitmq-template/definitions.template.json
+              subPath: definitions.template.json
+              readOnly: true
+            - name: users
+              mountPath: /run/secrets/rabbitmq-users
+              readOnly: true
+            - name: admin
+              mountPath: /run/secrets/rabbitmq-admin
+              readOnly: true
+            - name: definitions
+              mountPath: /run/rabbitmq-definitions
       containers:
         - name: rabbitmq
           image: docker.io/rabbitmq:4.4.0-management
@@ -57,19 +101,6 @@ spec:
               name: amqp
             - containerPort: 15672
               name: management
-          env:
-            - name: RABBITMQ_DEFAULT_USER
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-admin-creds
-                  key: username
-            - name: RABBITMQ_DEFAULT_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-admin-creds
-                  key: password
-            - name: RABBITMQ_DEFAULT_VHOST
-              value: /sophia
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             # memory : à garder égal à total_memory_available_override_value (00-config.yaml)
@@ -90,6 +121,13 @@ spec:
               mountPath: /etc/rabbitmq/conf.d/20-sophia.conf
               subPath: 20-sophia.conf
               readOnly: true
+            - name: config
+              mountPath: /etc/rabbitmq/enabled_plugins
+              subPath: enabled_plugins
+              readOnly: true
+            - name: definitions
+              mountPath: /run/rabbitmq-definitions
+              readOnly: true
       volumes:
         - name: config
           configMap:
@@ -103,3 +141,16 @@ spec:
           secret:
             secretName: rabbitmq-erlang-cookie
             defaultMode: 0440
+        # Un mot de passe par compte (clé = nom du compte), créé par l'administrateur (voir README.md)
+        - name: admin
+          secret:
+            secretName: rabbitmq-admin-creds
+            defaultMode: 0440
+        - name: users
+          secret:
+            secretName: rabbitmq-users
+            defaultMode: 0440
+        - name: definitions
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi

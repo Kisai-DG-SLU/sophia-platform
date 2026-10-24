@@ -17,8 +17,8 @@ spec:
       ports:
         - { protocol: TCP, port: 5432 }
 ---
-# Keycloak : entrée depuis le routeur (navigateurs), depuis sophia-apps (échanges
-# serveur à serveur des proxys OIDC) et depuis le namespace lui-même (operator,
+# Keycloak : entrée depuis le routeur (navigateurs), depuis sophia-apps et l'interface
+# Temporal de sophia-core (échanges serveur à serveur des proxys OIDC) et depuis le namespace lui-même (operator,
 # cluster Infinispan). Sortie non restreinte à ce stade : l'operator parle à l'API.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -34,4 +34,11 @@ spec:
             matchLabels: { policy-group.network.openshift.io/ingress: "" }
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-apps }
+        # oauth2-proxy de l'interface Temporal (jeton, clés) ; serveur Temporal
+        # (clés de signature) et Jobs d'administration (jeton du compte temporal-admin)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [temporal-ui, temporal, temporal-admin] }
         - podSelector: {}

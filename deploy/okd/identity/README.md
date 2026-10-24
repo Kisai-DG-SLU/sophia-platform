@@ -16,7 +16,7 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (approbation manuelle) |
 | `02-network.yaml` | PostgreSQL accepte le namespace d'identité ; Keycloak n'accepte que le routeur, le namespace des applications et lui-même |
 | `03-keycloak.yaml` | instance Keycloak et Route |
-| `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, premier client OIDC (PKCE, secret par *placeholder*) |
+| `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, clients OIDC — interface de discussion (PKCE, secret par *placeholder*), administration de RabbitMQ (client public PKCE, audience `rabbitmq`), interface de Temporal (oauth2-proxy, secret par *placeholder*) |
 
 ## Procédure
 
@@ -39,6 +39,6 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 ## Pièges rencontrés
 
 - **Une liste fournie dans l'import remplace les valeurs par défaut du realm.** Déclarer `clientScopes` pour ajouter un scope supprime `profile`, `email`, `basic`… et la connexion échoue en `invalid_scope`. Ajouter, ne pas redéfinir : le mappeur des groupes est porté par le client.
-- **L'import ne s'applique qu'à la création du realm.** Pour rejouer un import corrigé : supprimer le realm, supprimer la ressource `KeycloakRealmImport`, réappliquer.
+- **L'import ne s'applique qu'à la création du realm.** Pour rejouer un import corrigé : supprimer le realm, supprimer la ressource `KeycloakRealmImport`, réappliquer. Sur un realm existant, un client ajouté au fichier s'importe à part, depuis la console (*Clients → Import client*) ; le fichier reste la référence d'une installation neuve.
 
-Exemple d'application cliente : [interface de discussion](../apps/chat-interface/README.md).
+Applications clientes : [interface de discussion](../apps/chat-interface/README.md), [RabbitMQ](../core/rabbitmq/README.md), [Temporal](../core/temporal/README.md). Keycloak accepte depuis `sophia-core` les pods de Temporal (clés de signature, jetons des comptes de service) : `02-network.yaml`.

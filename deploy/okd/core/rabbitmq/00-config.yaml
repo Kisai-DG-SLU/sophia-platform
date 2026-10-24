@@ -7,6 +7,117 @@ metadata:
   namespace: sophia-core
   labels: { app: rabbitmq }
 data:
+  # Remplace celui de l'image (management + prometheus) : ajoute l'authentification OAuth2
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_prometheus,rabbitmq_auth_backend_oauth2].
+  # Comptes du vhost /sophia. Gabarit sans secret : l'initContainer « definitions » remplace
+  # chaque @PW_<compte>@ par la clé <compte> du Secret rabbitmq-users, et RabbitMQ importe le résultat
+  # à chaque démarrage (mot de passe haché à l'import ; comptes absents du fichier non touchés).
+  # Droits provisoires, à revoir avec la topologie des événements :
+  #  - agent : publie sur les exchanges sophia.agents (tâches, routées par nom d'agent) et
+  #    sophia.events (DelegateEvent) ; ne lit et ne configure que ses files sophia.agent.<nom>[.*].
+  #    Pas d'écriture sur l'exchange par défaut : impossible de déposer dans la file d'un autre.
+  #  - sophia-workflow : lecture des événements par une file temporaire (amq.gen-*), sans publier.
+  # L'administrateur interne (Secret rabbitmq-admin-creds) y figure aussi : avec des définitions,
+  # RabbitMQ ne crée plus RABBITMQ_DEFAULT_USER sur un volume neuf.
+  definitions.template.json: |
+    {
+      "vhosts": [
+        {
+          "name": "/sophia"
+        }
+      ],
+      "users": [
+        {
+          "name": "@ADMIN_USER@",
+          "password": "@ADMIN_PW@",
+          "tags": [
+            "administrator"
+          ]
+        },
+        {
+          "name": "sophia",
+          "password": "@PW_sophia@",
+          "tags": []
+        },
+        {
+          "name": "athena",
+          "password": "@PW_athena@",
+          "tags": []
+        },
+        {
+          "name": "hephaistos",
+          "password": "@PW_hephaistos@",
+          "tags": []
+        },
+        {
+          "name": "ouranos",
+          "password": "@PW_ouranos@",
+          "tags": []
+        },
+        {
+          "name": "dionysos",
+          "password": "@PW_dionysos@",
+          "tags": []
+        },
+        {
+          "name": "sophia-workflow",
+          "password": "@PW_sophia-workflow@",
+          "tags": []
+        }
+      ],
+      "permissions": [
+        {
+          "user": "@ADMIN_USER@",
+          "vhost": "/sophia",
+          "configure": ".*",
+          "write": ".*",
+          "read": ".*"
+        },
+        {
+          "user": "sophia",
+          "vhost": "/sophia",
+          "configure": "^sophia\\.agent\\.sophia(\\..*)?$",
+          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.sophia(\\..*)?)$",
+          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.sophia(\\..*)?)$"
+        },
+        {
+          "user": "athena",
+          "vhost": "/sophia",
+          "configure": "^sophia\\.agent\\.athena(\\..*)?$",
+          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.athena(\\..*)?)$",
+          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.athena(\\..*)?)$"
+        },
+        {
+          "user": "hephaistos",
+          "vhost": "/sophia",
+          "configure": "^sophia\\.agent\\.hephaistos(\\..*)?$",
+          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.hephaistos(\\..*)?)$",
+          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.hephaistos(\\..*)?)$"
+        },
+        {
+          "user": "ouranos",
+          "vhost": "/sophia",
+          "configure": "^sophia\\.agent\\.ouranos(\\..*)?$",
+          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.ouranos(\\..*)?)$",
+          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.ouranos(\\..*)?)$"
+        },
+        {
+          "user": "dionysos",
+          "vhost": "/sophia",
+          "configure": "^sophia\\.agent\\.dionysos(\\..*)?$",
+          "write": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.dionysos(\\..*)?)$",
+          "read": "^(sophia\\.agents|sophia\\.events|sophia\\.agent\\.dionysos(\\..*)?)$"
+        },
+        {
+          "user": "sophia-workflow",
+          "vhost": "/sophia",
+          "configure": "^amq\\.gen-.*$",
+          "write": "^amq\\.gen-.*$",
+          "read": "^(sophia\\.events|amq\\.gen-.*)$"
+        }
+      ]
+    }
   20-sophia.conf: |
     # RabbitMQ lit la mémoire du nœud, pas la limite du conteneur : sans cette valeur,
     # son seuil d'alerte (60 %) ne se déclencherait jamais avant l'OOM. Doit suivre limits.memory.
@@ -15,3 +126,30 @@ data:
     disk_free_limit.absolute = 1GB
     # Journal des files quorum : 512 Mo en mémoire par défaut, presque tout le seuil de 614 Mo
     raft.wal_max_size_bytes = 67108864
+
+    # --- Interface d'administration derrière Keycloak (realm sophia, client rabbitmq) ---
+    # Jetons OAuth2 d'abord, comptes internes ensuite (agents en AMQP, administrateur du Secret)
+    auth_backends.1 = rabbit_auth_backend_oauth2
+    auth_backends.2 = rabbit_auth_backend_internal
+    auth_oauth2.resource_server_id = rabbitmq
+    auth_oauth2.issuer = https://${IDP_HOST}/realms/sophia
+    # HTTPS obligatoire (l'adresse interne de Keycloak est en HTTP) : passe par le routeur
+    auth_oauth2.jwks_uri = https://${IDP_HOST}/realms/sophia/protocol/openid-connect/certs
+    auth_oauth2.https.peer_verification = verify_peer
+    auth_oauth2.https.cacertfile = /etc/ssl/certs/ca-certificates.crt
+    # Certificat joker du routeur (*.apps.<domaine du cluster>)
+    auth_oauth2.https.hostname_verification = wildcard
+    auth_oauth2.preferred_username_claims.1 = preferred_username
+    # Les groupes Keycloak (claim « groups ») deviennent des scopes ; seul « admin » ouvre des droits
+    auth_oauth2.additional_scopes_key = groups
+    auth_oauth2.scope_aliases.admin = rabbitmq.tag:administrator rabbitmq.read:*/* rabbitmq.write:*/* rabbitmq.configure:*/*
+    management.oauth_enabled = true
+    management.oauth_client_id = rabbitmq
+    management.oauth_provider_url = https://${IDP_HOST}/realms/sophia
+    management.oauth_scopes = openid profile
+    # Plus de connexion par mot de passe à l'interface ni à l'API HTTP
+    management.oauth_disable_basic_auth = true
+
+    # --- Comptes et droits importés au démarrage (voir definitions.template.json) ---
+    definitions.import_backend = local_filesystem
+    definitions.local.path = /run/rabbitmq-definitions/definitions.json
