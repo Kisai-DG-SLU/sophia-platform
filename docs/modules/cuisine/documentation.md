@@ -7,13 +7,15 @@
 - **Planning par personne** : plusieurs plats par créneau, plat industriel ou hors catalogue, repas pris à l'extérieur (cantine), mode vacances, menus des enfants en entrée / plat / légume. Un repas devient « passé » après 14 h ou 22 h.
 - **Génération de recettes sous règles** : une réserve permanente de nouveautés (28), une génération « avec ce que j'ai », 60 essais par jour au plus ; les recettes inspirées du web citent leurs sources.
 - **Aliments bannis** ou **dévalués** (un poids qui s'efface en 8 semaines), score de satiété, tris.
-- **Repas de fête** : menu par service, propositions, courses.
+- **Repas de fête** : menu par service, propositions, courses ; menu surprise, et **fête secrète** (en recette) : la fête entière est cachée aux comptes enfants, au planning comme dans la discussion.
 - **Courses** agrégées par rayon, coches partagées entre les membres du foyer, historique annulable ; un onglet transmet la liste validée au [module Courses](../courses/README.md), qui remplit le panier d'un drive.
 - **Import** d'une recette depuis un lien ou un texte collé : le modèle la met en fiche, des règles la contrôlent, le foyer relit un aperçu avant l'enregistrement.
 - **Photo du plat** générée localement par l'outil MCP `image` de la plateforme.
 - **Dans la discussion** : « on mange quoi ce soir ? » est répondu par l'assistant, à partir du planning.
 
-Prévu : une table des ingrédients (saison par mois, prix, calories) pour **calculer** coût, calories et saison au lieu de les estimer.
+- **Table des ingrédients** (en recette) : calories, saison et prix de chaque ingrédient, pour **calculer** le coût, les calories et les mois de saison des recettes au lieu de les estimer (voir ci-dessous).
+
+Prévu : prix réels du drive dans la table des ingrédients, par l'outil `prix_reference` du module Courses (contrat accepté des deux côtés) ; contrôle des plafonds de la génération sur les valeurs calculées.
 
 ## Architecture
 
@@ -78,6 +80,25 @@ Autres contrôles autour des sorties du modèle :
 - les interdits ne visent que les recettes **inventées**, pas les plats saisis ni les imports.
 
 **Données de santé** : jamais versionnées ni envoyées au modèle ; seules des contraintes nutritionnelles générales passent.
+
+### Fête secrète
+
+Une case à la création d'une fête, qui implique le menu surprise. Les comptes enfants ne voient pas la fête au planning ; le serveur MCP de lecture la **tait** dès que l'identité injectée est celle d'un enfant **ou qu'elle est absente** (prudence) — menu du jour, de la semaine, courses. Un adulte identifié la voit, avec « Surprise ! » pour le menu.
+
+## Table des ingrédients : données ouvertes, le modèle choisit parmi des candidats
+
+| Donnée | Source |
+|---|---|
+| Calories | table Ciqual (ANSES, données ouvertes), versionnée avec le module ; ≈ 3 100 aliments avec énergie, kcal calculées des nutriments selon le règlement européen d'étiquetage quand elles manquent (écart médian 0,2 % sur les aliments qui ont les deux) |
+| Saison | calendrier des fruits et légumes de saison de l'ADEME (73 produits, mois de saison) |
+| Prix au kilo, poids d'une pièce | estimés par le modèle aujourd'hui ; prix réels du drive ensuite |
+
+- **Règles d'abord** : les candidats sont trouvés sans modèle (mots du nom, intitulé avant la virgule, aliments crus d'abord ; petit lexique des noms composés : « pomme de terre » n'est pas « pomme ») ; le modèle (`sophia-local`, température 0,1, lots de 8) **choisit parmi ces candidats ou aucun**, et estime prix et poids ; une réponse hors candidats est écartée, les bornes sont vérifiées (0,2 à 200 €/kg, 0,1 à 5 000 g).
+- Une valeur **corrigée à la main** n'est jamais écrasée, ni par le modèle ni par un prix du drive.
+- **Calcul** : grammes par unité (cuillère, gousse, bouquet, pincée, centilitre…) ; calories et coût **remplacent l'estimation seulement si tout ce qui compte est connu**, l'estimation d'origine est gardée et revient si une donnée manque ; la fiche marque « ≈ » une valeur estimée.
+- **Saison** : les mois où tous les fruits et légumes du plat sont de saison ; un plat noté « hiver » dans l'ancien tableur mais fait de carottes devient de saison en octobre.
+- **Prix réels** (à brancher) : poids, volume et pièces **ne se convertissent jamais** — une ligne en poids prend le prix au kilo, en volume le prix au litre, une pièce le prix à la pièce, sinon pas de coût pour la ligne.
+- Une tâche de fond renseigne les nouveaux ingrédients (amorce, imports, générations) et recalcule les recettes : ≈ 250 ingrédients en une vingtaine de minutes ; 5 ingrédients rares sans candidat sont à saisir à la main.
 
 ## Mesures
 
