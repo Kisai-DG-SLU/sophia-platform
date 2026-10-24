@@ -1,70 +1,75 @@
-# Automation Deterministe : Separation des Moteurs
+# Automation Déterministe : séparation des moteurs
 
-Le module d'**Automation Deterministe** definit la separation stricte entre l'orchestration cognitive, qui releve des agents d'IA, et l'automatisation des processus, qui releve de moteurs deterministes.
+Le module d'**Automation Déterministe** définit la séparation stricte entre la réflexion, qui relève des modèles de langage, et l'exécution des processus, qui relève de moteurs déterministes.
 
-L'objectif est de ne pas confier a un systeme probabiliste (un modele de langage) l'execution de processus metier qui necessitent une fiabilite absolue.
+L'objectif est de ne pas confier à un système probabiliste (un modèle de langage) l'exécution de processus qui exigent une fiabilité absolue.
 
 ---
 
-## Probleme
+## Problème
 
-Les modeles de langage sont des systemes probabilistes. Meme avec un taux de reussite eleve, ils conservent une probabilite non nulle d'erreur, de hors-sujet ou d'hallucination.
+Les modèles de langage sont des systèmes probabilistes. Même avec un taux de réussite élevé, ils gardent une probabilité non nulle d'erreur, de hors-sujet ou d'hallucination.
 
-Pour des taches de nature creative ou exploratoire, cette variabilite est acceptable. Pour des processus metier reproductibles (envoi de notifications, mise a jour de bases, declenchement de flux de validation), elle ne l'est pas.
-
-Confier l'automatisation de processus a un agent d'IA revient a introduire de l'incertitude la ou l'organisation attend de la certitude.
+Pour une tâche créative ou exploratoire, cette variabilité est acceptable. Pour un processus reproductible (envoi de notifications, mise à jour de bases, déclenchement d'une validation, action sur l'infrastructure), elle ne l'est pas.
 
 ---
 
 ## Principe
 
-SophIA separe strictement deux types d'execution :
+**Le code orchestre, le modèle réfléchit, les règles décident.**
 
-**L'orchestration cognitive**, assuree par les agents du Pantheon Agentique. Elle est basee sur des modeles de langage et gere les taches qui necessitent raisonnement, adaptation et comprehension contextuelle. Son resultat est probabiliste et soumis a validation.
+- **Réfléchir** est un appel au modèle : comprendre, découper, proposer. Son résultat est probabiliste et soumis à validation.
+- **Exécuter** relève d'un moteur déterministe : le processus s'exécute correctement, ou il échoue avec une cause identifiable.
+- **L'autonomie d'exécution**, c'est-à-dire une boucle d'agent libre avec des outils, est réservée aux rôles dont c'est le métier, comme le développement (voir [Panthéon Agentique](08-pantheon-agentique.md)).
 
-**L'automatisation deterministe**, assuree par un moteur de workflows. Elle execute des processus definis, immuables et reproductibles. Son resultat est binaire : le processus s'execute correctement ou echoue avec une cause identifiable.
-
-Un agent peut declencher un workflow deterministe, mais il n'en controle pas l'execution. Le workflow s'execute selon ses regles internes, sans intervention du modele.
-
----
-
-## Fonctionnement
-
-### Definition des workflows
-
-Les workflows sont definis de maniere explicite, via un langage de programmation visuelle ou une configuration codee en dur. Chaque workflow precise :
-
-- les evenements declencheurs
-- les etapes d'execution
-- les conditions de branchement
-- les actions en cas d'erreur
-- les notifications et journalisations
-
-### Execution
-
-L'execution d'un workflow est entierement deterministe :
-
-- les etapes s'enchainent dans l'ordre defini
-- les conditions sont evaluees par des operateurs logiques, pas par un modele
-- les actions sont executees par des connecteurs predefinis
-- l'echec d'une etape interrompt le workflow et declenche la procedure d'erreur definie
-
-### Interaction avec les agents
-
-Un agent peut declencher un workflow par l'intermediaire de l'orchestrateur. La demande est transmise au moteur d'automatisation, qui l'execute sans intervention supplementaire du modele. L'agent recoit le resultat une fois l'execution terminee.
-
-L'inverse est egalement possible : un workflow peut, a une etape definie, solliciter un agent pour une tache de raisonnement avant de poursuivre son execution deterministe.
+Un agent peut déclencher un workflow, il n'en pilote pas l'exécution. Et, à l'inverse, **un workflow peut solliciter le modèle à une étape définie** : c'est le motif général de SophIA.
 
 ---
 
-## Position dans l'architecture
+## Le workflow sollicite le modèle
 
-Le moteur d'automatisation opere dans un namespace dedie, isole des namespaces d'inference et de memoire. Il est accessible depuis `sophia-core` via une interface securisee.
+Chaque fois qu'il faut réfléchir avant d'agir, le même motif s'applique :
 
-Technologies possibles : n8n, Node-RED, StackStorm, Temporal, ou tout moteur de workflows repondant aux exigences d'isolation et de determinisme.
+1. **Analyse.** Le modèle reçoit le contexte et rend une réponse **en sortie contrainte** (un schéma imposé) : par exemple « prochaine étape : outil, cible, arguments ».
+2. **Décision.** Des règles déterministes valident la réponse : outil de la liste fermée, cible autorisée, arguments bien formés, quota, validation humaine exigée ou non.
+3. **Exécution.** Une compétence déterministe fait l'appel, ou le répartiteur transmet la demande à l'agent concerné.
+4. **Retour.** Le résultat revient au modèle, qui synthétise ou propose l'étape suivante.
+
+La boucle est **bornée par le code** (nombre d'étapes, durée). Le modèle prend **une décision à la fois**, plutôt qu'un plan entier : un modèle local modeste y suffit, et chaque décision reste contrôlable.
+
+| Usage | Ce que fait le modèle | État |
+|---|---|---|
+| **Interface de discussion** | comprend la demande et choisit l'outil ; le serveur fabrique l'appel | en service |
+| **Délégations** | rien : le répartiteur décide par ses règles, le workflow exécute | en service |
+| **Planificateur** des objectifs ouverts | découpe l'objectif, une étape à la fois, entre les outils et les agents | prévu (prototype) |
+| **Maintenance** | rédige une proposition (le pourquoi et le manifeste) ; un humain l'approuve, puis chaque commande | prévu |
+| **Incidents** | diagnostique à partir d'une collecte déterministe et propose un plan (voir [Observabilité](10-observabilite.md)) | prévu |
+
+---
+
+## Définition des workflows
+
+Les workflows sont écrits explicitement, en code ou par programmation visuelle. Chacun précise :
+
+- les événements déclencheurs
+- les étapes d'exécution
+- les conditions de branchement, évaluées par des opérateurs logiques et non par un modèle
+- les actions en cas d'erreur : l'échec d'une étape interrompt le workflow et déclenche la procédure prévue
+- les notifications et la journalisation
+
+---
+
+## Moteurs
+
+| Moteur | Usage | État |
+|---|---|---|
+| **Temporal** | workflows durables en code : délégations entre agents, puis planificateur et incidents. L'historique de chaque workflow sert de journal | en service pour les délégations |
+| **n8n** | automatisations par programmation visuelle (connecteurs, notifications) | prévu, déployé avec le premier outil qui en a besoin ; hors du chemin des délégations |
+
+Le moteur de workflows durables n'a qu'un client applicatif, le répartiteur (`sophia-core`) : aucun agent n'y accède directement.
 
 ---
 
 ## Objectif
 
-Garantir que les processus metier reproductibles sont executes de maniere fiable et previsible, independamment de l'etat ou de la performance des modeles d'IA. L'automatisation deterministe et l'orchestration cognitive sont complementaires : la premiere assure la fiabilite des flux, la seconde apporte l'intelligence la ou elle est necessaire.
+Garantir que les processus reproductibles s'exécutent de manière fiable et prévisible, quel que soit l'état du modèle. Le modèle apporte la compréhension là où elle est nécessaire ; le code et les règles gardent la main sur ce qui est fait.
