@@ -1,64 +1,64 @@
 # Workspace Management
 
-Le **Workspace Management** definit la maniere dont SophIA gere les environnements de travail des agents et des utilisateurs.
+Le **Workspace Management** définit la manière dont SophIA gère les environnements de travail des agents et des utilisateurs.
 
-L'objectif est de garantir la reproductibilite, l'isolation et la tracabilite.
+L'objectif est de garantir la reproductibilité, l'isolation et la traçabilité.
 
 ---
 
-## Probleme
+## Problème
 
-Dans les systemes bases sur des agents, les environnements de travail peuvent devenir chaotiques : dependances implicites, chemins locaux dependants de la machine, melange entre memoire, code et execution.
+Dans les systèmes basés sur des agents, les environnements de travail peuvent devenir chaotiques : dépendances implicites, chemins locaux dépendants de la machine, mélange entre mémoire, code et exécution.
 
-Cela rend les systemes difficiles a maintenir et a reproduire.
+Cela rend les systèmes difficiles à maintenir et à reproduire.
 
 ---
 
 ## Principe
 
-SophIA separe strictement trois elements :
+SophIA sépare strictement trois éléments :
 
 ### Brain
 
-Le **Brain** contient la memoire et les specifications du projet.
+Le **Brain** contient la mémoire et les spécifications du projet.
 
 Exemples :
 
-- depot Brain d'un projet de developpement
-- depot Brain d'un projet d'architecture
+- dépôt Brain d'un projet de développement
+- dépôt Brain d'un projet d'architecture
 
 Contenu :
 
-- specifications
-- decisions d'architecture
+- spécifications
+- décisions d'architecture
 - configuration du projet
 
 ---
 
 ### Repository
 
-Le repository contient le travail reel : code, notebooks, ressources.
+Le repository contient le travail réel : code, notebooks, ressources.
 
 ---
 
 ### Workspace
 
-Le workspace est un environnement d'execution temporaire, ephemere, isole et reproductible. Il peut etre local, dans un pod Kubernetes ou dans un environnement sandbox.
+Le workspace est un environnement d'exécution temporaire, éphémère, isolé et reproductible. Il peut être local, dans un pod Kubernetes ou dans un environnement sandbox.
 
 ---
 
-## Regle fondamentale
+## Règle fondamentale
 
-Le workspace n'est jamais la source de verite. La source de verite est toujours le Brain (memoire) et le repository (code).
+Le workspace n'est jamais la source de vérité. La source de vérité est toujours le Brain (mémoire) et le repository (code).
 
 ---
 
-## Integration avec les agents
+## Intégration avec les agents
 
-Les agents operent dans ces workspaces. Ils peuvent lire les specifications dans le Brain, modifier le repository et executer des taches dans le workspace.
+Les agents opèrent dans ces workspaces. Ils peuvent lire les spécifications dans le Brain, modifier le repository et exécuter des tâches dans le workspace.
 
 ---
 
 ## Objectif
 
-Garantir que les projets restent reproductibles, que les environnements restent propres et que les agents ne dependent pas d'un etat local cache.
+Garantir que les projets restent reproductibles, que les environnements restent propres et que les agents ne dépendent pas d'un état local caché.

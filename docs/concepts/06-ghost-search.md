@@ -1,68 +1,68 @@
 # Ghost Search : Obfuscation des Intentions de Recherche
 
-Le **Ghost Search** est un mecanisme d'obfuscation destine a masquer les intentions reelles du systeme lorsqu'il effectue des recherches sur Internet.
+Le **Ghost Search** est un mécanisme d'obfuscation destiné à masquer les intentions réelles du système lorsqu'il effectue des recherches sur Internet.
 
-Son objectif est d'empecher l'analyse et le profilage des requetes emises depuis l'infrastructure, afin de ne pas reveler les centres d'interet, les projets en cours ou les orientations strategiques de l'organisation.
+Son objectif est d'empêcher l'analyse et le profilage des requêtes émises depuis l'infrastructure, afin de ne pas révéler les centres d'intérêt, les projets en cours ou les orientations stratégiques de l'organisation.
 
 ---
 
-## Probleme
+## Problème
 
-Chaque requete web emise depuis une infrastructure enterprise laisse une trace. Les moteurs de recherche, les CDN, les regies publicitaires et les fournisseurs d'acces analysent ces requetes pour :
+Chaque requête web émise depuis une infrastructure d'entreprise laisse une trace. Les moteurs de recherche, les CDN, les régies publicitaires et les fournisseurs d'accès analysent ces requêtes pour :
 
-- etablir un profil de l'entite qui emet les requetes
-- deduire les sujets de recherche, les technologies utilisees, les orientations R&D
-- revendre ces donnees a des concurrents ou a des courtiers en donnees
+- établir un profil de l'entité qui émet les requêtes
+- déduire les sujets de recherche, les technologies utilisées, les orientations R&D
+- revendre ces données à des concurrents ou à des courtiers en données
 
-Pour une organisation soucieuse de sa souverainete, exposer ses intentions de recherche revient a exposer sa strategie.
+Pour une organisation soucieuse de sa souveraineté, exposer ses intentions de recherche revient à exposer sa stratégie.
 
 ---
 
 ## Principe
 
-Ghost Search repose sur un principe simple : noyer les requetes legitimes dans un volume de requetes leurres indiscernables.
+Ghost Search repose sur un principe simple : noyer les requêtes légitimes dans un volume de requêtes leurres indiscernables.
 
-Une requete utile est accompagnee de plusieurs requetes factices, emises simultanement ou en sequence rapprochee, depuis des identites reseau differentes.
+Une requête utile est accompagnée de plusieurs requêtes factices, émises simultanément ou en séquence rapprochée, depuis des identités réseau différentes.
 
-Un observateur externe ne peut pas distinguer la requete reelle des leurres.
+Un observateur externe ne peut pas distinguer la requête réelle des leurres.
 
 ---
 
 ## Fonctionnement
 
-### Generation des leurres
+### Génération des leurres
 
-Les requetes leurres sont generees selon plusieurs strategies :
+Les requêtes leurres sont générées selon plusieurs stratégies :
 
-- **Thematique.** Des requetes sur des sujets proches mais non sensibles, pour brouiller le domaine exact de la recherche.
-- **Aleatoire.** Des requetes sur des sujets completement decorreles, pour diluer le signal dans le bruit.
-- **Historique.** Des requetes reproduisant des patterns de recherche anterieurs, pour simuler une activite normale et continue.
+- **Thématique.** Des requêtes sur des sujets proches mais non sensibles, pour brouiller le domaine exact de la recherche.
+- **Aléatoire.** Des requêtes sur des sujets complètement décorrélés, pour diluer le signal dans le bruit.
+- **Historique.** Des requêtes reproduisant des patterns de recherche antérieurs, pour simuler une activité normale et continue.
 
-### Rotation d'identite
+### Rotation d'identité
 
-Chaque requete (utile ou leurre) est emise depuis une identite reseau differente : proxy different, en-tetes HTTP varies, fingerprints de navigateur differents.
+Chaque requête (utile ou leurre) est émise depuis une identité réseau différente : proxy différent, en-têtes HTTP variés, fingerprints de navigateur différents.
 
 ### Synchronisation temporelle
 
-Les requetes sont emises de maniere a ce qu'un observateur ne puisse pas les differencier par leur rythme ou leur volume. Les leurres respectent les memes distributions temporelles que les requetes reelles.
+Les requêtes sont émises de manière à ce qu'un observateur ne puisse pas les différencier par leur rythme ou leur volume. Les leurres respectent les mêmes distributions temporelles que les requêtes réelles.
 
 ---
 
-## Relation avec le Sas Paranoiaque
+## Relation avec le Sas Paranoïaque
 
-Ghost Search est un module du Sas Paranoiaque. Il opere en amont de la phase de neutralisation du contenu :
+Ghost Search est un module du Sas Paranoïaque. Il opère en amont de la phase de neutralisation du contenu :
 
-1. Ghost Search genere les requetes (utiles + leurres) et les route via l'infrastructure d'obfuscation.
-2. Le Sas Paranoiaque recupere les reponses, les nettoie, et ne transmet au systeme que le contenu textuel de la requete utile.
+1. Ghost Search génère les requêtes (utiles + leurres) et les route via l'infrastructure d'obfuscation.
+2. Le Sas Paranoïaque récupère les réponses, les nettoie, et ne transmet au système que le contenu textuel de la requête utile.
 
 ---
 
 ## Position dans l'architecture
 
-Ghost Search est execute dans le namespace `sophia-dmz`, qui constitue la seule zone d'acces au web. Il ne necessite aucun acces depuis les autres namespaces, preservant ainsi l'isolation du systeme.
+Ghost Search est exécuté dans le namespace `sophia-dmz`, qui constitue la seule zone d'accès au web. Il ne nécessite aucun accès depuis les autres namespaces, préservant ainsi l'isolation du système.
 
 ---
 
 ## Objectif
 
-Garantir qu'un observateur externe ne peut pas deduire les sujets de recherche, les projets en cours, ou les orientations strategiques de l'organisation a partir de l'analyse de son trafic web.
+Garantir qu'un observateur externe ne peut pas déduire les sujets de recherche, les projets en cours, ou les orientations stratégiques de l'organisation à partir de l'analyse de son trafic web.
