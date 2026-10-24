@@ -1,27 +1,27 @@
-# Le Tribunal Semantique
+# Le Tribunal Sémantique
 
-Le **Tribunal Semantique** est un mecanisme de validation des connaissances destine a limiter l'ingestion d'informations erronees ou generees artificiellement.
+Le **Tribunal Sémantique** est un mécanisme de validation des connaissances destiné à limiter l'ingestion d'informations erronées ou générées artificiellement.
 
-Son role est de juger la credibilite d'une information avant son integration dans la memoire du systeme.
+Son rôle est de juger la crédibilité d'une information avant son intégration dans la mémoire du système.
 
 ---
 
-## Probleme
+## Problème
 
-Internet contient aujourd'hui une proportion croissante de contenus generes par IA. Cela entraine plusieurs risques :
+Internet contient aujourd'hui une proportion croissante de contenus générés par IA. Cela entraîne plusieurs risques :
 
 - propagation d'informations fausses
 - amplification d'erreurs
 - boucles d'auto-apprentissage (model collapse)
-- ingestion de contenu manipule
+- ingestion de contenu manipulé
 
-Un systeme RAG naif peut facilement integrer ces donnees sans distinction.
+Un système RAG naïf peut facilement intégrer ces données sans distinction.
 
 ---
 
 ## Principe
 
-Le Tribunal Semantique agit comme un mecanisme de validation multi-sources. Une information n'est integree dans la memoire du systeme que si elle respecte certaines regles.
+Le Tribunal Sémantique agit comme un mécanisme de validation multi-sources. Une information n'est intégrée dans la mémoire du système que si elle respecte certaines règles.
 
 ---
 
@@ -29,35 +29,41 @@ Le Tribunal Semantique agit comme un mecanisme de validation multi-sources. Une 
 
 ### 1. Extraction
 
-Le contenu est recupere via le Sas Paranoiaque.
+Le contenu est récupéré via le Sas Paranoïaque.
 
 ### 2. Analyse
 
-Le texte est analyse pour detecter :
+Le texte est analysé pour détecter :
 
-- indices de generation IA
-- incoherences factuelles
+- indices de génération IA
+- incohérences factuelles
 - absence de sources
 
 ### 3. Croisement
 
-Le systeme recherche plusieurs sources independantes. Une regle simple peut etre appliquee : une information doit etre confirmee par au moins trois sources.
+Le système recherche plusieurs sources indépendantes. Une règle simple peut être appliquée : une information doit être confirmée par au moins trois sources.
 
-### 4. Decision
+### 4. Décision
 
 Trois cas sont possibles :
 
-**Valide.** L'information est jugee fiable et peut etre indexee.
+**Validé.** L'information est jugée fiable et peut être indexée.
 
-**Conteste.** Les sources divergent. Le contenu est place en quarantaine.
+**Contesté.** Les sources divergent. Le contenu est placé en quarantaine.
 
-**Rejete.** Le contenu est juge non fiable. Il est ignore.
+**Rejeté.** Le contenu est jugé non fiable. Il est ignoré.
 
 ---
 
-## Resultat
+## Résultat
 
-Seules les informations validees sont integrees dans la memoire persistante (`sophia-memory`).
+Seules les informations validées sont intégrées dans la mémoire persistante (`sophia-memory`).
+
+---
+
+## État
+
+**Prévu.** Le tribunal n'est pas encore en service. En attendant, tout chemin qui en dépend est fermé : le répartiteur des délégations refuse par ses règles toute consultation dont la réponse devrait passer par le tribunal, et rien de ce qui vient du web n'est mémorisé.
 
 ---
 
