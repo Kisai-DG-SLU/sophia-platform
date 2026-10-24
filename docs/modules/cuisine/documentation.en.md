@@ -7,13 +7,15 @@
 - **Per-person meal plan**: several dishes per slot, ready-made or off-catalogue dish, meals eaten out (canteen), holiday mode, children's menus as starter / main / vegetable. A meal becomes "past" after 2 pm or 10 pm.
 - **Rule-bound recipe generation**: a permanent pool of new recipes (28), a "with what I have" generation, at most 60 attempts per day; web-inspired recipes cite their sources.
 - **Banned** or **downgraded** foods (a weight fading out over 8 weeks), satiety score, sorting.
-- **Festive meals**: menu per course, suggestions, shopping.
+- **Festive meals**: menu per course, suggestions, shopping; surprise menu, and **secret party** (under acceptance testing): the whole party is hidden from children's accounts, in the meal plan as in the chat.
 - **Shopping** aggregated by aisle, ticks shared between household members, undoable history; a tab sends the validated list to the [Shopping module](../courses/README.en.md), which fills a drive-through grocery basket.
 - **Import** of a recipe from a link or pasted text: the model turns it into a card, rules check it, the household reviews a preview before saving.
 - **Dish photo** generated locally by the platform's `image` MCP tool.
 - **In the chat**: "what's for dinner tonight?" is answered by the assistant, from the meal plan.
 
-Planned: an ingredient table (season per month, price, calories) to **compute** cost, calories and season instead of estimating them.
+- **Ingredient table** (under acceptance testing): calories, season and price of each ingredient, to **compute** the cost, calories and season months of recipes instead of estimating them (see below).
+
+Planned: real drive prices in the ingredient table, through the Shopping module's `prix_reference` tool (contract agreed on both sides); checking generation caps on computed values.
 
 ## Architecture
 
@@ -78,6 +80,25 @@ Other checks around the model's output:
 - bans only apply to **invented** recipes, not to dishes entered by hand or imports.
 
 **Health data**: never committed nor sent to the model; only general nutritional constraints go through.
+
+### Secret party
+
+A checkbox when creating a party, which implies the surprise menu. Children's accounts do not see the party in the meal plan; the read MCP server **keeps quiet** about it as soon as the injected identity is a child's **or is missing** (caution) — today's menu, the week, shopping. An identified adult sees it, with "Surprise!" for the menu.
+
+## Ingredient table: open data, the model chooses among candidates
+
+| Data | Source |
+|---|---|
+| Calories | Ciqual table (ANSES, French food agency, open data), versioned with the module; ≈ 3,100 foods with energy, kcal computed from nutrients per the EU labelling regulation when missing (median gap 0.2 % on foods that have both) |
+| Season | ADEME's seasonal fruit and vegetable calendar (73 products, season months) |
+| Price per kilo, weight of a piece | estimated by the model today; real drive prices next |
+
+- **Rules first**: candidates are found without the model (name words, label before the comma, raw foods first; a small lexicon of compound names: "pomme de terre" (potato) is not "pomme" (apple)); the model (`sophia-local`, temperature 0.1, batches of 8) **chooses among those candidates or none**, and estimates price and weight; an answer outside the candidates is dropped, bounds are checked (€0.2 to €200/kg, 0.1 to 5,000 g).
+- A value **corrected by hand** is never overwritten, neither by the model nor by a drive price.
+- **Computation**: grams per unit (spoon, clove, bunch, pinch, centilitre…); calories and cost **replace the estimate only if everything that counts is known**, the original estimate is kept and comes back if a value is missing; the card marks an estimated value with "≈".
+- **Season**: the months when all the dish's fruit and vegetables are in season; a dish labelled "winter" in the old spreadsheet but made of carrots becomes seasonal in October.
+- **Real prices** (to be wired): weight, volume and pieces are **never converted** — a line by weight takes the price per kilo, by volume the price per litre, a piece the price per piece, otherwise no cost for that line.
+- A background task fills in new ingredients (seed, imports, generations) and recomputes recipes: ≈ 250 ingredients in about twenty minutes; 5 rare ingredients without a candidate must be entered by hand.
 
 ## Measurements
 
