@@ -61,6 +61,12 @@ Only validated information is integrated into persistent memory (`sophia-memory`
 
 ---
 
+## Status
+
+**Planned.** The tribunal is not in service yet. Until then, every path that depends on it is closed: the delegation dispatcher's rules refuse any consultation whose answer would have to go through the tribunal, and nothing coming from the web is stored in memory.
+
+---
+
 ## Objective
 
 Limit knowledge base self-contamination, error amplification, and model collapse effects.
