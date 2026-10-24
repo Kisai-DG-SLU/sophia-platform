@@ -16,12 +16,31 @@ Le bus de messages des agents : chaque agent reçoit ses demandes dans sa file, 
 | Disque | `disk_free_limit.absolute = 1GB` | publications suspendues avant que le disque système ne soit plein (50 Mo par défaut) |
 | Déploiement | `Recreate`, une réplique | volume `ReadWriteOnce` : jamais deux RabbitMQ sur le même répertoire |
 | Comptes | **définitions importées à chaque démarrage** : vhost `/sophia`, un compte par agent et un pour le relais de visualisation, droits ; gabarit **sans secret** dans le `ConfigMap`, mots de passe insérés par un initContainer depuis un Secret, dans un volume en mémoire | les comptes et leurs droits sont décrits dans le dépôt et rejoués à l'identique ; le mot de passe est haché à l'import ; l'initContainer échoue si un compte du gabarit n'a pas de mot de passe |
-| Droits d'un agent | publier sur `sophia.agents` et `sophia.events` ; lire sa seule file `sophia.agent.<nom>` ; ne rien configurer | pas d'écriture sur l'exchange par défaut : un agent ne peut pas déposer dans la file d'un autre ; droits provisoires, revus avec la topologie des événements |
+| Droits d'un agent | publier sur `sophia.agents` et `sophia.events` ; lire sa seule file `sophia.agent.<nom>` ; ne rien configurer | pas d'écriture sur l'exchange par défaut : un agent ne peut pas déposer dans la file d'un autre ; toute la topologie est déclarée par l'import (voir ci-dessous) |
 | Relais de visualisation | file temporaire (`amq.gen-*`) liée à `sophia.events`, sans publier | lecture en direct des événements, sans rien pouvoir émettre |
 | Administrateur interne | dans les définitions (Secret `rabbitmq-admin-creds`) | avec des définitions, RabbitMQ ne crée plus `RABBITMQ_DEFAULT_USER` sur un volume neuf |
 | Interface d'administration | plugin `rabbitmq_auth_backend_oauth2` : jetons du realm, client **public PKCE** `rabbitmq` ; **connexion par mot de passe désactivée** (`management.oauth_disable_basic_auth`) | une seule identité pour toutes les consoles ; les agents gardent leurs comptes internes en AMQP (`auth_backends` : OAuth2, puis interne) |
 | Droits des personnes | les groupes Keycloak (claim `groups`) deviennent des scopes (`additional_scopes_key`) ; seul le groupe `admin` reçoit un alias de droits complets (`scope_aliases.admin`) | un compte du realm hors du groupe `admin` n'a aucun droit dans RabbitMQ |
 | Clés de signature | `jwks_uri` en **HTTPS** par le nom public de Keycloak, certificat vérifié (`hostname_verification = wildcard` pour le certificat joker du routeur) | RabbitMQ refuse un `jwks_uri` en HTTP, or l'adresse interne de Keycloak est en HTTP |
+
+## Topologie
+
+Les délégations entre agents passent par [Temporal](../temporal/) ; RabbitMQ ne porte que les **événements** et les **messages simples**. Tout est déclaré par l'import des définitions (`00-config.yaml`) : aucun client ne configure quoi que ce soit.
+
+| Objet | Type | Rôle |
+|---|---|---|
+| `sophia.agents` | exchange `direct` | message simple à un agent, clé de routage = nom de l'agent |
+| `sophia.agent.<nom>` | file quorum, une par agent | boîte de l'agent ; politique `sophia-agents` : lettres mortes vers `sophia.dlx`, 5 livraisons au plus, `at-least-once`, 10 000 messages puis **refus à la publication** (l'émetteur reçoit un *nack* : rien ne se perd en silence) |
+| `sophia.events` | exchange `topic` | événements (délégation commencée, terminée…), clé `<agent>.<événement>` ; lu en direct par le relais de visualisation |
+| `sophia.dlx` → `sophia.dlq` | `fanout` → file quorum | lettres mortes ; politique `sophia-dlq` : 30 jours, 10 000 messages (les plus anciens tombent) ; lue par l'administrateur |
+
+| Compte | configure | write | read |
+|---|---|---|---|
+| agent `<nom>` | rien | `sophia.agents`, `sophia.events` | `sophia.agent.<nom>` |
+| relais de visualisation | `amq.gen-*` | `amq.gen-*` | `sophia.events`, `amq.gen-*` |
+| administrateur | tout | tout | tout |
+
+Côté clients : déclarer files et exchanges en `passive=True` (pas de droit `configure`), `ack` manuel, `user_id` = nom du compte (RabbitMQ refuse une valeur différente). Un compte, une file ou une liaison s'ajoute dans le gabarit, jamais depuis un client.
 
 ## Fichiers
 
@@ -65,7 +84,7 @@ unset ARGS p
 
 3. Keycloak : client `rabbitmq` du realm ([`../../identity/`](../../identity/)) ; EgressFirewall du namespace ouvert vers `${IDP_HOST}` en 443 ([`../network/policies.yaml`](../network/policies.yaml)) — **sans cette règle, la connexion à l'interface échoue** : le nom public résout vers le nœud, hors des réseaux internes autorisés.
 4. `00` à `05` : `--dry-run=server`, puis `apply`.
-5. Vérifier : pod `Running` et prêt, `rabbitmq-diagnostics status` sans alarme, `rabbitmqctl list_users` et `list_permissions -p /sophia` conformes au gabarit, interface d'administration joignable par le VPN (connexion par Keycloak, refusée hors du groupe `admin`), port 5672 refusé depuis un autre namespace que celui des agents.
+5. Vérifier : pod `Running` et prêt, `rabbitmq-diagnostics status` sans alarme, `rabbitmqctl list_users`, `list_permissions`, `list_queues name type policy`, `list_exchanges` et `list_bindings` (`-p /sophia`) conformes au gabarit, interface d'administration joignable par le VPN (connexion par Keycloak, refusée hors du groupe `admin`), port 5672 refusé depuis un autre namespace que celui des agents.
 
 **Ajouter un compte** : l'ajouter au gabarit de `00-config.yaml`, ajouter sa clé à `rabbitmq-users`, redémarrer RabbitMQ. Un compte retiré du gabarit n'est **pas** supprimé : `rabbitmqctl delete_user`.
 
@@ -73,4 +92,4 @@ unset ARGS p
 
 ## Suite
 
-Restent la topologie des événements (exchanges `sophia.agents` et `sophia.events`, files quorum `sophia.agent.<nom>`, file de rebut), le format des messages et l'intégration dans les agents ; les délégations entre agents passent par [Temporal](../temporal/).
+Restent le format des messages et l'intégration dans les agents (un worker Temporal par agent, événements publiés sur `sophia.events`, identifiant de tâche propagé partout).
