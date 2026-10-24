@@ -14,7 +14,7 @@ Ce document présente SophIA en trois longueurs : une phrase, trente secondes, t
 
 Les organisations veulent des agents d'IA. Mais elles ne peuvent pas confier leurs données sensibles à des plateformes opaques hors de leur juridiction, ni laisser des agents autonomes agir sans garde-fous.
 
-SophIA est une architecture de référence qui répond à ces deux contraintes. Elle repose sur un cluster que l'organisation contrôle. Chaque agent spécialisé vit dans un environnement confiné, avec des droits minimaux, et les actions critiques attendent une validation humaine. La mémoire est versionnée dans Git. Un routeur de modèles accepte n'importe quel modèle, local ou distant.
+SophIA est une architecture de référence qui répond à ces deux contraintes. Elle repose sur un cluster que l'organisation contrôle. Les agents spécialisés n'ont que des droits minimaux et ne se parlent jamais : chaque demande passe par un répartiteur qui décide par des règles, sans modèle, et les actions critiques attendent une validation humaine. La mémoire est versionnée dans Git. Les modèles tournent en local, derrière un routeur qui accepte n'importe quel modèle.
 
 On change de modèle sans changer d'architecture, et chaque décision reste auditable.
 
@@ -38,9 +38,9 @@ Adopter l'IA aujourd'hui, c'est accepter trois risques :
 
 Un modèle peut halluciner. Avec SophIA, ses erreurs restent sans conséquence :
 
+- le code orchestre, le modèle réfléchit, les règles décident : le modèle propose en sortie contrainte, des règles valident, une compétence déterministe exécute ;
 - un agent qui génère une commande destructrice est arrêté par le contrôle d'accès du cluster ;
 - une action de modification attend une validation humaine, imposée par le code et non par une consigne ;
-- les sous-agents ne communiquent qu'en JSON strict, et tout écart est rejeté ;
 - le réseau limite chaque composant à son périmètre.
 
 Ces garde-fous fonctionnent quel que soit le modèle, du plus petit au plus grand.
@@ -50,13 +50,13 @@ Ces garde-fous fonctionnent quel que soit le modèle, du plus petit au plus gran
 | Pilier | Ce que cela apporte |
 |---|---|
 | **Souveraineté** | Infrastructure Kubernetes maîtrisée, stockage local, mémoire de projet dans une forge Git auto-hébergée. Routeur de modèles agnostique : un modèle local ou distant est un choix de routage, pas une dépendance. |
-| **Panthéon agentique** | Des agents spécialisés, un domaine chacun : développement en sandbox, déploiement, maintenance, supervision en lecture seule. Droits minimaux, validation humaine sur les actions critiques. |
+| **Panthéon agentique** | Des agents spécialisés, un domaine chacun : développement en sandbox, déploiement, maintenance, supervision en lecture seule. Ils sont joints par un seul répartiteur, qui décide par des règles ; droits minimaux, validation humaine sur les actions critiques. |
 | **Mémoire RAG 5D** | Cinq dimensions complémentaires : vectorielle, relationnelle, versionnée, structurelle, graphe. Chaque fait retrouvé peut être relié à sa source. |
 | **Sécurité par conception** | Acquisition web isolée et nettoyée (Sas Paranoïaque), validation croisée avant ingestion (Tribunal Sémantique), requêtes leurres (Ghost Search), filtrage des fuites (DLP), journalisation des interactions. |
 
 ### 4. Ce qui différencie SophIA
 
-SophIA n'est pas un produit de plus. C'est **une recette reproductible** qui assemble des composants existants (Kubernetes, LiteLLM, Qdrant, PostgreSQL, Forgejo, agents Hermes) de manière cohérente.
+SophIA n'est pas un produit de plus. C'est **une recette reproductible** qui assemble des composants existants (Kubernetes, LiteLLM, llama.cpp, Keycloak, Temporal, RabbitMQ, Qdrant, PostgreSQL, Forgejo, Hermes Agent) de manière cohérente.
 
 - **Reproductible** : l'infrastructure est décrite et versionnée.
 - **Auditable** : les décisions, le code et la mémoire sont tracés dans Git.
@@ -68,31 +68,33 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 
 **Opérationnel aujourd'hui**
 
-- Cluster Kubernetes (OKD) mono-nœud sur serveur physique, accès VPN, GPU disponible.
-- Forge Git auto-hébergée, source de vérité du code et de la mémoire des projets.
-- Routeur de modèles unifié, avec plusieurs profils (routine, réflexion, architecture).
-- Environnements de développement isolés, pilotés par des agents.
-- Interface de discussion connectée au routeur, sans aucune clé dans le navigateur.
-- Agents du panthéon déployés, chacun dans son propre environnement.
-- Base vectorielle et service d'embedding en service.
+- Cluster Kubernetes (OKD) mono-nœud sur serveur physique, accès par VPN seulement, identité unique (SSO) pour toutes les interfaces.
+- Inférence locale sur le GPU du serveur (texte et vision), voix et images sur CPU, sans accès réseau ; modèle local par défaut de l'interface et des modules.
+- Routeur de modèles unifié : local et distant derrière les mêmes alias.
+- Interface de discussion connectée au routeur et à des outils locaux (géographie, images), sans aucune clé dans le navigateur.
+- Acquisition web isolée par le sas, première brique du Sas Paranoïaque.
+- Répartiteur des délégations, workflows durables et bus d'événements ; premier agent exécutant (développement) en recette.
+- Forge Git auto-hébergée, source de vérité du code et de la mémoire des projets ; environnements de développement isolés.
+- Base vectorielle et service d'embedding.
 
 **En cours**
 
-- Inférence sur GPU local. Aujourd'hui, les modèles passent par un fournisseur distant via le routeur : la souveraineté est garantie par la conception, pas encore par l'exploitation.
-- Pipeline d'ingestion de la mémoire et dimension graphe.
-- Bus de communication entre agents.
+- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique.
+- L'interface comme demandeur du répartiteur ; planificateur des objectifs ouverts.
+- API mémoire, pipeline d'ingestion et dimension graphe.
 
 **Prévu**
 
-- Sas Paranoïaque, Tribunal Sémantique, filtre DLP.
-- Permissions par rôle et niveaux de confidentialité de la mémoire.
+- Observabilité et workflow « incident » ; supervision, déploiement et maintenance derrière le répartiteur.
+- Tribunal Sémantique, Ghost Search, filtre DLP.
+- Niveaux de confidentialité de la mémoire.
 - Paquets de déploiement reproductibles et multi-locataires.
 
 Le détail est dans la [feuille de route](roadmap.md).
 
 ### 6. La suite
 
-- **Démonstration** : la même question posée à un modèle distant puis à un modèle local, depuis la même interface, sans que les données locales quittent le cluster.
+- **Démonstration** : la même question posée à un modèle distant puis au modèle local, depuis le même sélecteur de l'interface ; avec le modèle local, rien ne quitte le cluster.
 - **Livre blanc** technique, en préparation.
 - **Ouverture** aux retours d'ingénieurs, de chercheurs et d'organisations intéressés par une IA souveraine.
 
@@ -101,10 +103,10 @@ Le détail est dans la [feuille de route](roadmap.md).
 ## Questions fréquentes
 
 **SophIA est-elle souveraine aujourd'hui ?**
-Elle l'est par sa conception : l'infrastructure, la mémoire et le contrôle d'accès sont maîtrisés. L'inférence passe encore par un fournisseur distant, et le passage au GPU local est en cours. Le routeur rend cette bascule transparente pour les utilisateurs et les agents.
+En grande partie : l'infrastructure, la mémoire, le contrôle d'accès et l'inférence de l'interface et des modules sont locaux. Les agents passent encore par des modèles distants pour les essais ; leur passage au modèle local est en cours, sans rien changer d'autre qu'un routage.
 
 **Faut-il un très gros modèle ?**
-Non. Le confinement, la validation humaine et le format de sortie imposé ne dépendent pas des capacités du modèle.
+Non. Le confinement, les règles, la validation humaine et la sortie contrainte ne dépendent pas des capacités du modèle. Les tâches sont découpées en petites décisions, à la portée d'un modèle local modeste.
 
 **Pourquoi ne pas utiliser une plateforme existante ?**
 Parce que l'objectif est le contrôle : chaque brique est open source, remplaçable et auditable, et l'ensemble peut être reproduit sur l'infrastructure de l'organisation.

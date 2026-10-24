@@ -14,7 +14,7 @@ This document presents SophIA at three lengths: one sentence, thirty seconds, th
 
 Organizations want AI agents. But they cannot hand their sensitive data to opaque platforms outside their jurisdiction, nor let autonomous agents act without guardrails.
 
-SophIA is a reference architecture that answers both constraints. It runs on a cluster the organization controls. Each specialized agent lives in a confined environment with minimal rights, and critical actions wait for human approval. Memory is versioned in Git. A model router accepts any model, local or remote.
+SophIA is a reference architecture that answers both constraints. It runs on a cluster the organization controls. Specialized agents have minimal rights and never talk to each other: every request goes through a dispatcher that decides by rules, without a model, and critical actions wait for human approval. Memory is versioned in Git. Models run locally, behind a router that accepts any model.
 
 You change models without changing the architecture, and every decision stays auditable.
 
@@ -38,9 +38,9 @@ On top of that, the ecosystem is fragmented. Every team hand-assembles tools tha
 
 A model may hallucinate. With SophIA, its mistakes have no consequences:
 
+- code orchestrates, the model thinks, rules decide: the model proposes in constrained output, rules validate, a deterministic skill executes;
 - an agent generating a destructive command is stopped by the cluster's access control;
 - a mutating action waits for human approval, enforced by code rather than by an instruction;
-- sub-agents communicate only in strict JSON, and any deviation is rejected;
 - the network confines each component to its perimeter.
 
 These guardrails work with any model, from the smallest to the largest.
@@ -50,13 +50,13 @@ These guardrails work with any model, from the smallest to the largest.
 | Pillar | What it brings |
 |---|---|
 | **Sovereignty** | Controlled Kubernetes infrastructure, local storage, project memory in a self-hosted Git forge. Model-agnostic router: a local or remote model is a routing choice, not a dependency. |
-| **Agentic Pantheon** | Specialized agents, one domain each: sandboxed development, deployment, maintenance, read-only supervision. Minimal rights, human approval on critical actions. |
+| **Agentic Pantheon** | Specialized agents, one domain each: sandboxed development, deployment, maintenance, read-only supervision. They are reached by a single dispatcher, which decides by rules; minimal rights, human approval on critical actions. |
 | **5D RAG memory** | Five complementary dimensions: vector, relational, versioned, structural, graph. Every retrieved fact can be traced back to its source. |
 | **Security by design** | Isolated and sanitized web acquisition (Paranoid Airlock), cross-validation before ingestion (Semantic Tribunal), decoy queries (Ghost Search), leak filtering (DLP), interaction logging. |
 
 ### 4. What sets SophIA apart
 
-SophIA is not yet another product. It is **a reproducible recipe** that assembles existing components (Kubernetes, LiteLLM, Qdrant, PostgreSQL, Forgejo, Hermes agents) coherently.
+SophIA is not yet another product. It is **a reproducible recipe** that assembles existing components (Kubernetes, LiteLLM, llama.cpp, Keycloak, Temporal, RabbitMQ, Qdrant, PostgreSQL, Forgejo, Hermes Agent) coherently.
 
 - **Reproducible**: the infrastructure is described and versioned.
 - **Auditable**: decisions, code and memory are tracked in Git.
@@ -68,31 +68,33 @@ SophIA is an experimental architecture under construction. We separate what work
 
 **Operational today**
 
-- Single-node Kubernetes (OKD) cluster on a physical server, VPN access, GPU available.
-- Self-hosted Git forge, source of truth for code and project memory.
-- Unified model router with several profiles (routine, reasoning, architecture).
-- Isolated development environments driven by agents.
-- Chat interface connected to the router, with no key in the browser.
-- Pantheon agents deployed, each in its own environment.
-- Vector database and embedding service running.
+- Single-node Kubernetes (OKD) cluster on a physical server, VPN-only access, single sign-on (SSO) for every interface.
+- Local inference on the server's GPU (text and vision), voice and images on CPU, without network access; local model by default for the interface and modules.
+- Unified model router: local and remote behind the same aliases.
+- Chat interface connected to the router and to local tools (geography, images), with no key in the browser.
+- Isolated web acquisition through the airlock, first brick of the Paranoid Airlock.
+- Delegation dispatcher, durable workflows and event bus; first executor agent (development) in acceptance testing.
+- Self-hosted Git forge, source of truth for code and project memory; isolated development environments.
+- Vector database and embedding service.
 
 **In progress**
 
-- Inference on the local GPU. Today, models go through a remote provider via the router: sovereignty is guaranteed by design, not yet in operation.
-- Memory ingestion pipeline and graph dimension.
-- Inter-agent messaging bus.
+- Pantheon agents on the local model, with priority to chat on the graphics card.
+- The interface as a requester of the dispatcher; planner for open goals.
+- Memory API, ingestion pipeline and graph dimension.
 
 **Planned**
 
-- Paranoid Airlock, Semantic Tribunal, DLP filter.
-- Role-based permissions and memory confidentiality levels.
+- Observability and "incident" workflow; supervision, deployment and maintenance behind the dispatcher.
+- Semantic Tribunal, Ghost Search, DLP filter.
+- Memory confidentiality levels.
 - Reproducible, multi-tenant deployment packages.
 
 Details are in the [roadmap](roadmap.en.md).
 
 ### 6. What comes next
 
-- **Demonstration**: the same question asked to a remote model and then to a local model, from the same interface, without local data leaving the cluster.
+- **Demonstration**: the same question asked to a remote model and then to the local model, from the same selector in the interface; with the local model, nothing leaves the cluster.
 - **Technical white paper**, in preparation.
 - **Openness** to feedback from engineers, researchers and organizations interested in sovereign AI.
 
@@ -101,10 +103,10 @@ Details are in the [roadmap](roadmap.en.md).
 ## Frequently asked questions
 
 **Is SophIA sovereign today?**
-It is by design: infrastructure, memory and access control are under control. Inference still goes through a remote provider, and the move to the local GPU is under way. The router makes this switch transparent to users and agents.
+Largely: infrastructure, memory, access control and inference for the interface and modules are local. Agents still use remote models for testing; their move to the local model is under way, changing nothing but routing.
 
 **Do you need a very large model?**
-No. Confinement, human approval and enforced output format do not depend on the model's capabilities.
+No. Confinement, rules, human approval and constrained output do not depend on the model's capabilities. Tasks are broken into small decisions, within reach of a modest local model.
 
 **Why not use an existing platform?**
 Because the goal is control: every component is open source, replaceable and auditable, and the whole can be reproduced on the organization's own infrastructure.
