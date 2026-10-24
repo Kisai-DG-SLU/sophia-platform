@@ -10,8 +10,8 @@ Exécution durable des délégations entre agents : chaque délégation est un *
 | Forme | un pod, quatre services (frontend, history, matching, worker) et un frontend interne | un seul nœud aujourd'hui ; séparables par `TEMPORAL_SERVICES` sans toucher à la base (les pods se trouvent par la table d'appartenance) |
 | Base | `temporal` et `temporal_visibility` dans le PostgreSQL partagé, rôle `temporal` | pas de base de plus à exploiter ; pool de connexions borné par service (au plus 28) |
 | Shards de l'historique | **128, irréversible** | fixé à la création de la base : en changer veut dire migrer vers un autre cluster Temporal |
-| Point d'entrée | Service `temporal-frontend:7233` (gRPC) | clients : agents (namespace des agents), interface, Jobs d'administration, réseau du nœud |
-| Autorisation | **jeton Keycloak à chaque appel** ; droits dans le claim `permissions` sous la forme `namespace:rôle` (`sophia:write`, `temporal-system:admin`) | un compte de service par agent (`sophia:write`), un pour l'administration ; aucun appel anonyme |
+| Point d'entrée | Service `temporal-frontend:7233` (gRPC) | clients : le [répartiteur](../repartiteur/) (seul client applicatif ; les agents n'ont aucun accès à Temporal), l'interface, les Jobs d'administration |
+| Autorisation | **jeton Keycloak à chaque appel** ; droits dans le claim `permissions` sous la forme `namespace:rôle` (`sophia:write`, `temporal-system:admin`) | un compte de service pour le répartiteur (`temporal-repartiteur`, `sophia:write`), un pour l'administration ; les anciens comptes par agent sont désactivés ; aucun appel anonyme ; l'auteur authentifié de chaque signal est inscrit dans l'historique (`frontend.enablePrincipalPropagation`) |
 | Tâches système | frontend interne (7236) sans jeton, joignable entre pods Temporal seulement | configuration officielle de Temporal avec autorisation |
 | Chiffrement | **TLS vérifié**, clients et entre services : certificat de service d'OKD pour `temporal-frontend.sophia-core.svc`, renouvelé par le cluster | le trafic reste chiffré le jour où les services seront sur plusieurs nœuds ; avertissement 30 j avant l'expiration, erreur à 7 j |
 | Interface | `temporal-ui` derrière un **oauth2-proxy** (groupe `admin` du realm), qui transmet le jeton d'identité | l'interface ne filtre pas par groupe ; le serveur refuse tout appel sans jeton |
@@ -23,7 +23,7 @@ Exécution durable des délégations entre agents : chaque délégation est un *
 |---|---|
 | `01-schema-job.yaml` | Job de création et de mise à jour des schémas (rejouable) |
 | `02-server.yaml` | configuration dynamique, autorité de certification, serveur, Services (dont l'annotation du certificat) |
-| `03-network-policy.yaml` | entrée de Temporal (agents, interface, Jobs, réseau du nœud, entre pods Temporal) et de Postgres (Temporal) ; l'entrée de l'interface (routeur) est dans `04-ui.yaml` |
+| `03-network-policy.yaml` | entrée de Temporal (répartiteur, interface, Jobs, entre pods Temporal) et de Postgres (Temporal) ; l'entrée de l'interface (routeur) est dans `04-ui.yaml` |
 | `04-ui.yaml` | interface, oauth2-proxy, Route `edge` |
 | `05-namespace-job.yaml` | création du namespace `sophia` (jeton du compte d'administration) |
 | `06-smoke-test-job.yaml` | recette : appel sans jeton refusé, puis un workflow « bonjour » de bout en bout |

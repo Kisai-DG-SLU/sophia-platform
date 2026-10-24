@@ -16,7 +16,7 @@ Le bus de messages des agents : chaque agent reçoit ses demandes dans sa file, 
 | Disque | `disk_free_limit.absolute = 1GB` | publications suspendues avant que le disque système ne soit plein (50 Mo par défaut) |
 | Déploiement | `Recreate`, une réplique | volume `ReadWriteOnce` : jamais deux RabbitMQ sur le même répertoire |
 | Comptes | **définitions importées à chaque démarrage** : vhost `/sophia`, un compte par agent et un pour le relais de visualisation, droits ; gabarit **sans secret** dans le `ConfigMap`, mots de passe insérés par un initContainer depuis un Secret, dans un volume en mémoire | les comptes et leurs droits sont décrits dans le dépôt et rejoués à l'identique ; le mot de passe est haché à l'import ; l'initContainer échoue si un compte du gabarit n'a pas de mot de passe |
-| Droits d'un agent | publier sur `sophia.agents` et `sophia.events` ; lire sa seule file `sophia.agent.<nom>` ; ne rien configurer | pas d'écriture sur l'exchange par défaut : un agent ne peut pas déposer dans la file d'un autre ; toute la topologie est déclarée par l'import (voir ci-dessous) |
+| Droits d'un agent | aucune écriture ; lecture de sa file `sophia.agent.<nom>`, sans usage depuis le répartiteur, en attendant son retrait ; ne rien configurer | les agents sont des exécutants, joints par le seul répartiteur, **seul éditeur** sur `sophia.events` (clés `<demandeur>.delegate.<événement>`, par `topic_permissions`) |
 | Relais de visualisation | file temporaire (`amq.gen-*`) liée à `sophia.events`, sans publier | lecture en direct des événements, sans rien pouvoir émettre |
 | Administrateur interne | dans les définitions (Secret `rabbitmq-admin-creds`) | avec des définitions, RabbitMQ ne crée plus `RABBITMQ_DEFAULT_USER` sur un volume neuf |
 | Interface d'administration | plugin `rabbitmq_auth_backend_oauth2` : jetons du realm, client **public PKCE** `rabbitmq` ; **connexion par mot de passe désactivée** (`management.oauth_disable_basic_auth`) | une seule identité pour toutes les consoles ; les agents gardent leurs comptes internes en AMQP (`auth_backends` : OAuth2, puis interne) |
@@ -31,12 +31,13 @@ Les délégations entre agents passent par [Temporal](../temporal/) ; RabbitMQ n
 |---|---|---|
 | `sophia.agents` | exchange `direct` | message simple à un agent, clé de routage = nom de l'agent |
 | `sophia.agent.<nom>` | file quorum, une par agent | boîte de l'agent ; politique `sophia-agents` : lettres mortes vers `sophia.dlx`, 5 livraisons au plus, `at-least-once`, 10 000 messages puis **refus à la publication** (l'émetteur reçoit un *nack* : rien ne se perd en silence) |
-| `sophia.events` | exchange `topic` | événements (délégation commencée, terminée…), clé `<agent>.<événement>` ; lu en direct par le relais de visualisation |
+| `sophia.events` | exchange `topic` | événements (délégation commencée, terminée…), clé `<demandeur>.delegate.<événement>`, publiés par le répartiteur seul ; lu en direct par le relais de visualisation |
 | `sophia.dlx` → `sophia.dlq` | `fanout` → file quorum | lettres mortes ; politique `sophia-dlq` : 30 jours, 10 000 messages (les plus anciens tombent) ; lue par l'administrateur |
 
 | Compte | configure | write | read |
 |---|---|---|---|
-| agent `<nom>` | rien | `sophia.agents`, `sophia.events` | `sophia.agent.<nom>` |
+| agent `<nom>` | rien | rien | `sophia.agent.<nom>` |
+| répartiteur | rien | `sophia.events` (clés `<demandeur>.delegate.<événement>`) | rien |
 | relais de visualisation | `amq.gen-*` | `amq.gen-*` | `sophia.events`, `amq.gen-*` |
 | administrateur | tout | tout | tout |
 
@@ -92,4 +93,4 @@ unset ARGS p
 
 ## Suite
 
-Restent le format des messages et l'intégration dans les agents (un worker Temporal par agent, événements publiés sur `sophia.events`, identifiant de tâche propagé partout).
+Les événements des délégations sont publiés par le [répartiteur](../repartiteur/). Restent leurs consommateurs, et le retrait des files `sophia.agent.<nom>` et de l'exchange `sophia.agents`, devenus inutiles.

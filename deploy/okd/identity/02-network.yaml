@@ -35,10 +35,11 @@ spec:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-apps }
         # oauth2-proxy de l'interface Temporal (jeton, clés) ; serveur Temporal
-        # (clés de signature) et Jobs d'administration (jeton du compte temporal-admin)
+        # (clés de signature), Jobs d'administration (jeton du compte temporal-admin) et
+        # répartiteur (jeton du compte temporal-repartiteur)
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-core }
           podSelector:
             matchExpressions:
-              - { key: app, operator: In, values: [temporal-ui, temporal, temporal-admin] }
+              - { key: app, operator: In, values: [temporal-ui, temporal, temporal-admin, repartiteur] }
         - podSelector: {}
