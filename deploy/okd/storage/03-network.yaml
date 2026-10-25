@@ -1,0 +1,67 @@
+# Réseau de sophia-storage : tout refusé, entrées et sorties.
+#   entrée : passerelle S3 (8443) depuis le routeur (Route, VPN : URL présignées envoyées par le
+#            navigateur), depuis le namespace de l'espace de travail (application de fichiers) et
+#            depuis le Job d'initialisation ;
+#   sortie : DNS seulement (aucun besoin d'Internet ni d'un autre service).
+# Consommateurs suivants (mémoire, modules) : une entrée chacun, ajoutée ici.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: sophia-storage
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: s3-ingress
+  namespace: sophia-storage
+spec:
+  podSelector:
+    matchLabels: { app: s3 }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: "${WORKSPACE_NAMESPACE}" }
+        - podSelector:
+            matchLabels: { app: s3-init }
+      ports:
+        - { protocol: TCP, port: 8443 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: sophia-storage
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+---
+# Le Job d'initialisation parle à la passerelle S3 (Service s3 → pod, 8443)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: s3-init-egress
+  namespace: sophia-storage
+spec:
+  podSelector:
+    matchLabels: { app: s3-init }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app: s3 }
+      ports:
+        - { protocol: TCP, port: 8443 }

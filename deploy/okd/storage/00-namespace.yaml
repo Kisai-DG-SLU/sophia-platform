@@ -1,0 +1,30 @@
+# Stockage objet S3 commun (SeaweedFS). Consommateurs : bureautique (namespace de l'espace de travail),
+# puis mémoire (RAG) et modules, chacun avec son identité et son seau.
+# Adresse interne : https://s3.sophia-storage.svc:9000 ; externe (VPN) : https://${S3_HOST}.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sophia-storage
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-quota
+  namespace: sophia-storage
+spec:
+  hard:
+    # SeaweedFS 2 + Job d'initialisation 0,5 + marge
+    limits.memory: 3Gi
+    limits.cpu: "3"
+    pods: "4"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: storage-defaults
+  namespace: sophia-storage
+spec:
+  limits:
+    - type: Container
+      default: { cpu: 500m, memory: 512Mi }
+      defaultRequest: { cpu: 20m, memory: 64Mi }

@@ -1,0 +1,38 @@
+# Volume du S3. Préalable sur le nœud (README, étape 1) : volume logique XFS dédié, monté par fstab
+# sur ${S3_MOUNT_POINT}, étiqueté container_file_t. Extensible à chaud (lvextend + xfs_growfs),
+# puis capacité du PV relevée.
+# PV et PVC désignés l'un l'autre : aucune autre PVC ne peut le prendre.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-s3
+  labels: { app: s3 }
+spec:
+  capacity: { storage: "${S3_SIZE}" }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: ${S3_MOUNT_POINT}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: ["${NODE_NAME}"] }
+  claimRef:
+    namespace: sophia-storage
+    name: s3-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s3-data
+  namespace: sophia-storage
+  labels: { app: s3 }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-s3
+  resources:
+    requests: { storage: "${S3_SIZE}" }
