@@ -1,0 +1,26 @@
+# Quota et valeurs par défaut du namespace de la mémoire.
+# Le quota porte sur les limits : tout nouveau pod doit en avoir ; sans valeur explicite, le
+# LimitRange en donne une. Les pods déjà en service ne sont pas touchés.
+# Base de la taille : embedding 2 CPU / 4 Gi, graphe 2 CPU / 8 Gi (tas 4 Go et cache 2 Go),
+# ingestion et base vectorielle ; pics relevés sur 7 jours bien en dessous.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: memory-quota
+  namespace: ${SOPHIA_MEMORY_NAMESPACE:-sophia-memory}
+spec:
+  hard:
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    pods: "10"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: memory-defaults
+  namespace: ${SOPHIA_MEMORY_NAMESPACE:-sophia-memory}
+spec:
+  limits:
+    - type: Container
+      default: { cpu: 500m, memory: 512Mi }
+      defaultRequest: { cpu: 20m, memory: 64Mi }
