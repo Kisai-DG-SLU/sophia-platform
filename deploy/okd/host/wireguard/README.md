@@ -26,6 +26,7 @@ Toute adresse hors de `${VPN_ADMIN_RANGE}` est un appareil **utilisateur** : HTT
 | `sophia-wg-filter.service` | charge le filtre au démarrage, avant le réseau, puis lance le garde-fou |
 | `wg-filter-check.sh` | **garde-fou** : relit tout le ruleset avec le nft d'OVN-Kubernetes ; illisible → supprime la table et alerte dans le journal (le cluster prime, le VPN n'est **jamais** coupé) |
 | `sophia-wg-filter-check.{service,timer}` | relance le garde-fou 3 min après le démarrage puis toutes les 15 min (mises à jour d'OKD) |
+| `test-garde-fou-metrique.sh` | banc local, **sous Linux seulement** : compare l'ancien et le nouveau garde-fou avec de faux `crictl`, `podman`, `nft` et `logger` |
 | `test-nft-ovn.sh` | teste expression par expression ce que le nft d'OVN sait relire (tables sans hook, supprimées aussitôt) |
 | `add-peer.sh` | ajoute un appareil : nom, adresse, **clé publique** ; contrôles (format, doublons, plage), sauvegarde du profil, application sans couper les tunnels |
 
@@ -130,7 +131,17 @@ Si le garde-fou a retiré la table : le cluster tourne mais **le VPN n'est plus 
 
 **Règles à retenir :** ne jamais lancer `nft flush ruleset` ; ne jamais toucher aux tables d'OVN ni d'OpenShift ; tout test nftables se fait dans une table **sans hook**, supprimée dans la foulée ; tout chargement d'un filtre se fait sous interrupteur automatique.
 
+## 5. Garde-fou en métrique
+
+À chaque passage, le garde-fou écrit son code (0 lisible, 1 table retirée, 2 vérification impossible) et un horodatage dans `/var/lib/sophia/metrics/wg_filter.prom`, que lit l'exporteur du nœud ([`../../monitoring/`](../../monitoring/)). Trois alertes en découlent : filtre retiré, vérification impossible, garde-fou muet depuis plus de 45 minutes. L'écriture est atomique (fichier temporaire, puis `mv`) et **toute erreur est ignorée** : ni les décisions, ni les actions, ni les codes de sortie du garde-fou ne changent.
+
+C'est le seul chemin d'administration : un changement du garde-fou s'installe avec la même prudence que le filtre.
+
+1. **Banc, avant toute installation** : `bash deploy/okd/host/wireguard/test-garde-fou-metrique.sh <copie de l'ancien script>`, à la racine du dépôt, sous Linux. Il croise 5 scénarios d'OVN-Kubernetes et 3 états du fichier de métrique (inscriptible, absent, en erreur) ; le code de sortie et la suite exacte des actions doivent être identiques. Attendu : `AUCUN ÉCART (15 cas)` ; sinon, on n'installe pas. Le banc refuse de tourner sans `sed` GNU (code 2) : le garde-fou utilise `\+` dans ses expressions, que le `sed` BSD ne comprend pas, et un banc lancé ailleurs ne prouverait pas le comportement du nœud.
+2. **Installation**, hors de l'heure d'usage, la session d'administration restant ouverte : `bash -n`, ancien script mis de côté sur le nœud, installation, puis **un passage identique à celui de la minuterie**, sans recharger le filtre ni redémarrer `sophia-wg-filter.service`. Attendu : `garde-fou=0`, `sophia_wg_filter_code 0` et un horodatage dans le fichier, table présente ; au passage suivant de la minuterie, l'horodatage avance.
+3. **Retour arrière en une commande** : réinstaller l'ancien script mis de côté et le lancer une fois.
+
 ## Points ouverts
 
 - Plus propre à terme : livrer ces fichiers par une `MachineConfig`, comme le reste de la configuration du nœud. Sur un nœud unique, appliquer une MachineConfig **redémarre le nœud** : à planifier.
-- Le garde-fou alerte dans le journal du nœud ; le relayer vers le canal d'alerte de la plateforme reste à faire.
+- Le garde-fou alerte dans le journal du nœud et en métrique (section 5) ; le relais des alertes vers le répartiteur, puis vers l'administrateur, est prévu avec le workflow « incident ».

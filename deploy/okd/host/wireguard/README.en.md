@@ -25,6 +25,7 @@ Any address outside `${VPN_ADMIN_RANGE}` is a **user** device: HTTP/HTTPS only.
 | `wg-filter.nft` | template of the `inet sophia_wg` nftables table, independent from OVN-Kubernetes: **administration** → whole node + Forgejo; **users** → 80/443 only; **nothing is forwarded** to the local network, pods or Services, except Forgejo for administration |
 | `sophia-wg-filter.service` | loads the filter at boot, before the network, then runs the safeguard |
 | `wg-filter-check.sh` | **safeguard**: re-reads the whole ruleset with OVN-Kubernetes' nft; unreadable → deletes the table and raises a journal alert (the cluster comes first, the VPN is **never** cut) |
+| `test-garde-fou-metrique.sh` | local bench, **Linux only**: compares the old and new safeguard with fake `crictl`, `podman`, `nft` and `logger` |
 | `sophia-wg-filter-check.{service,timer}` | re-runs the safeguard 3 min after boot, then every 15 min (OKD updates) |
 | `test-nft-ovn.sh` | tests, expression by expression, what OVN's nft can read back (hook-less tables, deleted immediately) |
 | `add-peer.sh` | adds a device: name, address, **public key**; checks (format, duplicates, range), profile backup, applied without dropping tunnels |
@@ -130,7 +131,17 @@ If the safeguard removed the table: the cluster runs but **the VPN is no longer 
 
 **Rules to keep:** never run `nft flush ruleset`; never touch OVN or OpenShift tables; every nftables test happens in a **hook-less** table deleted right away; every filter load happens under a dead-man switch.
 
+## 5. Safeguard as a metric
+
+On each run, the safeguard writes its code (0 readable, 1 table removed, 2 check impossible) and a timestamp to `/var/lib/sophia/metrics/wg_filter.prom`, read by the node exporter ([`../../monitoring/`](../../monitoring/)). Three alerts follow: filter removed, check impossible, safeguard silent for more than 45 minutes. The write is atomic (temporary file, then `mv`) and **every error is ignored**: the safeguard's decisions, actions and exit codes do not change.
+
+This is the only administration path: a change to the safeguard is installed with the same care as the filter.
+
+1. **Bench, before any installation**: `bash deploy/okd/host/wireguard/test-garde-fou-metrique.sh <copy of the old script>`, at the repository root, on Linux. It crosses 5 OVN-Kubernetes scenarios with 3 states of the metric file (writable, missing, in error); the exit code and the exact sequence of actions must be identical. Expected: `AUCUN ÉCART (15 cas)`; otherwise, do not install. The bench refuses to run without GNU `sed` (code 2): the safeguard uses `\+` in its expressions, which BSD `sed` does not understand, and a bench run elsewhere would not prove the node's behavior.
+2. **Installation**, outside usage hours, with the administration session kept open: `bash -n`, old script set aside on the node, installation, then **one run identical to the timer's**, without reloading the filter or restarting `sophia-wg-filter.service`. Expected: `garde-fou=0`, `sophia_wg_filter_code 0` and a timestamp in the file, table present; on the timer's next run, the timestamp moves forward.
+3. **Rollback in one command**: reinstall the old script set aside and run it once.
+
 ## Open points
 
 - Cleaner later: ship these files through a `MachineConfig`, like the rest of the node configuration. On a single node, applying a MachineConfig **reboots the node**: to be planned.
-- The safeguard alerts in the node journal; relaying it to the platform's alert channel is still to do.
+- The safeguard alerts in the node journal and as a metric (section 5); relaying alerts to the dispatcher, then to the administrator, is planned with the "incident" workflow.

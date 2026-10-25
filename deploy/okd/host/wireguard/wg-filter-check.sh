@@ -10,6 +10,15 @@
 set -u
 CACHE=/var/lib/sophia/ovn-nft-image   # image OVN de la dernière vérification réussie
 log() { logger -t sophia-wg-filter -p "daemon.$1" -- "$2"; echo "$2" >&2; }
+# État exposé en métrique (lu par l'exporteur du nœud, ../../monitoring/, alertes du filtre). Écriture
+# atomique ; toute erreur est ignorée : la métrique ne change jamais le comportement du garde-fou.
+METRIQUE=/var/lib/sophia/metrics/wg_filter.prom
+metrique() {
+    { mkdir -p "${METRIQUE%/*}" &&
+      printf '# TYPE sophia_wg_filter_code gauge\nsophia_wg_filter_code %s\n# TYPE sophia_wg_filter_horodatage_secondes gauge\nsophia_wg_filter_horodatage_secondes %s\n' \
+        "$1" "$(date +%s)" > "$METRIQUE.tmp" &&
+      chmod 644 "$METRIQUE.tmp" && mv -f "$METRIQUE.tmp" "$METRIQUE"; } 2>/dev/null || true
+}
 
 # Lance « nft list ruleset » avec le nft d'OVN. Affiche le code de nft lui-même,
 # ou « ? » si la vérification n'a pas pu avoir lieu.
@@ -38,9 +47,10 @@ ovn_list_rc() {
 
 rc=$(ovn_list_rc)
 case $rc in
-    0)  log info "ruleset lisible par le nft d'OVN-Kubernetes"; exit 0 ;;
-    \?) log warning "vérification impossible (OVN injoignable, pas d'image en cache) — table inet sophia_wg conservée"; exit 2 ;;
+    0)  log info "ruleset lisible par le nft d'OVN-Kubernetes"; metrique 0; exit 0 ;;
+    \?) log warning "vérification impossible (OVN injoignable, pas d'image en cache) — table inet sophia_wg conservée"; metrique 2; exit 2 ;;
     *)  nft delete table inet sophia_wg 2>/dev/null
         log crit "ALERTE : ruleset illisible par le nft d'OVN (code $rc) — table inet sophia_wg SUPPRIMÉE pour protéger le cluster, VPN NON FILTRÉ (jamais coupé). Voir /etc/sophia/wg-filter.nft."
+        metrique 1
         exit 1 ;;
 esac
