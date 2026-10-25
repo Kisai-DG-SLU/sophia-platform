@@ -7,6 +7,8 @@ Un **module** est une application du foyer ou de l'organisation, construite sur 
 | [Cuisine](cuisine/README.md) | planning des repas, catalogue de recettes, génération de recettes sous règles, courses | SSO, modèle local, PostgreSQL, outil `image`, sas web, MCP vers la discussion et vers le module Courses |
 | [Courses](courses/README.md) | choix des produits d'un drive selon les règles du foyer, remplissage du vrai panier, panier express depuis la discussion | SSO, modèle local, PostgreSQL, navigateur distant dans le sas, MCP |
 | [École](ecole/README.md) | école ludique du primaire au collège, indices sans la réponse, carnet de notes, lecture des devoirs photographiés | SSO et rôles, modèle local avec vision, interface de discussion, contenus par Git |
+| [Bureautique](bureautique/README.md) | fichiers de chacun, privés par défaut, édition des documents dans le navigateur, recherche et lecture depuis la discussion | SSO, PostgreSQL 18, S3 commun, outil MCP « fichiers » sous l'identité de la personne |
+| [Visualisation](visualisation/README.md) | état mesuré de chaque composant et chemin d'une demande, contrôle horaire des miroirs des dépôts ; conformité prévue | SSO, API du cluster et métrologie en lecture, bus d'événements en lecture, forge |
 
 ## Le patron commun
 
