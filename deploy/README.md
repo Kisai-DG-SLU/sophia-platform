@@ -48,6 +48,7 @@ Chaque dossier décrit un composant : ses choix et leurs raisons, ses gabarits (
 | [`okd/inference/`](okd/inference/) | modèles locaux : texte et vision sur GPU, voix et images sur CPU |
 | [`okd/memory/`](okd/memory/) | embedding et schéma de la mémoire vectorielle |
 | [`okd/storage/`](okd/storage/) | stockage objet S3 commun |
+| [`okd/office/`](okd/office/) | bureautique : fichiers de chacun et édition des documents (La Suite Drive, Collabora) |
 | [`okd/identity/`](okd/identity/), [`okd/ingress/`](okd/ingress/) | identité et SSO, certificats |
 | [`okd/apps/`](okd/apps/), [`okd/skills/`](okd/skills/), [`okd/dmz/`](okd/dmz/) | interface, outils MCP locaux, sas web |
 | [`okd/hermes-system/`](okd/hermes-system/) | agents du panthéon et assistant de code |

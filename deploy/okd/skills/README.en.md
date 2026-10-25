@@ -5,7 +5,7 @@ The "tools" zone of the [architecture](../../../docs/architecture.en.md): MCP se
 | Zone | What goes there | Network egress |
 |---|---|---|
 | [`sophia-dmz`](../dmz/) | what fetches from outside: web search, page reading, weather | Internet (80/443) only |
-| **`sophia-skills`** | **local tools**: geography, images (protection rules), downloaded official sources | **none** (DNS; image models) |
+| **`sophia-skills`** | **local tools**: geography, images (protection rules), downloaded official sources, the person's files | **none to the Internet** (DNS; image models; for the "files" tool: the identity provider and the internal port of Files) |
 | [`sophia-inference`](../inference/) | the models: text, voice, image generator and classifier | none |
 
 ```
@@ -35,7 +35,9 @@ The servers' code is not provided; their contract:
 - `sophia/injecte`: parameters filled in by **the interface** itself, never by the model (e.g. `protected` = protected account, taken from the session);
 - `sophia/delai_s`: the tool's timeout (queueing included);
 - a result may carry `_affichage` (`image/png` in base64 or `image/svg+xml`, with a title): the interface **checks** the content then inserts it as is in the answer; the model only gets the description, not the image;
-- a failure is a readable `error`, which the model reports as is.
+- a failure is a readable `error`, which the model reports as is;
+- `sophia/jeton`: the tool acts under the person's identity and requires their relayed token; the interface sends it only to the servers on its closed list, and never offers these tools to the model: it calls them itself after the rules have decided ([Identity Relay](../../../docs/concepts/12-relais-identite.en.md));
+- `sophia/contenu`: the result contains the content of one of the person's documents; the interface gives it only to a local model and removes it from any other call ([Models by Role](../../../docs/concepts/13-modeles-par-role.en.md)).
 
 ## Geography — `sophia-geo`
 
@@ -58,6 +60,22 @@ Open data: French municipalities (official municipalities API), GeoNames (towns 
 3. **on display**: the interface checks the received content again.
 
 Each image comes with the model's name and licence. SDXL-Turbo licence: **non-commercial** use (see [`../inference/`](../inference/)).
+
+## The person's files — `mcp-fichiers`
+
+Status: in service (search) and deployed (content reading, acceptance test pending); the reference installation's code and manifests are not published, their contract and rules are, here. Module: [Office](../../../docs/modules/bureautique/documentation.en.md).
+
+| Tool | Role |
+|---|---|
+| `chercher_fichiers` | items found by name (or the most recent ones), with path, date, type, "editable", never a URL |
+| `details_fichier` | one item and its readable path |
+| `lire_fichier` | a document's text, extracted without execution (bounded XML archives, text-only PDF), truncated, flagged `contenu_sensible` |
+
+- **Read-only, under the person's identity**: token relayed by the interface, verified (signature, issuer, expiry, audience, originating client, groups), then **exchanged** for a token issued to the tool; Files introspects it and applies its own permissions. No service account that reads everything. One MCP session per call; no token logged (the HTTP client's log brought down to WARNING, so that the person's search does not appear in it).
+- **Network**: ingress from the interface only; egress to DNS, the identity provider (public keys and exchange) and the reserved internal port of Files (GET only), **nothing else**.
+- **Build in a separate namespace** (`sophia-skills-build`): the tool receives the family's tokens, so no agent may change its BuildConfig or its image. That namespace has **no RoleBinding to an agent account**; quota of one build at a time; no ingress.
+- **Build EgressFirewall with a final deny**: cluster Services and pods, **the cluster API** (control-plane nodes, on the API port; without this rule the build hangs at clone, unable to update its status), PyPI; nothing else.
+- **Base image** that already contains Python, **imported through the internal registry** (ImageStream with `referencePolicy: Local`, pinned by digest): the build pod pulls nothing from the vendor and installs no system package. **Python dependencies pinned by hash** (`--require-hashes`, binary wheels only). Binary source (`git archive` of the commit), no trigger: a new image replaces the pod only after a new digest has been committed and applied.
 
 ## Variables
 
