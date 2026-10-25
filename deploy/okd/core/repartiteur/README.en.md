@@ -26,7 +26,9 @@ requester ──POST /v1/demandes──▶ DISPATCHER (sophia-core, no model)
 | **Only Temporal client** | one workflow per request (id = `task_id`); agents have no access to Temporal | Temporal's authorizer only knows (namespace, role) pairs: removing the right is the only protection |
 | **Only event publisher** | each step publishes on `sophia.events` (keys `<requester>.delegate.<event>`), `user_id` always set; agents no longer write to the bus | a consumer refuses any event from another publisher |
 | **Single-attempt execution** | start with `Idempotency-Key = task_id`, follow the stream with resumption, stop at the maximum duration; the work itself is never retried | an agent's work is not idempotent: a retry is a new request |
-| **Destination filters** | deterministic workflow steps: secret detection on supervision answers; leak filter on the way out and tribunal on the way back for an external consultation; a missing or uncertain filter stops the workflow | nothing passes by default; until these filters exist, the rules refuse consultation |
+| **One mission at a time per executor** *(ready: written and tested, in service at the next build)* | a mission holds its target from acceptance to the end of its workflow, plan approval included; a second one gets `409 {"refus": "exécutant occupé"}`, without using quota; reads do not count; occupancy is rebuilt from Temporal at startup | an agent has a single work loop; two simultaneous missions would fight over its workspace |
+| **Local-model slots by time of day** *(ready, same build)* | missions on the background alias are capped at 1 during the day and 2 from 3 a.m. to 7 a.m. (local time); beyond that, `409` ("modèle local occupé"); nothing is interrupted when the period changes | the alias lock does not cover streamed generation: the agents' real bound is here; chat keeps its slots (see [Inference and Hardware](../../../../docs/concepts/11-inference-materiel.en.md)) |
+| **Destination filters** | deterministic workflow steps: secret detection on supervision answers; leak filter on the way out and tribunal on the way back for an external consultation; a missing or uncertain filter stops the workflow | nothing passes by default; until these filters exist, the rules refuse consultation. The secret filter accepts readable names segment by segment (long object names, alert names, option paths, git digests) and blocks random strings: tried on real cluster reads, it otherwise blocked ordinary diagnostics |
 | **D3a and D3b approvals** | D3a: approval of the goal before departure (signal bound to its hash); D3b: approval of **each command**; the dispatcher only passes `once` or `deny` to the executor, never a permanent approval | an approval is valid once |
 | **Verified principal** | with `frontend.enablePrincipalPropagation`, each event of the Temporal history carries the `sub` of the caller's token; only the `sub` values in the `approbateurs` list are accepted; approvals go through the Temporal UI, restricted to the `admin` group | a signal's `identity` field is declared by the client: it proves nothing |
 
@@ -34,9 +36,10 @@ requester ──POST /v1/demandes──▶ DISPATCHER (sophia-core, no model)
 
 | Endpoint | Role |
 |---|---|
-| `POST /v1/demandes` | `{type, cible, objectif[, parent]}` with `Authorization: Bearer <projected token>`; `202 {task_id, etat}` if a rule accepts it, `403 {refus}` otherwise, `401` without a valid token |
+| `POST /v1/demandes` | `{type, cible, objectif[, parent]}` with `Authorization: Bearer <projected token>`; `202 {task_id, etat}` if a rule accepts it, `403 {refus}` otherwise, `401` without a valid token, `409 {refus}` if the target or the local model is busy |
 | `GET /v1/demandes/{task_id}` | status and filtered result, for the requester only |
 | `GET /sante` | health (probe) |
+| `POST /v1/alertes` | Alertmanager alert intake ("alertes" requester, bearer token); **written and tested, disabled** until its token is set: at first it will only validate and log ([`../../monitoring/`](../../monitoring/)) |
 
 The service code is not provided: this directory describes its contract and deployment. It is written in Python (Temporal SDK), without a model; its image starts from a base pinned by index digest, with dependencies locked by hash (`pip install --require-hashes`), under an arbitrary UID, read-only root filesystem.
 
@@ -104,4 +107,6 @@ The dispatcher alone: delete its Deployment, Service and two NetworkPolicies. Th
 
 ## Next
 
-Planned: the interface as a requester; reads to supervision (with the secret filter); deployment and maintenance missions with D3a and D3b and the approver list; mutual TLS between the dispatcher and executors (the `api_server` currently speaks HTTP inside the cluster, the key travels over it, ingress being limited to the dispatcher); external consultation, after the leak filter and the tribunal.
+First real requester accepted, fully local: the Sophia agent requests through an MCP tool (`repartiteur`, tools `mcp_repartiteur_*`), with the projected token of her account without rights; a "pong" mission to the executor completes on the local model. **Pitfall**: an MCP server named like one of the agent's native toolsets (`delegation`) is masked by it, and its tools are never given to the model; an MCP connection test does not go through that resolution and gives a false positive. The acceptance test therefore lists the tools actually given to the model.
+
+Planned: the interface as a requester (designed: the person's token relayed and verified from the start, per-person daily quotas, approvals of the plan and of commands in the interface, the Temporal UI as fallback, notifications in the chat then by Web Push, a read-only return queue); reads to supervision (with the secret filter); deployment and maintenance missions with D3a and D3b and the approver list; mutual TLS between the dispatcher and executors (the `api_server` currently speaks HTTP inside the cluster, the key travels over it, ingress being limited to the dispatcher); external consultation, after the leak filter and the tribunal.
