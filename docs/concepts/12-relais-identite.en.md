@@ -120,6 +120,6 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 ## Place in the architecture
 
 - identity and SSO: `sophia-identity` ([`deploy/okd/identity/`](../../deploy/okd/identity/));
-- chat interface: `sophia-apps` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/));
+- chat interface: `sophia-interface` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/));
 - MCP tools without Internet: `sophia-skills`;
 - overall protections: [Security model](../security.en.md).

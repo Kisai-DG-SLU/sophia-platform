@@ -61,7 +61,7 @@ Un piège du passage au local : un modèle distant acceptait deux messages `syst
 La mémoire vive a de la marge, **le CPU non**. La consommation réelle est faible (quelques cœurs en temps normal, une pointe à 11 cœurs sur une semaine), mais les limites déclarées dépassaient la capacité du nœud, et les charges à venir (bureautique, modèle hybride, réindexation de la mémoire) sont lourdes. **En service** (recette : [`deploy/okd/cluster/`](../../deploy/okd/cluster/)) :
 
 - **Priorités, sans préemption** : un **socle** au-dessus de tout (le pod de lecture du cluster, qui permet de comprendre une panne, et la forge Git, d'où partent tous les déploiements : jamais évincés), puis discussion et modèle de langage > voix > répartiteur et agents > bureautique > images > développement et clusters enfants. Seul le serveur du modèle de langage garde le droit de préempter ;
-- **quotas** sur les limites, par namespace, et des demandes et limites explicites pour chaque conteneur ; le quota du namespace des agents attend le créneau du pod de lecture ;
+- **quotas** sur les limites, par namespace, et des demandes et limites explicites pour chaque conteneur ; le quota du namespace des agents est posé, après la classe du pod de lecture ;
 - génération d'images limitée à 8 cœurs.
 
 **Leçon** : une classe de priorité ne protège que les pods qui déclarent leurs demandes. Un pod sans demande est le premier évincé sous pression mémoire, quelle que soit sa classe : chaque pod du socle demande au moins son pic mesuré.

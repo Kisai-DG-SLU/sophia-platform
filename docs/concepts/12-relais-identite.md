@@ -120,6 +120,6 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 ## Position dans l'architecture
 
 - identité et SSO : `sophia-identity` ([`deploy/okd/identity/`](../../deploy/okd/identity/)) ;
-- interface de discussion : `sophia-apps` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/)) ;
+- interface de discussion : `sophia-interface` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/)) ;
 - outils MCP sans Internet : `sophia-skills` ;
 - protections d'ensemble : [Modèle de sécurité](../security.md).

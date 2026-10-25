@@ -103,7 +103,7 @@ Tested against a fake router: dry run, unknown model, missing limit, incompatibl
 ## Place in the architecture
 
 - model router: `sophia-core` ([`deploy/okd/core/`](../../deploy/okd/core/));
-- chat interface: `sophia-apps` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/));
+- chat interface: `sophia-interface` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/));
 - agents: [`deploy/okd/hermes-system/`](../../deploy/okd/hermes-system/);
 - sharing the local model: [Inference and Hardware](11-inference-materiel.en.md);
 - overall protections: [Security model](../security.en.md).

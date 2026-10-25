@@ -103,7 +103,7 @@ Essayé contre un faux routeur : à blanc, modèle inconnu, limite absente, opti
 ## Position dans l'architecture
 
 - routeur de modèles : `sophia-core` ([`deploy/okd/core/`](../../deploy/okd/core/)) ;
-- interface de discussion : `sophia-apps` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/)) ;
+- interface de discussion : `sophia-interface` ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/)) ;
 - agents : [`deploy/okd/hermes-system/`](../../deploy/okd/hermes-system/) ;
 - partage du modèle local : [Inférence et matériel](11-inference-materiel.md) ;
 - protections d'ensemble : [Modèle de sécurité](../security.md).
