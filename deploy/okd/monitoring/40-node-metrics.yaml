@@ -1,0 +1,145 @@
+# Exporteur des métriques du nœud : GPU (NVML) et fichiers .prom déposés par les scripts du nœud
+# (garde-fou du filtre VPN). Code : node-metrics/exporteur.py, monté par le ConfigMap sophia-node-metrics
+# (créé depuis le fichier, voir le README).
+# Namespace sophia-inference : son compte default a déjà la SCC privileged, comme llama-server ; aucun
+# droit nouveau. Privilégié pour ouvrir /dev/nvidia* ; lecture seule de deux répertoires du nœud ; aucune
+# sortie réseau (refus par défaut de sophia-inference) ; llama-server n'est pas touché.
+# ${NVIDIA_LIB_DIR} : répertoire du nœud qui contient libnvidia-ml.so.1 (le même que llama-server).
+# Substitution restreinte : envsubst '${NVIDIA_LIB_DIR}' < 40-node-metrics.yaml (les annotations
+# contiennent des {{ $value }} qu'un envsubst sans liste viderait).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-node-metrics
+  namespace: sophia-inference
+  labels: { app: sophia-node-metrics }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: sophia-node-metrics }
+  template:
+    metadata:
+      labels: { app: sophia-node-metrics }
+    spec:
+      priorityClassName: sophia-agents  # classe des services de fond, si elle existe
+      containers:
+        - name: exporteur
+          image: docker.io/library/python:3.13.17-slim-trixie@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/app/exporteur.py"]
+          env:
+            - { name: NVML_LIB, value: /opt/nvidia-libs/libnvidia-ml.so.1 }
+            - { name: METRIQUES_NOEUD, value: /var/lib/sophia/metrics }
+            - { name: PORT, value: "9400" }
+          ports:
+            - { name: metrics, containerPort: 9400 }
+          securityContext:
+            privileged: true
+            readOnlyRootFilesystem: true
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+          readinessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            periodSeconds: 30
+          volumeMounts:
+            - { name: code, mountPath: /app, readOnly: true }
+            - { name: nvidia-libs, mountPath: /opt/nvidia-libs, readOnly: true }
+            - { name: metriques-noeud, mountPath: /var/lib/sophia/metrics, readOnly: true }
+      volumes:
+        - name: code
+          configMap: { name: sophia-node-metrics }
+        - name: nvidia-libs
+          hostPath: { path: "${NVIDIA_LIB_DIR}", type: Directory }
+        - name: metriques-noeud
+          hostPath: { path: /var/lib/sophia/metrics, type: DirectoryOrCreate }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-node-metrics
+  namespace: sophia-inference
+  labels: { app: sophia-node-metrics }
+spec:
+  selector: { app: sophia-node-metrics }
+  ports:
+    - { name: metrics, port: 9400, targetPort: metrics }
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sophia-node-metrics
+  namespace: sophia-inference
+spec:
+  selector:
+    matchLabels: { app: sophia-node-metrics }
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-metrics-from-user-workload-monitoring
+  namespace: sophia-inference
+spec:
+  podSelector:
+    matchLabels: { app: sophia-node-metrics }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-user-workload-monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+      ports:
+        - { protocol: TCP, port: 9400 }
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes-noeud
+  namespace: sophia-inference
+  labels: { sophia: oui }
+spec:
+  groups:
+    - name: sophia-noeud
+      rules:
+        - alert: SophiaFiltreVPNRetire
+          expr: max(sophia_wg_filter_code) == 1
+          labels: { severity: critical, sophia: oui }
+          annotations:
+            summary: "le garde-fou a retiré le filtre du VPN (ruleset illisible par le nft d'OVN) — VPN ouvert sans filtre"
+            action: "journalctl -t sophia-wg-filter ; test-nft-ovn.sh ; voir deploy/okd/host/wireguard/README.md"
+        - alert: SophiaFiltreVPNVerificationImpossible
+          expr: max(sophia_wg_filter_code) == 2
+          for: 30m
+          labels: { severity: warning, sophia: oui }
+          annotations:
+            summary: "le garde-fou ne peut plus vérifier le filtre du VPN depuis 30 min (nft d'OVN injoignable)"
+        - alert: SophiaFiltreVPNMuet
+          expr: (time() - max(sophia_wg_filter_horodatage_secondes)) > 2700 or absent(sophia_wg_filter_code)
+          for: 15m
+          labels: { severity: warning, sophia: oui }
+          annotations:
+            summary: "aucune vérification du filtre du VPN depuis plus de 45 min (minuterie arrêtée, ou script sans métrique)"
+        - alert: SophiaGPUMesureImpossible
+          expr: max(sophia_gpu_nvml_ok) == 0
+          for: 15m
+          labels: { severity: warning, sophia: oui }
+          annotations:
+            summary: "NVML ne répond pas : mémoire et température du GPU inconnues"
+        - alert: SophiaGPUMemoirePleine
+          expr: max(sophia_gpu_memoire_utilisee_octets / sophia_gpu_memoire_totale_octets) > 0.97
+          for: 10m
+          labels: { severity: warning, sophia: oui }
+          annotations:
+            summary: "Mémoire du GPU utilisée à plus de 97 % depuis 10 min ({{ $value | humanizePercentage }})"
+        - alert: SophiaGPUTemperature
+          expr: max(sophia_gpu_temperature_celsius) > 85
+          for: 10m
+          labels: { severity: warning, sophia: oui }
+          annotations:
+            summary: "GPU à {{ $value }} °C depuis 10 min"

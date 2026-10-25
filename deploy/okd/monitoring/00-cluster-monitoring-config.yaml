@@ -1,0 +1,12 @@
+# Active la surveillance des charges utilisateur d'OKD : Prometheus, Thanos Ruler et (avec
+# 01-user-workload-config.yaml) un Alertmanager propres aux namespaces applicatifs.
+# Si le ConfigMap existe déjà, fusionner la clé enableUserWorkload dans l'existant au lieu de le remplacer.
+# Coût estimé : ≈ 0,2 CPU et 1 à 2 Gio pour l'ensemble.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    enableUserWorkload: true

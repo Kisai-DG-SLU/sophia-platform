@@ -1,0 +1,47 @@
+# Collecte par le Prometheus des charges utilisateur.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  namespace: sophia-core
+spec:
+  selector:
+    matchLabels: { app: rabbitmq, sophia-metrics: "true" }
+  endpoints:
+    # Agrégats du nœud RabbitMQ (mémoire, disque, connexions, messages)
+    - port: metrics
+      path: /metrics
+      interval: 30s
+    # Détail par file et par exchange du vhost /sophia (DLQ, files en attente)
+    - port: metrics
+      path: /metrics/detailed
+      interval: 60s
+      params:
+        vhost: ["/sophia"]
+        family: ["queue_coarse_metrics", "exchange_metrics"]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: temporal
+  namespace: sophia-core
+spec:
+  selector:
+    matchLabels: { app: temporal, sophia-metrics: "true" }
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: llama-server
+  namespace: sophia-inference
+spec:
+  selector:
+    matchLabels: { app: llama-server }
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
