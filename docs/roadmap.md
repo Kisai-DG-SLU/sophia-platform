@@ -19,12 +19,14 @@ En service.
 
 En service.
 
-- Routage des modèles par LiteLLM : modèles distants et locaux derrière les mêmes alias ([`deploy/okd/core/`](../deploy/okd/core/))
+- Routage des modèles par LiteLLM : modèles distants et locaux derrière les mêmes alias, une clé virtuelle par usage, clé maître confinée au routeur ([`deploy/okd/core/`](../deploy/okd/core/), [modèles par rôle](concepts/13-modeles-par-role.md))
+- Base relationnelle commune en PostgreSQL 18, un rôle par base, sur un volume dédié extensible ([`deploy/okd/core/`](../deploy/okd/core/))
 - Inférence locale : texte et vision sur GPU, voix et images sur CPU, sans sortie réseau ([`deploy/okd/inference/`](../deploy/okd/inference/))
 - Identité et SSO : Keycloak pour toutes les interfaces ([`deploy/okd/identity/`](../deploy/okd/identity/))
-- Interface de discussion ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/))
+- Interface de discussion, dans son namespace ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/))
+- Bureautique : fichiers et édition en ligne, retrouvés et lus depuis la discussion sous l'identité de la personne ([module Bureautique](modules/bureautique/README.md), [relais de l'identité](concepts/12-relais-identite.md))
 - Recherche web par un sas isolé, première brique du Sas Paranoïaque ([`deploy/okd/dmz/`](../deploy/okd/dmz/))
-- Outils MCP locaux : géographie, images avec règles de protection ([`deploy/okd/skills/`](../deploy/okd/skills/))
+- Outils MCP locaux : géographie, images avec règles de protection, fichiers de la personne ([`deploy/okd/skills/`](../deploy/okd/skills/))
 - Plateforme Git et assistant de code persistant ([`deploy/okd/hermes-system/`](../deploy/okd/hermes-system/))
 
 ---
@@ -36,10 +38,10 @@ En cours. Les travaux suivent cet ordre :
 | # | Travail | État |
 |---|---|---|
 | 0 | **Bus d'événements et workflows durables** : RabbitMQ (topologie, droits, lettres mortes), Temporal ; **répartiteur** des délégations, seul client de Temporal et seul éditeur des événements ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | en service ([`deploy/okd/core/repartiteur/`](../deploy/okd/core/repartiteur/)) ; files et comptes des agents retirés du bus ; consommateurs des événements à faire |
-| 1 | **Observabilité minimale** et **priorités CPU** : métriques des services, règles d'alerte, classes de priorité, quotas par namespace ([observabilité](concepts/10-observabilite.md), [inférence et matériel](concepts/11-inference-materiel.md)) | en service ([`deploy/okd/monitoring/`](../deploy/okd/monitoring/), [`deploy/okd/cluster/`](../deploy/okd/cluster/)) ; routage des alertes vers le répartiteur et quota du namespace des agents à faire |
+| 1 | **Observabilité minimale** et **priorités CPU** : métriques des services, règles d'alerte, classes de priorité, quotas par namespace ([observabilité](concepts/10-observabilite.md), [inférence et matériel](concepts/11-inference-materiel.md)) | en service ([`deploy/okd/monitoring/`](../deploy/okd/monitoring/), [`deploy/okd/cluster/`](../deploy/okd/cluster/)), quota du namespace des agents et alerte de remplissage des volumes compris ; routage des alertes vers le répartiteur à faire |
 | 2 | **Agents sur le modèle local**, avec un alias « de fond » qui laisse la priorité à la discussion, une clé du routeur par agent et des places de la carte selon l'heure | en service ([`deploy/okd/hermes-system/`](../deploy/okd/hermes-system/)) ; plafond des missions au prochain build du répartiteur |
-| 3 | **Mémoire (RAG)** : collection et schéma avec les tags, **API mémoire** (droits par tag, écriture long terme par le service mémoire), graphe et ingestion, stockage objet pour les fichiers | en cours : schéma, alias d'embedding ([`deploy/okd/memory/`](../deploy/okd/memory/)) et stockage objet ([`deploy/okd/storage/`](../deploy/okd/storage/)) en service ; API mémoire conçue ; graphe et ingestion à reconstruire |
-| 4 | **L'interface comme demandeur** du répartiteur, avec un canal de retour pour les validations et les notifications ; un namespace dédié à l'interface | conçu ; premier pas en service : modèles par rôle, ouverture d'une application ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/)) |
+| 3 | **Mémoire (RAG)** : collection et schéma avec les tags, **API mémoire** (droits par tag, écriture long terme par le service mémoire), graphe et ingestion, stockage objet pour les fichiers | en cours : schéma, base vectorielle sur son volume dédié, alias d'embedding ([`deploy/okd/memory/`](../deploy/okd/memory/)) et stockage objet ([`deploy/okd/storage/`](../deploy/okd/storage/)) en service ; API mémoire conçue ; graphe et ingestion à reconstruire |
+| 4 | **L'interface comme demandeur** du répartiteur, avec un canal de retour pour les validations et les notifications | conçu ; premiers pas en service : namespace dédié, modèles par rôle, ouverture d'une application, jeton de la personne relayé jusqu'à un outil ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/)) |
 | 5 | Délégations vers la **supervision** (lecture), le **déploiement** et la **maintenance** (approbations à deux niveaux) ; TLS mutuel | à faire |
 | 6 | **Planificateur** des objectifs ouverts : prototype en workflow, comparé à un agent planificateur sur des objectifs réels | à faire |
 | 7 | **n8n** (avec le premier outil qui en a besoin), **filtre anti-fuite**, **Tribunal Sémantique** | à faire |
@@ -61,6 +63,9 @@ Futur.
 - Niveaux de confidentialité de la mémoire, permissions par rôle sur la mémoire
 - Refus par défaut dans la mémoire et le développement
 - Volumes chiffrés, isolation complète de la mémoire
+- Sauvegardes planifiées et chiffrées, avec essai de restauration ; double authentification
+- Veille des mises à jour et des failles des images figées
+- Conformité (RGPD, AI Act, ISO 27001 visée « certifiable ») : état des lieux mesuré, plan d'action, suivi (conçu, [module Visualisation](modules/visualisation/README.md))
 - Journalisation d'audit avancée, historisation brute des échanges, workflows de vérification des connaissances
 - Workflow « incident » : de l'alarme au plan approuvé ([observabilité](concepts/10-observabilite.md))
 
@@ -71,7 +76,7 @@ Futur.
 Futur.
 
 - Ouverture à d'autres utilisateurs
-- Tableau de bord du système, interface de connaissance
+- Tableau de bord du système : premier pas en service, l'état mesuré de chaque composant et le contrôle des miroirs ([module Visualisation](modules/visualisation/README.md)) ; interface de connaissance
 - Arbitre : un modèle extérieur consulté après le filtre anti-fuite
 
 ---

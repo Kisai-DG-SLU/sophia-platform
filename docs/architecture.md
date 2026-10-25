@@ -77,7 +77,7 @@ Détail : [Panthéon Agentique](concepts/08-pantheon-agentique.md), [Observabili
 
 ### sophia-core
 
-Couche d'orchestration centrale : routage des modèles (LiteLLM), répartiteur des délégations, workflows durables (Temporal), bus d'événements (RabbitMQ), base relationnelle.
+Couche d'orchestration centrale : routage des modèles (LiteLLM), répartiteur des délégations, workflows durables (Temporal), bus d'événements (RabbitMQ), base relationnelle commune (PostgreSQL 18, un rôle par base, volume dédié).
 
 ### sophia-inference
 
@@ -120,8 +120,11 @@ Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 | namespace des agents | pods du panthéon, un compte de service et un UID par pod |
 | sophia-sandbox | environnements de développement, clusters enfants par projet |
 | sophia-test | validation CI/CD |
-| sophia-apps | interfaces utilisateur et modules |
-| namespaces dédiés (prévus) | l'interface de discussion et l'outil de visualisation, hors de la portée de l'agent de déploiement |
+| sophia-apps | modules |
+| sophia-interface | l'interface de discussion, hors de la portée de l'agent de déploiement |
+| sophia-workflow | l'outil de visualisation, même raison |
+| sophia-workspace | la bureautique : fichiers et édition en ligne |
+| namespaces de build | construction d'outils sensibles, sans compte d'agent |
 | prod-* | charges de travail des locataires |
 
 ---

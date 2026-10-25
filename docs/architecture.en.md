@@ -77,7 +77,7 @@ Details: [Agent Pantheon](concepts/08-pantheon-agentique.en.md), [Observability]
 
 ## sophia-core
 
-Central orchestration layer: model routing (LiteLLM), delegation dispatcher, durable workflows (Temporal), event bus (RabbitMQ), relational database.
+Central orchestration layer: model routing (LiteLLM), delegation dispatcher, durable workflows (Temporal), event bus (RabbitMQ), shared relational database (PostgreSQL 18, one role per database, dedicated volume).
 
 ## sophia-inference
 
@@ -120,8 +120,11 @@ Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 | agents namespace | pantheon pods, one service account and one UID per pod |
 | sophia-sandbox | development environments, child clusters per project |
 | sophia-test | CI/CD validation |
-| sophia-apps | user interfaces and modules |
-| dedicated namespaces (planned) | the chat interface and the visualisation tool, out of the deployment agent's reach |
+| sophia-apps | modules |
+| sophia-interface | the chat interface, out of the deployment agent's reach |
+| sophia-workflow | the visualisation tool, same reason |
+| sophia-workspace | the office suite: files and online editing |
+| build namespaces | building sensitive tools, with no agent account |
 | prod-* | tenant workloads |
 
 ---

@@ -62,7 +62,12 @@ flowchart TB
     WG[WireGuard Access]
     U --> WG
 
-    WG --> APPS[sophia-apps]
+    WG --> APPS[sophia-apps\nModules]
+    WG --> ITF[sophia-interface\nDiscussion]
+    WG --> WS[sophia-workspace\nBureautique]
+    ITF --> CORE
+    ITF --> SKILLS
+    SKILLS --> WS
     WG --> CORE[sophia-core\nOrchestration / LiteLLM]
     WG --> GIT[sophia-git\nForgejo / Project Memory]
 
@@ -100,7 +105,7 @@ SophIA est actuellement un projet d'architecture experimentale.
 
 Etape actuelle :
 
-- infrastructure initiale deployee
+- plateforme centrale en service dans l'installation de reference (inference locale, routeur de modeles, SSO, discussion, bureautique, bus et workflows, agents sur le modele local, observabilite) ; agents et memoire en cours — voir [Où en est le projet](docs/pitch.md) et la [feuille de route](docs/roadmap.md)
 - documentation architecturale en cours
 - livre blanc en preparation
 - structure du depot public en cours d'etablissement
