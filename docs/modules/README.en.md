@@ -7,6 +7,8 @@ A **module** is an application for the household or the organisation, built on t
 | [Cooking](cuisine/README.en.md) | meal plan, recipe catalogue, rule-bound recipe generation, shopping | SSO, local model, PostgreSQL, `image` tool, web airlock, MCP to the chat and to the Shopping module |
 | [Shopping](courses/README.en.md) | choosing a drive-through store's products according to household rules, filling the real basket, express basket from the chat | SSO, local model, PostgreSQL, remote browser in the airlock, MCP |
 | [School](ecole/README.en.md) | playful school from primary to lower secondary, hints without the answer, report book, reading photographed homework | SSO and roles, local model with vision, chat interface, content through Git |
+| [Office](bureautique/README.en.md) | each person's files, private by default, document editing in the browser, search and reading from the chat | SSO, PostgreSQL 18, common S3, "files" MCP tool under the person's identity |
+| [Visualisation](visualisation/README.en.md) | measured state of each component and path of a request, hourly check of repository mirrors; compliance planned | SSO, read access to the cluster API and metrics, read access to the event bus, forge |
 
 ## The common pattern
 
