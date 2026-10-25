@@ -28,9 +28,10 @@ Each namespace belongs to a security zone. Communication is restricted by Kubern
 | Inference | `sophia-inference` | local models | **in place**: deny all, ingress from the model router and the image tool only, no egress |
 | Local tools | `sophia-skills` | MCP servers | **in place**: no egress besides DNS and image models |
 | Airlock | `sophia-dmz` | web acquisition | **in place**: default deny; egress to the web reserved for acquisition |
-| Applications | `sophia-apps` | interfaces and modules | **in place**: default ingress deny, one rule per application |
-| Agents | agents namespace | pantheon | **in place**: agents' ingress open to the dispatcher only; one service account and one UID per pod |
-| Memory | `sophia-memory` | vector database, embedding, graph | **target**: default deny to apply after the inventory of callers; the zone is not isolated yet |
+| Applications | `sophia-apps` | interfaces and modules | **in place**: default ingress deny, one rule per application. The deployment agent is administrator there and could read an application's Secrets: the chat interface and the visualisation tool each get their own namespace (**planned**: designed, manifests ready), with no binding to any agent, and the school its own address |
+| Object storage | `sophia-storage` | shared S3 | **in place**: default deny on ingress **and** egress (DNS only); one identity per application, limited to its bucket; no anonymous access |
+| Agents | agents namespace | pantheon | **in place**: agents' ingress open to the dispatcher only; one service account and one UID per pod; one model-router key per agent. **Target**: Internet egress, uncontrolled today, to be inventoried then closed by an EgressFirewall, first in observation mode |
+| Memory | `sophia-memory` | vector database, embedding, graph | **target**: default deny to apply after the memory service; the zone is not isolated yet, and the vector database answers without a key |
 | Development | `sophia-sandbox` | development environments, child clusters | **target**: default deny to apply |
 
 Templates: `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` and the model router's ingress rule, `deploy/okd/core/litellm/network-policy.yaml`.
@@ -69,7 +70,10 @@ Agents are executors, reached by the dispatcher only, which decides by rules wit
 - **No agent reaches the workflow engine or writes to the bus**: the dispatcher is their only client and only publisher.
 - **Proven identity**: each request presents a short-lived projected service account token, checked against the Kubernetes API.
 - **One key per executor**, known to it and to the dispatcher only.
-- **Human approvals** through a single path, the workflow engine's interface, restricted to the administration group; the authenticated author of each signal is checked against the approver list; an approval is valid once.
+- **One model-router key per agent**, limited to the local background model and embedding; the router's master key no longer leaves its pod, then gets rotated.
+- **Agents' web tools without internal addresses** (`allow_private_urls` off, against request forgery towards the cluster); online model catalog off.
+- **Administration availability**: the cluster read pod and the Git forge are in a priority class no other workload can evict ([`deploy/okd/cluster/`](../deploy/okd/cluster/)).
+- **Human approvals** through a single path today, the workflow engine's interface, restricted to the administration group (the chat interface, with the person's token relayed, will become the first path); the authenticated author of each signal is checked against the approver list; an approval is valid once.
 
 ---
 
@@ -84,7 +88,8 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 # Data Protection
 
 - strict access control: SSO, groups, per-client restricted keys on the model router;
-- secrets managed through Kubernetes: manifests contain none; a value found in a repository's history is changed, without rewriting history;
+- secrets managed through Kubernetes: manifests contain none; a Secret is created from standard input, never as a command argument (visible in the process list), and no value is printed; a value found in a repository's history is changed, without rewriting history;
+- builds read-only on their repository: one deploy key per repository, never a forge administrator's token;
 - audit logging;
 - encrypted volumes: **target**, not yet in place (unencrypted local volumes).
 
@@ -95,7 +100,8 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 # Interaction Logging
 
 - **In place**: the model router's request log (routing, costs, refusals); the history of each delegation workflow (30 days), with the author of each approval; dated events published by the dispatcher.
-- **Target**: raw history of exchanges in Git, for audit, replay and sourcing; alerts and "incident" workflow (see [Observability](concepts/10-observabilite.en.md)).
+- **In place**: service metrics and alert rules, including the removal of the VPN filter by its safeguard (see [Observability](concepts/10-observabilite.en.md)).
+- **Target**: raw history of exchanges in Git, for audit, replay and sourcing; alert routing to the dispatcher and "incident" workflow.
 
 ---
 
@@ -104,5 +110,8 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 - leak filter (DLP) before any output to an external model;
 - Semantic Tribunal before storing anything from the web;
 - default deny in `sophia-memory` and `sophia-sandbox`;
+- egress control for the agents namespace;
+- dedicated namespaces for the chat interface and the visualisation tool;
+- rotation of the model router's master key;
 - mutual TLS between the dispatcher and executors;
 - encrypted volumes.
