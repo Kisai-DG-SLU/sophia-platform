@@ -10,13 +10,15 @@
 - **Model per use**: the express purchase, which the chat waits for, stays on the main alias; non-urgent lists go through the background alias, falling back to the main alias if the router refuses it (unknown alias or not allowed for the key).
 - **Reference prices** for the Cooking module's ingredient table: **read-only** MCP tool `prix_reference` (see below).
 
+- **New-version notice** (in service): the fallback page shows a "Reload" banner when the image has changed, never during unsent typing, and keeps modified fields across the reload; never inside a frame: in the Cooking module's shopping tab, only Cooking's banner shows.
+
 Planned: several stores, comparison between chains, a signal when a site becomes unreadable.
 
 ## Architecture
 
 ```
 Cooking module ─MCP─┐
-chat ───────────MCP─┼→ service (applications namespace)   ──→ shared PostgreSQL (own schema)
+chat ───────────MCP─┼→ service (applications namespace)   ──→ shared PostgreSQL 18 (own schema)
 fallback page ──────┘    │ LiteLLM (sophia-local, strict JSON)
                          └←── readings ── remote browser extension (airlock, filtered Internet egress)
                                               └──→ store site (session opened by the human)

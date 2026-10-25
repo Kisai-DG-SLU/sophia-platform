@@ -15,13 +15,15 @@
 
 - **Ingredient table** (under acceptance testing): calories, season and price of each ingredient, to **compute** the cost, calories and season months of recipes instead of estimating them (see below).
 
+- **New-version notice** (in service): every response carries the image version (`X-Sophia-Version`, the commit); a page opened before a build shows a "Reload" banner, never during typing or a pending request, never an automatic reload. In the shopping tab, a single banner shows, Cooking's: the Shopping module's version is never relayed there.
+
 Planned: checking generation caps on computed values.
 
 ## Architecture
 
 ```
 browser ─VPN─→ router ─→ [ oauth2-proxy │ application ]   (applications namespace)
-                               │            │  dedicated database ─→ shared PostgreSQL
+                               │            │  dedicated database ─→ shared PostgreSQL 18
                                │            │  LiteLLM (sophia-local, strict JSON)
                                │            │  image MCP tool (sophia-skills)
                                │            │  web airlock (search, page reading)
@@ -34,7 +36,7 @@ Shopping module ─MCP (limited write)─→ application
 |---|---|
 | Pod | two containers: **oauth2-proxy** (Keycloak SSO, PKCE) and the application (FastAPI, Jinja2 templates, htmx), listening on `127.0.0.1` only; identity arrives through the header set by the proxy, a request without it is refused |
 | Image | UBI minimal, Python 3.12, non-root, nothing written to disk, `seccomp` `RuntimeDefault`, capabilities dropped |
-| Data | a **dedicated database** in the shared PostgreSQL, own role, schema created at start; photos stored in the database; no persistent volume |
+| Data | a **dedicated database** in the shared PostgreSQL 18, own role, schema created at start; photos stored in the database; no persistent volume |
 | Variety | computed on the recipe's identity fields (cooking method, main ingredient, sides), without a vector database |
 | Access | two realm groups: full access, protected accounts (read-only, never photo generation) |
 | Timeouts | 300 s at the proxy and the Route: the local model takes several tens of seconds |

@@ -6,7 +6,7 @@
 - **Entraînements de calcul mental** sur une liste de calculs écrite dans le contenu (`faits:`), avec la même répétition espacée, le même chronomètre et la reprise des ratés que les tables : 17 entraînements, 314 calculs, qui reprennent les méthodes et les exemples de chaque fiche. Pas de générateur aléatoire, pour rester fidèle aux nombres de chaque leçon.
 - **Figures de géométrie** : 29 figures SVG dans 15 leçons, insérées après le passage qu'elles illustrent, sans modifier le texte.
 - **Mode relecture** pour l'administrateur : tout est ouvert, rien n'est compté, un bandeau le dit dans chaque lieu ; un enfant garde ses verrous. Ce n'est pas une barrière de sécurité (tout le contenu est déjà dans la page), mais le moyen de valider ce qu'on demande de valider.
-- **Avatar** commun à la discussion et à l'école (un dessin, ou une petite photo).
+- **Avatar** commun à la discussion et à l'école (un dessin, ou une petite photo). Prévu (codé, non déployé) : le dessin choisi est rangé en image réduite dans le profil de la discussion, comme une photo ; l'école garde le catalogue, et l'ancien chemin `/ecole/` deviendra une redirection vers l'adresse de l'école.
 - **Journal de progression** de l'enfant, et un **livret en lecture seule** pour les parents.
 - **Fiches d'exercices** (énoncé, corrigé, auto-évaluation) et vidéos en lien.
 - **Carnet de notes** de l'école réelle, recopié par l'enfant : notes, bulletins, moyennes, import d'un tableur, courbes ; au primaire, des **compétences** (non acquis, partiellement, acquis, dépassé), sans note ni comparaison.
@@ -14,35 +14,46 @@
 - **Dictée sur ardoise** et **fiche de lecture** photographiées, lues par le modèle local (vision).
 - Outil `carnet_scolaire` dans la discussion : il ne lit que le journal de l'enfant qui parle ; le verdict (félicitations, encouragements…) est **calculé par le serveur**.
 
+- **Avis de nouvelle version** : une tablette reste ouverte des jours ; le build écrit une empreinte du moteur (`version.json`, servi sans cache) et chaque synchronisation une empreinte du contenu. La page compare au chargement et au retour sur l'onglet, et affiche un bandeau « Recharger », jamais pendant un exercice ou une dictée, jamais de rechargement d'elle-même. Une leçon publiée sans build déclenche aussi l'avis.
+- **Navigateurs anciens** (Safari 15.4 et plus) : avant toute écriture, le build analyse le moteur en ES2021 et refuse une liste d'API et de règles CSS absentes de Safari 15 ; un moteur refusé fait échouer le build sans effacer la version construite, et l'image en service reste.
 - **Publication des contenus sans reconstruction d'image** : le conteneur `contenus` synchronise les dépôts en lecture seule chaque minute et garde la version en ligne si la nouvelle est invalide (incident corrigé, voir les leçons).
 
-Prévu : l'école sur sa propre adresse, hors de l'origine de la discussion (voir [l'interface](../../../deploy/okd/apps/chat-interface/README.md)), une touche virgule pour les calculs à décimaux et à fractions, version de partage avec une voix de synthèse libre enregistrée, outils MCP de progression et d'ouverture, carnet servi en MCP avec un jeton signé limité à l'enfant.
+Prévu : une touche virgule pour les calculs à décimaux et à fractions, version de partage avec une voix de synthèse libre enregistrée, outils MCP de progression et d'ouverture, carnet servi en MCP avec un jeton signé limité à l'enfant.
 
 ## Architecture
 
 ```
-navigateur ─VPN─→ interface de discussion (SSO) ── /ecole/ ──→ pod école (namespace des applications)
-                                                                 ├ site      : nginx, GET/HEAD seulement
-                                                                 └ contenus  : synchronisation Git chaque minute
-                                                                                 → bascule atomique d'un lien « current »
-API des discussions : progression, carnet, photos (base de l'interface) ; indices et lecture des photos par sophia-local
+navigateur ─VPN─→ adresse de l'école (Route, TLS) ──→ pod école (namespace des applications)
+                                                       ├ oauth2-proxy : connexion propre (client SSO de l'école, sans les invités)
+                                                       ├ site         : nginx, GET/HEAD seulement
+                                                       └ contenus     : synchronisation Git chaque minute
+                                                                          → bascule atomique d'un lien « current »
+        └── appels de l'école ──→ API des discussions, préfixe /api/store/school/ seulement (CORS pour l'origine exacte de l'école)
+            progression, carnet, photos (base de l'interface) ; indices, lecture des photos et voix par les modèles locaux
 ```
 
 | Élément | Choix |
 |---|---|
-| Pod | une image, **deux conteneurs**, ni Route ni connexion propre : seuls les pods de l'interface le joignent (NetworkPolicy) |
+| Pod | une image, **trois conteneurs** (connexion, site, contenus), une Route vers son oauth2-proxy ; le Service interne n'est joint que par les pods de l'interface (index des contenus, catalogue des avatars) |
 | `site` | nginx sans privilèges, `GET`/`HEAD` seulement, en-têtes stricts ; sert le moteur et un **contenu de secours intégré à l'image** |
 | `contenus` | récupère en SSH (clé de déploiement en lecture seule, seul secret du pod) un dépôt de contenus public et un privé facultatif, **vérifie**, reconstruit, puis bascule d'un coup un lien `current` dans un volume partagé ; contenu invalide ou dépôt injoignable : la version en ligne reste, l'erreur est publiée dans un fichier d'état |
 | Build | Docker en deux étapes (UBI 9, Node.js) ; seul un changement du **moteur** demande un build, les contenus passent par Git |
-| Identité | même oauth2-proxy et même Keycloak que la discussion ; rôles : administrateur, responsables (parents), protégés (enfants) |
+| Identité | son **propre oauth2-proxy** et son propre client Keycloak, même realm que la discussion ; rôles : administrateur, responsables (parents), protégés (enfants) ; pas d'invités. Pourquoi : une école servie sous l'origine de la discussion aurait tous les droits de la personne sur la discussion. La CSP de l'école n'autorise que l'origine de la discussion ; la reconnexion passe par la connexion de la discussion, avec retour vers l'école. Voir [l'interface](../../../deploy/okd/apps/chat-interface/README.md) |
 | Données | progression et carnet dans la base de l'interface (table d'événements, profil) ; personne n'écrit dans le journal d'un autre |
-| Ouverture depuis la discussion | l'analyse d'intention (modèle, schéma JSON) reconnaît « école » ; une **politique déterministe** autorise l'action `ouvrir_ecole` ; le lien est construit par le serveur à partir de l'index de l'école, le navigateur vérifie sa forme |
+| Ouverture depuis la discussion | l'analyse d'intention (modèle, schéma JSON) reconnaît « école » ; une **politique déterministe** autorise l'action `ouvrir_ecole` ; le lien, vers l'adresse de l'école, est construit par le serveur à partir de l'index de l'école ; le navigateur en fait un bouton, et la consigne du modèle ne contient aucune adresse |
 
 ### Format des contenus
 
 `contenus/<matière>/<niveau>/<module>/`, un fichier YAML par module et par niveau. Types d'activités : leçon (Markdown avec en-tête YAML), TP, défi QCM, « clique sur le mot », « je complète », dictée sur ardoise, fiche de lecture. Champs obligatoires : `id`, `type`, `titre`, `notions`, `source`, `licence`, `redistribuable`.
 
 Le build **refuse** tout contenu invalide : bonne réponse absente des choix, notion inconnue, licence manquante. Le dépôt privé ajoute des modules sans rien remplacer ; seul ce qui est marqué `redistribuable: true` entre dans la version de partage, qui ne garde que des liens vers le reste.
+
+## Version publique
+
+- **Un dépôt public à part**, qui ne contient que le **site construit** (aucun moteur source, aucun contenu privé), avec un miroir vers une page statique hébergée ; une racine qui accueille les cours publics, filtrés par une **liste versionnée des cours autorisés**.
+- **Publication par un script**, sur l'accord de l'administrateur : il construit, puis **vérifie** l'absence de données privées (une liste de mots interdits gardée dans le dépôt privé, jamais recopiée ailleurs ; les cours hors liste refusés), montre le résumé, et ne pousse que sur confirmation. Une relance sans changement ne publie rien.
+- **La page publique est figée** ; la discussion, outil interne, ne l'ouvre jamais.
+- L'ancienne adresse publique garde une redirection qui conserve le fragment, puis son dépôt est archivé.
 
 ## Règles : le modèle formule, le serveur décide
 
@@ -54,8 +65,9 @@ Le build **refuse** tout contenu invalide : bonne réponse absente des choix, no
 ## Mesures
 
 - ≈ 800 activités publiées (806) ; un module de physique-chimie relu en entier : 19 leçons, 13 TP, 19 défis, ≈ 120 questions vérifiées contre des corrigés de référence, aucune contradiction.
-- 91 tests automatisés (contenus, build, progression, synchronisation, parcours dans le navigateur, relecture).
+- 115 tests automatisés (contenus, build, progression, synchronisation, parcours dans le navigateur, relecture, compatibilité Safari 15, avis de nouvelle version, publication).
 - Pod : nginx limité à 64 Mi, synchronisation à 256 Mi.
+- Tests sans données réelles : des prénoms fictifs dans les tests, jamais ceux des enfants.
 
 ## Leçons
 

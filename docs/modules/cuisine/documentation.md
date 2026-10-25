@@ -15,13 +15,15 @@
 
 - **Table des ingrédients** (en recette) : calories, saison et prix de chaque ingrédient, pour **calculer** le coût, les calories et les mois de saison des recettes au lieu de les estimer (voir ci-dessous).
 
+- **Avis de nouvelle version** (en service) : chaque réponse porte la version de l'image (`X-Sophia-Version`, le commit) ; une page ouverte avant un build affiche un bandeau « Recharger », jamais pendant une saisie ou une requête en cours, jamais de rechargement automatique. Dans l'onglet des courses, un seul bandeau s'affiche, celui de Cuisine : la version du module Courses n'y est jamais relayée.
+
 Prévu : contrôle des plafonds de la génération sur les valeurs calculées.
 
 ## Architecture
 
 ```
 navigateur ─VPN─→ routeur ─→ [ oauth2-proxy │ application ]   (namespace des applications)
-                                   │            │  base dédiée ─→ PostgreSQL partagé
+                                   │            │  base dédiée ─→ PostgreSQL 18 partagé
                                    │            │  LiteLLM (sophia-local, JSON strict)
                                    │            │  outil MCP image (sophia-skills)
                                    │            │  sas web (recherche, lecture de pages)
@@ -34,7 +36,7 @@ module Courses ─────────MCP (écriture limitée)─→ applica
 |---|---|
 | Pod | deux conteneurs : **oauth2-proxy** (SSO Keycloak, PKCE) et l'application (FastAPI, gabarits Jinja2, htmx), qui n'écoute que sur `127.0.0.1` ; l'identité arrive par l'en-tête posé par le proxy, une requête sans cet en-tête est refusée |
 | Image | UBI minimal, Python 3.12, non root, rien d'écrit sur disque, `seccomp` `RuntimeDefault`, capacités retirées |
-| Données | une **base dédiée** dans le PostgreSQL partagé, rôle propre, schéma créé au démarrage ; photos stockées en base ; aucun volume persistant |
+| Données | une **base dédiée** dans le PostgreSQL 18 partagé, rôle propre, schéma créé au démarrage ; photos stockées en base ; aucun volume persistant |
 | Variabilité | calculée sur des champs d'identité de la recette (cuisson, ingrédient principal, accompagnements), sans base vectorielle |
 | Accès | deux groupes du realm : accès complet, comptes protégés (lecture seule, jamais de génération de photo) |
 | Délais | 300 s au proxy et à la Route : le modèle local met plusieurs dizaines de secondes |
