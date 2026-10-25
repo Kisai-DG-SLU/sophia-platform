@@ -17,7 +17,7 @@ The platform's event bus: each step of a delegation is published on it by the [d
 | Rollout | `Recreate`, one replica | `ReadWriteOnce` volume: never two RabbitMQ on the same directory |
 | Accounts | **definitions imported on every start**: `/sophia` vhost, one account for the dispatcher, one for the visualisation relay, the administrator, permissions; a **secret-free** template in the `ConfigMap`, passwords inserted by an initContainer from a Secret, into an in-memory volume | accounts and permissions are described in the repository and replayed identically; the password is hashed on import; the initContainer fails if a template account has no password |
 | Agents | **no account**: the accounts, the `sophia.agent.<name>` queues, the `sophia.agents` exchange and the agents' policy have been removed (empty and without consumers) | agents are executors, reached by the dispatcher only, which is the **only publisher** on `sophia.events` (keys `<requester>.delegate.<event>`, through `topic_permissions`) |
-| Visualisation relay | temporary queue (`amq.gen-*`) bound to `sophia.events`, without publishing | live reading of events, unable to emit anything |
+| Visualisation relay | temporary server-named queue (`amq.gen-*`, or `amq_<32 hex>` since RabbitMQ 4.4) bound to `sophia.events`, without publishing | live reading of events, unable to emit anything |
 | Internal administrator | in the definitions (Secret `rabbitmq-admin-creds`) | with definitions, RabbitMQ no longer creates `RABBITMQ_DEFAULT_USER` on a fresh volume |
 | Management UI | `rabbitmq_auth_backend_oauth2` plugin: realm tokens, **public PKCE** client `rabbitmq`; **password login disabled** (`management.oauth_disable_basic_auth`) | one identity for every console; the dispatcher and the relay keep their internal accounts over AMQP (`auth_backends`: OAuth2, then internal) |
 | People's permissions | Keycloak groups (`groups` claim) become scopes (`additional_scopes_key`); only the `admin` group gets a full-permission alias (`scope_aliases.admin`) | a realm account outside the `admin` group has no permission in RabbitMQ |
@@ -35,7 +35,7 @@ Delegations go through [Temporal](../temporal/); RabbitMQ only carries **events*
 | Account | configure | write | read |
 |---|---|---|---|
 | dispatcher | nothing | `sophia.events` (keys `<requester>.delegate.<event>`) | nothing |
-| visualisation relay | `amq.gen-*` | `amq.gen-*` | `sophia.events`, `amq.gen-*` |
+| visualisation relay | `amq.gen-*`, `amq_<32 hex>` | `amq.gen-*`, `amq_<32 hex>` | `sophia.events`, `amq.gen-*`, `amq_<32 hex>` |
 | administrator | everything | everything | everything |
 
 Client side: declare queues and exchanges with `passive=True` (no `configure` permission), manual `ack`, `user_id` = account name (RabbitMQ rejects a different value). An account, queue or binding is added in the template, never from a client.
@@ -78,6 +78,8 @@ printf 'repartiteur=%s\nsophia-workflow=%s\n' "$(openssl rand -hex 32)" "$(opens
 5. Check: pod `Running` and ready, `rabbitmq-diagnostics status` without alarms, `rabbitmqctl list_users`, `list_permissions`, `list_queues name type policy`, `list_exchanges` and `list_bindings` (`-p /sophia`) matching the template, management UI reachable through the VPN (Keycloak login, refused outside the `admin` group), port 5672 refused from any pod other than the dispatcher and the relay.
 
 **Adding an account**: add it to the template in `00-config.yaml`, add its key to `rabbitmq-users`, restart RabbitMQ. An account removed from the template is **not** deleted from the server: see below.
+
+**Server-named queues**: RabbitMQ 4.4 names a queue declared without a name `amq_<32 hex>`, no longer `amq.gen-*`. A permission written for the old form refuses the relay's listening queue (access refused at declaration). The permissions therefore admit both forms; a live fix goes through `rabbitmqctl set_permissions`, without restart, then through the template.
 
 ## Removing an account or a queue
 
