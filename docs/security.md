@@ -28,9 +28,10 @@ Chaque namespace appartient à une zone de sécurité. Les communications sont r
 | Inférence | `sophia-inference` | modèles locaux | **en place** : tout refusé, entrée depuis le routeur de modèles et l'outil d'images seulement, aucune sortie |
 | Outils locaux | `sophia-skills` | serveurs MCP | **en place** : aucune sortie hors DNS et modèles d'image |
 | Sas | `sophia-dmz` | acquisition web | **en place** : refus par défaut ; sortie vers le web réservée à l'acquisition |
-| Applications | `sophia-apps` | interfaces et modules | **en place** : refus par défaut en entrée, une règle par application |
-| Agents | namespace des agents | panthéon | **en place** : entrée des agents ouverte au seul répartiteur ; un compte de service et un UID par pod |
-| Mémoire | `sophia-memory` | base vectorielle, embedding, graphe | **cible** : refus par défaut à appliquer après l'inventaire des appelants ; la zone n'est pas encore isolée |
+| Applications | `sophia-apps` | interfaces et modules | **en place** : refus par défaut en entrée, une règle par application. L'agent de déploiement y est administrateur et pourrait lire les Secrets d'une application : l'interface de discussion et l'outil de visualisation reçoivent chacun leur namespace (**prévu** : conçus, manifestes prêts), sans aucune liaison vers un agent, et l'école sa propre adresse |
+| Stockage objet | `sophia-storage` | S3 commun | **en place** : refus par défaut en entrée **et** en sortie (DNS seul) ; une identité par application, limitée à son seau ; aucun accès anonyme |
+| Agents | namespace des agents | panthéon | **en place** : entrée des agents ouverte au seul répartiteur ; un compte de service et un UID par pod ; une clé du routeur de modèles par agent. **Cible** : les sorties vers Internet, aujourd'hui sans contrôle, à inventorier puis fermer par un EgressFirewall, d'abord en observation |
+| Mémoire | `sophia-memory` | base vectorielle, embedding, graphe | **cible** : refus par défaut à appliquer après le service mémoire ; la zone n'est pas encore isolée, et la base vectorielle répond sans clé |
 | Développement | `sophia-sandbox` | environnements de développement, clusters enfants | **cible** : refus par défaut à appliquer |
 
 Gabarits : `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` et la règle d'entrée du routeur de modèles, `deploy/okd/core/litellm/network-policy.yaml`.
@@ -69,7 +70,10 @@ Les agents sont des exécutants, joints par le seul répartiteur, qui décide pa
 - **Aucun agent n'accède au moteur de workflows ni n'écrit sur le bus** : le répartiteur en est le seul client et le seul éditeur.
 - **Identité prouvée** : chaque demande présente un jeton de compte de service projeté, de courte durée, vérifié auprès de l'API Kubernetes.
 - **Une clé par exécutant**, connue de lui et du répartiteur seulement.
-- **Validations humaines** par un seul chemin, l'interface du moteur de workflows, réservée au groupe d'administration ; l'auteur authentifié de chaque signal est vérifié contre la liste des approbateurs ; une approbation ne vaut qu'une fois.
+- **Une clé du routeur de modèles par agent**, limitée au modèle local de fond et à l'embedding ; la clé maître du routeur ne sort plus de son pod, puis se renouvelle.
+- **Outils web des agents sans adresses internes** (`allow_private_urls` coupé, contre la falsification de requêtes vers le cluster) ; catalogue de modèles en ligne coupé.
+- **Disponibilité de l'administration** : le pod de lecture du cluster et la forge Git sont dans une classe de priorité qu'aucune autre charge ne peut évincer ([`deploy/okd/cluster/`](../deploy/okd/cluster/)).
+- **Validations humaines** par un seul chemin aujourd'hui, l'interface du moteur de workflows, réservée au groupe d'administration (l'interface de discussion, avec le jeton de la personne relayé, viendra en premier chemin) ; l'auteur authentifié de chaque signal est vérifié contre la liste des approbateurs ; une approbation ne vaut qu'une fois.
 
 ---
 
@@ -84,7 +88,8 @@ Ce mécanisme empêche les scripts malveillants et les mécanismes de traçage d
 ## Protection des données
 
 - contrôle d'accès strict : SSO, groupes, clés restreintes par client du routeur de modèles ;
-- secrets gérés par Kubernetes : les manifestes n'en contiennent aucun ; une valeur trouvée dans l'historique d'un dépôt est changée, sans réécrire l'historique ;
+- secrets gérés par Kubernetes : les manifestes n'en contiennent aucun ; un Secret se crée par l'entrée standard, jamais en argument d'une commande (visible dans la liste des processus), et aucune valeur n'est affichée ; une valeur trouvée dans l'historique d'un dépôt est changée, sans réécrire l'historique ;
+- builds en lecture seule sur leur dépôt : une clé de déploiement par dépôt, jamais le jeton d'un administrateur de la forge ;
 - journalisation d'audit ;
 - volumes chiffrés : **cible**, pas encore en place (volumes locaux non chiffrés).
 
@@ -95,7 +100,8 @@ Les données persistantes (bases vectorielles, bases relationnelles, dépôts) s
 ## Journalisation des interactions
 
 - **En place** : journal des requêtes du routeur de modèles (routage, coûts, refus) ; historique de chaque workflow de délégation (30 jours), avec l'auteur de chaque approbation ; événements datés publiés par le répartiteur.
-- **Cible** : historisation brute des échanges dans Git, pour l'audit, le rejeu et le sourçage ; alertes et workflow « incident » (voir [Observabilité](concepts/10-observabilite.md)).
+- **En place** : métrologie des services et règles d'alerte, dont le retrait du filtre VPN par son garde-fou (voir [Observabilité](concepts/10-observabilite.md)).
+- **Cible** : historisation brute des échanges dans Git, pour l'audit, le rejeu et le sourçage ; routage des alertes vers le répartiteur et workflow « incident ».
 
 ---
 
@@ -104,5 +110,8 @@ Les données persistantes (bases vectorielles, bases relationnelles, dépôts) s
 - filtre anti-fuite (DLP) avant toute sortie vers un modèle extérieur ;
 - Tribunal Sémantique avant toute mémorisation venue du web ;
 - refus par défaut dans `sophia-memory` et `sophia-sandbox` ;
+- contrôle des sorties du namespace des agents ;
+- namespaces dédiés pour l'interface de discussion et l'outil de visualisation ;
+- renouvellement de la clé maître du routeur de modèles ;
 - TLS mutuel entre le répartiteur et les exécutants ;
 - volumes chiffrés.
