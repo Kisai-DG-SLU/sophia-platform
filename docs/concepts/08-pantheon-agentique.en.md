@@ -42,7 +42,7 @@ The architecture defines four fundamental roles, plus a planner. The list can be
 | **Hephaistos** | development | full powers in its development environment, one child cluster per project; everything it produces is versioned in the Git forge | autonomous agent | in acceptance testing, first executor behind the dispatcher |
 | **Ouranos** | application deployment | limited to the applications namespace | agent, closed tool list, every command approved | planned |
 | **Athena** | platform maintenance | cluster administrator, **every command approved** by a human after the plan is approved | agent, closed tool list (the terminal under approval) | planned |
-| **Dionysos** | supervision | read-only on the whole cluster and on metrics; can alert, never act | deterministic read functions exposed to the dispatcher; interpretation is left to the model, inside a workflow | planned |
+| **Dionysos** | supervision | read-only on the whole cluster and on metrics; can alert, never act | deterministic read functions exposed to the dispatcher, in a separate pod, without node network access or secrets, with a read-only account; interpretation is left to the model, inside a workflow | planned: designed and tested, not deployed |
 | **Planner** | open goals: break them down, then share them out among agents | no rights of its own: it only makes requests to the dispatcher | workflow in code, one model decision at a time | planned, prototype to be compared with a planner agent |
 
 Athena and Dionysos never request anything. Only the planner, or the interface, assigns a mission.
@@ -60,9 +60,9 @@ The dispatcher is a service without a model, in `sophia-core`. It is the **only 
 5. **Destination filters.** Deterministic workflow steps, chosen by destination: secret detection on supervision answers, leak filter before any output to an external model, semantic tribunal on the way back. A missing or uncertain filter stops the workflow: nothing passes by default.
 6. **Events.** Each step publishes a dated event on the bus, signed by the dispatcher's account; consumers refuse any other publisher.
 
-**Human approvals.** Two levels: approving the plan before departure, then approving each command. They go through a single path, the workflow engine's interface, restricted to the administration group: the authenticated author of each signal is recorded in the history, and only an approver from the list is accepted. A signal carries only a decision and a hash, never a command. An approval is valid once: nothing is written into a permanent allow list.
+**Human approvals.** Two levels: approving the plan before departure, then approving each command. Today they go through a single path, the workflow engine's interface, restricted to the administration group; they will move into the chat interface, with the person's token relayed and verified, the workflow engine's interface staying the fallback: the authenticated author of each signal is recorded in the history, and only an approver from the list is accepted. A signal carries only a decision and a hash, never a command. An approval is valid once: nothing is written into a permanent allow list.
 
-Status: **in service** for rules, workflow, events and the mission to development (in acceptance testing). **Planned**: the interface as requester, reads to supervision, deployment and maintenance missions, consulting an external model (after the leak filter and the tribunal), mutual TLS.
+Status: **in service** for rules, workflow, events and the mission to development (in acceptance testing); the first real requester, the Sophia agent, completed the full round trip entirely on the local model. **Ready** (written and tested, at the next build): one mission at a time per executor, and local-model slots by time of day. **Planned**: the interface as requester, reads to supervision, deployment and maintenance missions, consulting an external model (after the leak filter and the tribunal), mutual TLS.
 
 ---
 
@@ -71,6 +71,8 @@ Status: **in service** for rules, workflow, events and the mission to developmen
 - **One namespace shared by the agents.** Isolation does not come from the namespace, but from a service account and a UID specific to each pod, from NetworkPolicies that open the agents' entry to the dispatcher only, and from each account's rights.
 - **No agent access to the workflow engine, no write access to the bus.** An executor has no way to reach another agent: no other agent's key, no workflow engine, no bus.
 - **A key per executor**, known to it and to the dispatcher only.
+- **One model-router key per agent**, limited to the local background model and embedding: no agent holds the router's master key or a remote model.
+- **The bus has no agent accounts any more**: their queues are removed; agents are not bus clients.
 - **Closed tool list** per agent, checked in non-regression testing: the tools actually given to the model are listed at every update of the agent engine, whose defaults may change.
 
 ---
