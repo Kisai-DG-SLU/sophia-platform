@@ -26,7 +26,9 @@ COPY css/ css/
 COPY js/ js/
 COPY images/ images/
 COPY deploy/nginx.conf.in deploy/render-config.py deploy/render-pricing.py deploy/entrypoint.sh deploy/
-COPY api/__init__.py api/app.py api/access.py api/profile.py api/forgejo.py api/websearch.py api/schema.sql api/persona-sophia.md api/
+# Tous les modules de l'API : un module oublié ici fait planter le conteneur à l'import
+# (api/tests/test_containerfile.py le vérifie).
+COPY api/*.py api/schema.sql api/persona-sophia.md api/
 
 # Le gabarit lit mime.types dans l'environnement pixi du pod de dev.
 # Journaux vers la sortie du conteneur (oc logs), pas dans des fichiers.

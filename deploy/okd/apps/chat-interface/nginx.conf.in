@@ -2,9 +2,10 @@
 #
 # Ce fichier est un modèle : il est rendu en `nginx.conf` (gitignoré) par
 # `render-config.py`, au lancement (`make serve`) et à chaque rechargement.
-# seul ${LITELLM_AUTH} est substitué :
+# seuls les marqueurs LITELLM_AUTH et LITELLM_AUDIO_AUTH (écrits $ + {…}) sont substitués :
 #   - clé présente dans l'env   → `"Bearer sk-..."`
 #   - clé absente               → `""` (nginx retire l'en-tête → LiteLLM 401)
+#   - clé audio absente         → la clé du pod
 #
 # Front statique (app) sur le port 8080.
 # /api/ → LiteLLM interne, préfixe /api/ strippé, LISTE BLANCHE seulement :
@@ -58,6 +59,16 @@ http {
     }
 
     # API des discussions et des profils (étapes 6b, 5c), conteneur voisin du pod.
+    # Origine de l'école sur sa propre adresse : la seule à recevoir les en-têtes CORS.
+    map $http_origin $ecole_origin {
+        "https://ecole.example.org" $http_origin;
+        default "";
+    }
+    map $ecole_origin $ecole_credentials {
+        "" "";
+        default "true";
+    }
+
     upstream sophia_store {
         server 127.0.0.1:8000;
         keepalive 8;
@@ -68,6 +79,12 @@ http {
     map $sophia_end_user $sophia_chat_upstream {
         ""      litellm;
         default sophia_store;
+    }
+
+    # Jeton d'accès de la personne, seulement quand la discussion passe par l'API (identité présente).
+    map $sophia_end_user $sophia_jeton {
+        ""      "";
+        default $http_x_forwarded_access_token;
     }
 
     upstream litellm {
@@ -89,7 +106,7 @@ http {
         # tout le reste rend 404. Un nouveau dossier du front s'ajoute ici.
         # Cache : le navigateur revalide la page et les scripts à chaque chargement (réponse
         # 304 si rien n'a changé). Sans en-tête, Safari les garde des jours après une mise à
-        # jour (cache heuristique) : un correctif déployé restait invisible sur l'iPad.
+        # jour (cache heuristique) : un correctif déployé restait invisible sur une tablette.
         location = / {
             add_header Cache-Control "no-cache";
             try_files /index.html =404;
@@ -105,6 +122,35 @@ http {
             return 404;
         }
 
+        # Sophia School : pod voisin du namespace, mêmes connexion et identité que le chat.
+        # Le nom est résolu à chaque requête (variable + resolver) et non au démarrage : si l'école
+        # est absente, le chat démarre quand même et seul /ecole/ répond 502.
+        # Ni cookie ni en-tête d'identité ne partent vers l'école : elle ne sert que des fichiers,
+        # et passe par /api/store/school/ pour la progression.
+        location = /ecole {
+            return 301 /ecole/;
+        }
+        location ^~ /ecole/ {
+            resolver dns-default.openshift-dns.svc.cluster.local valid=30s ipv6=off;
+            set $sophia_school http://sophia-school.sophia-apps.svc.cluster.local:8080;
+            rewrite ^/ecole/(.*)$ /$1 break;
+            proxy_pass $sophia_school;
+            proxy_http_version 1.1;
+            proxy_set_header Host sophia-school;
+            proxy_set_header Connection "";
+            proxy_set_header X-Sophia-Jeton "";
+            proxy_set_header Cookie "";
+            proxy_set_header Authorization "";
+            proxy_set_header X-Forwarded-User "";
+            proxy_set_header X-Forwarded-Email "";
+            proxy_set_header X-Forwarded-Preferred-Username "";
+            proxy_set_header X-Forwarded-Groups "";
+            proxy_set_header X-Forwarded-Access-Token "";
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 30s;
+            limit_except GET HEAD { deny all; }
+        }
+
         # Routes LiteLLM réellement appelées par le front (js/api.js).
         # Ajouter une route ici, jamais élargir à tout /api/.
         location = /api/v1/chat/completions {
@@ -113,6 +159,10 @@ http {
             proxy_http_version 1.1;
             proxy_set_header Host litellm-svc.sophia-core.svc.cluster.local:4000;
             proxy_set_header Connection "";
+            # Jeton d'accès de la personne (oauth2-proxy --pass-access-token) : vers store-api seulement, et sur
+            # cette seule route ; jamais vers LiteLLM (pod de dev sans identité : vide).
+            proxy_set_header X-Forwarded-Access-Token "";
+            proxy_set_header X-Sophia-Jeton $sophia_jeton;
             proxy_set_header Authorization ${LITELLM_AUTH};
             proxy_set_header x-litellm-customer-id "";
             proxy_set_header x-litellm-end-user-id $sophia_end_user;
@@ -125,7 +175,9 @@ http {
             proxy_read_timeout 300s;
         }
 
-        # Voix locale (PVoix) : sophia-stt et sophia-tts, via LiteLLM (clé et identité imposées).
+        # Voix locale : sophia-stt et sophia-tts, via LiteLLM (clé et identité imposées). Clé dédiée
+        # (LITELLM_AUDIO_API_KEY, render-config.py) limitée aux modèles audio : le modèle du formulaire ne
+        # peut pas viser un modèle distant.
         # Corps limités : 12 Mo pour un enregistrement (le service refuse au-delà de 10 Mo / 120 s).
         location ~ ^/api/v1/audio/(transcriptions|speech)$ {
             rewrite ^/api/(.*)$ /$1 break;
@@ -133,7 +185,9 @@ http {
             proxy_http_version 1.1;
             proxy_set_header Host litellm-svc.sophia-core.svc.cluster.local:4000;
             proxy_set_header Connection "";
-            proxy_set_header Authorization ${LITELLM_AUTH};
+            proxy_set_header X-Forwarded-Access-Token "";
+            proxy_set_header X-Sophia-Jeton "";
+            proxy_set_header Authorization ${LITELLM_AUDIO_AUTH};
             proxy_set_header x-litellm-customer-id "";
             proxy_set_header x-litellm-end-user-id $sophia_end_user;
             client_max_body_size 12m;
@@ -150,6 +204,8 @@ http {
 
             proxy_set_header Host litellm-svc.sophia-core.svc.cluster.local:4000;
             proxy_set_header Connection "";
+            proxy_set_header X-Forwarded-Access-Token "";
+            proxy_set_header X-Sophia-Jeton "";
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
@@ -179,9 +235,77 @@ http {
             if ($sophia_end_user = "") {
                 return 404;
             }
+            # Routes de l'école : l'école, sur sa propre adresse, n'appelle le chat que sous ce
+            # préfixe. CORS pour la seule origine exacte de l'école ($ecole_origin), avec le cookie du chat.
+            # Préflight OPTIONS (sans cookie, laissé passer par oauth2-proxy) traité ici, avant l'identité.
+            # Les directives if/return ne s'héritent pas d'un bloc à l'autre : chaque bloc les répète.
+            location ^~ /api/store/school/ {
+                if ($request_method = OPTIONS) {
+                    return 204;
+                }
+                if ($sophia_end_user = "") {
+                    return 404;
+                }
+                add_header Access-Control-Allow-Origin $ecole_origin always;
+                add_header Access-Control-Allow-Credentials $ecole_credentials always;
+                add_header Access-Control-Allow-Methods "GET, POST, PUT" always;
+                add_header Access-Control-Allow-Headers "Content-Type" always;
+                add_header Access-Control-Max-Age 600 always;
+                add_header Vary Origin always;
+                # Appels de l'école au modèle local (ardoise, fiche de lecture, « Demander à Sophia », réaction
+                # à une note) : même API, plus la clé LiteLLM du pod ; corps de 2 photos, lecture jusqu'à 3 min.
+                location ~ "^/api/store/school/(ardoise|lecture|aide|reaction/[0-9a-f-]{36})$" {
+                    if ($request_method = OPTIONS) {
+                        return 204;
+                    }
+                    if ($sophia_end_user = "") {
+                        return 404;
+                    }
+                    limit_except POST OPTIONS { deny all; }
+                    proxy_pass http://127.0.0.1:8000;
+                    proxy_http_version 1.1;
+                    proxy_set_header Connection "";
+                    proxy_set_header X-Forwarded-Access-Token "";
+                    proxy_set_header X-Sophia-Jeton "";
+                    proxy_set_header X-Sophia-User $sophia_end_user;
+                    proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
+                    proxy_set_header Authorization ${LITELLM_AUTH};
+                    client_max_body_size 9m;
+                    proxy_read_timeout 180s;
+                }
+                # Voix de Sophia pour l'école : clé audio (modèles audio locaux seulement).
+                location = /api/store/school/voix {
+                    if ($request_method = OPTIONS) {
+                        return 204;
+                    }
+                    if ($sophia_end_user = "") {
+                        return 404;
+                    }
+                    limit_except POST OPTIONS { deny all; }
+                    proxy_pass http://127.0.0.1:8000;
+                    proxy_http_version 1.1;
+                    proxy_set_header Connection "";
+                    proxy_set_header X-Forwarded-Access-Token "";
+                    proxy_set_header X-Sophia-Jeton "";
+                    proxy_set_header X-Sophia-User $sophia_end_user;
+                    proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
+                    proxy_set_header Authorization ${LITELLM_AUDIO_AUTH};
+                    proxy_read_timeout 120s;
+                }
+                proxy_pass http://127.0.0.1:8000;
+                proxy_http_version 1.1;
+                proxy_set_header Connection "";
+                proxy_set_header X-Forwarded-Access-Token "";
+                proxy_set_header X-Sophia-Jeton "";
+                proxy_set_header X-Sophia-User $sophia_end_user;
+                proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
+                proxy_read_timeout 60s;
+            }
             proxy_pass http://127.0.0.1:8000;
             proxy_http_version 1.1;
             proxy_set_header Connection "";
+            proxy_set_header X-Forwarded-Access-Token "";
+            proxy_set_header X-Sophia-Jeton "";
             proxy_set_header X-Sophia-User $sophia_end_user;
             proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
             proxy_read_timeout 60s;

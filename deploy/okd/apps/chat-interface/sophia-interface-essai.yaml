@@ -1,0 +1,21 @@
+# Route d'essai avant bascule : un nom couvert par le joker DNS des applications, résolu vers l'adresse
+# du VPN (donc joignable par le VPN seulement) et par le certificat du routeur. Supprimée à la bascule.
+# Pendant l'essai, oauth2-proxy du nouveau namespace renvoie vers ce nom, et le client Keycloak de
+# l'interface accepte son adresse de retour (retirée ensuite).
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sophia-interface-essai
+  namespace: sophia-interface
+  labels: { app: sophia-interface }
+  annotations:
+    # Réponses longues en streaming (gros modèles).
+    haproxy.router.openshift.io/timeout: 900s
+spec:
+  host: chat-essai.apps.example.org
+  to: { kind: Service, name: sophia-interface }
+  port: { targetPort: http }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

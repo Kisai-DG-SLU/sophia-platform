@@ -1,0 +1,19 @@
+# Route de production de l'interface dans le namespace sophia-interface. À appliquer à la bascule,
+# après la suppression de l'ancienne Route (même nom d'hôte).
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sophia-interface
+  namespace: sophia-interface
+  labels: { app: sophia-interface }
+  annotations:
+    # Réponses longues en streaming (gros modèles).
+    haproxy.router.openshift.io/timeout: 900s
+spec:
+  host: chat.example.org
+  to: { kind: Service, name: sophia-interface }
+  port: { targetPort: http }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
