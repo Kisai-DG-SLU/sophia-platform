@@ -163,7 +163,7 @@ spec:
           env:
             - { name: SOPHIA_FAMILY_ORG, value: famille }
             - { name: SOPHIA_BRAIN_REPO, value: ORGANISATION/brain }
-            - { name: SOPHIA_PROMOTE_TARGETS, value: '{"famille": "Famille", "projets-perso": "Perso"}' }
+            - { name: SOPHIA_PROMOTE_TARGETS, value: '{"famille": "Famille", "perso": "Perso"}' }
             # Modèle par défaut (profil sans choix explicite, journal) : inférence locale, rien ne sort du cluster.
             - { name: SOPHIA_DEFAULT_MODEL, value: sophia-local }
             # Fenêtre de contexte par modèle, en tokens : au-delà, refus expliqué avant le routeur.
