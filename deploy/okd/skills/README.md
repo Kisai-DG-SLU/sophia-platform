@@ -5,7 +5,7 @@ La zone « outils » de l'[architecture](../../../docs/architecture.md) : des se
 | Zone | Ce qu'on y met | Sortie réseau |
 |---|---|---|
 | [`sophia-dmz`](../dmz/) | ce qui va chercher dehors : recherche web, lecture de pages, météo | Internet (80/443) seulement |
-| **`sophia-skills`** | **outils locaux** : géographie, images (règles de protection), sources officielles téléchargées | **aucune** (DNS ; modèles d'image) |
+| **`sophia-skills`** | **outils locaux** : géographie, images (règles de protection), sources officielles téléchargées, fichiers de la personne | **aucune vers Internet** (DNS ; modèles d'image ; pour l'outil « fichiers » : le fournisseur d'identité et le port interne de Fichiers) |
 | [`sophia-inference`](../inference/) | les modèles : texte, voix, générateur et classifieur d'images | aucune |
 
 ```
@@ -35,7 +35,9 @@ Le code des serveurs n'est pas fourni ; leur contrat :
 - `sophia/injecte` : paramètres que **l'interface** remplit elle-même, jamais le modèle (ex. `protected` = compte protégé, tiré de la session) ;
 - `sophia/delai_s` : délai d'attente de l'outil (file d'attente comprise) ;
 - un résultat peut porter `_affichage` (`image/png` en base64 ou `image/svg+xml`, avec un titre) : l'interface **vérifie** le contenu puis l'insère tel quel dans la réponse ; le modèle ne reçoit que la description, pas l'image ;
-- un échec est un `error` lisible, que le modèle rapporte tel quel.
+- un échec est un `error` lisible, que le modèle rapporte tel quel ;
+- `sophia/jeton` : l'outil agit sous l'identité de la personne et exige son jeton relayé ; l'interface ne l'envoie qu'aux serveurs de sa liste fermée, et ne propose jamais ces outils au modèle : elle les appelle elle-même après la décision des règles ([Relais de l'identité](../../../docs/concepts/12-relais-identite.md)) ;
+- `sophia/contenu` : le résultat contient le contenu d'un document de la personne ; l'interface ne le donne qu'à un modèle local et le retire de tout autre appel ([Modèles par rôle](../../../docs/concepts/13-modeles-par-role.md)).
 
 ## Géographie — `sophia-geo`
 
@@ -58,6 +60,22 @@ Outil `image` : la demande de la personne (en français, telle quelle) et la con
 3. **à l'affichage** : l'interface vérifie à nouveau le contenu reçu.
 
 Le nom et la licence du modèle accompagnent chaque image. Licence de SDXL-Turbo : usage **non commercial** (voir [`../inference/`](../inference/)).
+
+## Fichiers de la personne — `mcp-fichiers`
+
+État : en service (recherche) et déployé (lecture du contenu, recette à faire) ; le code et les manifestes de l'installation de référence ne sont pas publiés, leur contrat et leurs règles le sont ici. Module : [Bureautique](../../../docs/modules/bureautique/documentation.md).
+
+| Outil | Rôle |
+|---|---|
+| `chercher_fichiers` | éléments trouvés par le nom (ou les plus récents), avec chemin, date, type, « modifiable », jamais d'URL |
+| `details_fichier` | un élément et son chemin lisible |
+| `lire_fichier` | texte d'un document, extrait sans exécution (archives XML bornées, PDF en texte seul), tronqué, marqué `contenu_sensible` |
+
+- **Lecture seule, sous l'identité de la personne** : jeton relayé par l'interface, vérifié (signature, émetteur, expiration, audience, client d'origine, groupes), puis **échangé** contre un jeton émis pour l'outil ; Fichiers l'introspecte et applique ses propres droits. Aucun compte de service qui lit tout. Une session MCP par appel ; aucun jeton journalisé (journal du client HTTP ramené à WARNING, pour que la recherche de la personne n'y figure pas).
+- **Réseau** : entrée depuis l'interface seulement ; sortie vers le DNS, le fournisseur d'identité (clés publiques et échange) et le port interne réservé de Fichiers (GET seulement), **rien d'autre**.
+- **Build dans un namespace à part** (`sophia-skills-build`) : l'outil reçoit les jetons de la famille, donc aucun agent ne doit pouvoir changer sa BuildConfig ou son image. Ce namespace n'a **aucun RoleBinding vers un compte d'agent** ; quota d'un build à la fois ; aucune entrée.
+- **EgressFirewall du build en refus final** : Services et pods du cluster, **l'API du cluster** (nœuds du plan de contrôle, sur le port de l'API ; sans cette règle, le build reste bloqué au clonage, faute de pouvoir mettre à jour son état), PyPI ; rien d'autre.
+- **Image de base** déjà munie de Python, **importée par le registre interne** (ImageStream en `referencePolicy: Local`, figée par empreinte) : le pod de build ne tire rien chez l'éditeur et n'installe aucun paquet système. **Dépendances Python figées par empreinte** (`--require-hashes`, roues binaires seules). Source binaire (`git archive` du commit), aucun déclencheur : une nouvelle image ne remplace le pod qu'après une nouvelle empreinte commitée et appliquée.
 
 ## Variables
 
