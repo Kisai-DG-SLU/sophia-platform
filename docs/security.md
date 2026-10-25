@@ -89,7 +89,7 @@ Ce mécanisme empêche les scripts malveillants et les mécanismes de traçage d
 
 - contrôle d'accès strict : SSO, groupes, clés restreintes par client du routeur de modèles ;
 - secrets gérés par Kubernetes : les manifestes n'en contiennent aucun ; un Secret se crée par l'entrée standard, jamais en argument d'une commande (visible dans la liste des processus), et aucune valeur n'est affichée ; une valeur trouvée dans l'historique d'un dépôt est changée, sans réécrire l'historique ;
-- builds en lecture seule sur leur dépôt : une clé de déploiement par dépôt, jamais le jeton d'un administrateur de la forge ;
+- lecture des dépôts par une clé de déploiement en lecture seule, propre à chaque dépôt, jamais par le jeton d'un administrateur de la forge : **en place** pour la synchronisation des contenus de l'école, **prévu** pour les builds de l'interface et de l'outil de visualisation ;
 - journalisation d'audit ;
 - volumes chiffrés : **cible**, pas encore en place (volumes locaux non chiffrés).
 
