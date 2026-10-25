@@ -87,7 +87,7 @@ Ce mécanisme empêche les scripts malveillants et les mécanismes de traçage d
 
 ## Protection des données
 
-- contrôle d'accès strict : SSO, groupes, clés restreintes par client du routeur de modèles ;
+- contrôle d'accès strict : SSO, groupes ; modèles imposés par le serveur selon le rôle (enfants et invités sur le modèle local), une clé virtuelle du routeur de modèles par usage, la clé maître confinée au routeur (voir [Modèles par rôle](concepts/13-modeles-par-role.md)) ;
 - un outil qui agit pour la personne reçoit son identité par un jeton relayé sur une seule route, vers une liste fermée de serveurs, vérifié puis échangé contre un jeton émis pour l'outil ; le service garde ses propres droits, et le modèle ne voit jamais le jeton (voir [Relais de l'identité](concepts/12-relais-identite.md)) ;
 - secrets gérés par Kubernetes : les manifestes n'en contiennent aucun ; un Secret se crée par l'entrée standard, jamais en argument d'une commande (visible dans la liste des processus), et aucune valeur n'est affichée ; une valeur trouvée dans l'historique d'un dépôt est changée, sans réécrire l'historique ;
 - lecture des dépôts par une clé de déploiement en lecture seule, propre à chaque dépôt, jamais par le jeton d'un administrateur de la forge : **en place** pour la synchronisation des contenus de l'école, **prévu** pour les builds de l'interface et de l'outil de visualisation ;

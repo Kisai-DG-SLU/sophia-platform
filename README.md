@@ -138,6 +138,7 @@ La documentation est organisee dans le repertoire [`docs/`](docs/index.md).
 | [Observabilité](docs/concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
 | [Inférence et matériel](docs/concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
 | [Relais de l'identité](docs/concepts/12-relais-identite.md) | Un outil MCP agit sous l'identité de la personne : relais, vérification et échange du jeton |
+| [Modèles par rôle](docs/concepts/13-modeles-par-role.md) | Modèle imposé par le serveur selon le rôle, une clé virtuelle par usage, clé maître confinée au routeur |
 
 ### Deploiement
 

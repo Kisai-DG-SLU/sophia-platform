@@ -147,6 +147,7 @@ Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 | [Observability](docs/concepts/10-observabilite.en.md) | Alarms, "incident" workflow, human approval |
 | [Inference and Hardware](docs/concepts/11-inference-materiel.en.md) | One card per task family, sharing and priority, CPU budget |
 | [Identity Relay](docs/concepts/12-relais-identite.en.md) | An MCP tool acts under the person's identity: token relay, verification and exchange |
+| [Models by Role](docs/concepts/13-modeles-par-role.en.md) | Model enforced by the server per role, one virtual key per use, master key confined to the router |
 
 ### Deployment
 

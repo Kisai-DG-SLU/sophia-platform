@@ -104,7 +104,7 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 |---|---|
 | Token relay (oauth2-proxy, nginx, closed list) | in service |
 | "Files" MCP: verification, exchange, search by name, links built by the chat | in service |
-| Reading a document's content, reserved to local models | designed |
+| Reading a document's content, reserved to local models ([Models by role](13-modeles-par-role.en.md)) | deployed, acceptance test pending |
 | Human approvals through the chat, with the same relayed token | planned (see [Observability](10-observabilite.en.md)) |
 
 ---

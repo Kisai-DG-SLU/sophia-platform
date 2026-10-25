@@ -35,6 +35,7 @@ Bienvenue dans la documentation de l'architecture SophIA.
 | 10 | [Observabilité](concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
 | 11 | [Inférence et matériel](concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
 | 12 | [Relais de l'identité](concepts/12-relais-identite.md) | Un outil MCP agit sous l'identité de la personne : relais, vérification et échange du jeton |
+| 13 | [Modèles par rôle](concepts/13-modeles-par-role.md) | Modèle imposé par le serveur selon le rôle, une clé virtuelle par usage, clé maître confinée au routeur |
 
 ---
 

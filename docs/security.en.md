@@ -87,7 +87,7 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 
 # Data Protection
 
-- strict access control: SSO, groups, per-client restricted keys on the model router;
+- strict access control: SSO, groups; models enforced by the server per role (children and guests on the local model), one model-router virtual key per use, the master key confined to the router (see [Models by Role](concepts/13-modeles-par-role.en.md));
 - a tool acting for the person receives their identity through a token relayed on a single route, to a closed list of servers, verified then exchanged for a token issued to the tool; the service keeps its own permissions, and the model never sees the token (see [Identity Relay](concepts/12-relais-identite.en.md));
 - secrets managed through Kubernetes: manifests contain none; a Secret is created from standard input, never as a command argument (visible in the process list), and no value is printed; a value found in a repository's history is changed, without rewriting history;
 - repositories read through a read-only deploy key, specific to each repository, never through a forge administrator's token: **in place** for the school's content sync, **planned** for the builds of the interface and of the visualisation tool;
