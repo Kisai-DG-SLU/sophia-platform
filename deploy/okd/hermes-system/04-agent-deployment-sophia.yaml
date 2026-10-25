@@ -18,6 +18,7 @@ spec:
       # par défaut. Pas de jeton d'API monté : le seul jeton du pod est le jeton projeté d'audience
       # « repartiteur », que l'API Kubernetes refuse. Sophia délègue par le répartiteur seulement.
       serviceAccountName: sophia-sa
+      priorityClassName: ${AGENT_PRIORITY_CLASS:-sophia-agents}
       automountServiceAccountToken: false
 
       initContainers:
@@ -46,9 +47,12 @@ spec:
           if [ -f "config.yaml" ]; then
             envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
           fi
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: "500m", memory: 256Mi }
         env:
         - name: AGENT_MODEL
-          value: ${MODEL_THINK:-sophia-think}
+          value: ${AGENT_MODEL_ALIAS:-sophia-local-fond}
         - name: FORGEJO_USER
           valueFrom:
             secretKeyRef:
@@ -59,6 +63,8 @@ spec:
             secretKeyRef:
               name: ${FORGEJO_SECRET_PREFIX}-sophia
               key: password
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-sophia, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -96,6 +102,8 @@ spec:
         # UID arbitraire (restricted-v2) : pas d'entrée passwd, HOME vers le volume inscriptible
         - name: HOME
           value: /opt/data
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-sophia, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
