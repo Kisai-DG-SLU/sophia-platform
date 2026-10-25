@@ -11,7 +11,7 @@
 - **Shopping** aggregated by aisle, ticks shared between household members, undoable history; a tab sends the validated list to the [Shopping module](../courses/README.en.md), which fills a drive-through grocery basket.
 - **Import** of a recipe from a link or pasted text: the model turns it into a card, rules check it, the household reviews a preview before saving.
 - **Dish photo** generated locally by the platform's `image` MCP tool.
-- **In the chat**: "what's for dinner tonight?" is answered by the assistant, from the meal plan.
+- **In the chat**: "what's for dinner tonight?" is answered by the assistant, from the meal plan. The service always announces the chosen slot (`_trace`); if every requested meal is empty, the service writes the answer itself (`_fin`: "Nothing planned… Shall I suggest a dish?"), shown as is: the model can no longer invent a "planned" meal. A secret party hidden from a child gives the empty-slot answer, without a word about the party. From the chat, adults can also open the application on the week's plan or on the shopping tab.
 
 - **Ingredient table** (under acceptance testing): calories, season and price of each ingredient, to **compute** the cost, calories and season months of recipes instead of estimating them (see below).
 
@@ -59,6 +59,8 @@ All through the model router, with a dedicated virtual key and the person's iden
 | recipe generation | 0.9 |
 | recipe import (turning a page into a card) | 0.1 |
 | short English prompt for the photo, length checked | — |
+
+Generation and the ingredient table are **background tasks**: they use the router's background alias, which leaves priority to chat, falling back to the main alias as long as the background alias is not open to the module's key (re-read every 10 minutes, without restart). Import and photo, started by a click, stay on the main alias. The model actually used is recorded in the generation log.
 
 ## Rules: the model proposes, rules decide
 
