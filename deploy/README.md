@@ -79,7 +79,12 @@ Le deploiement exemple utilise une architecture de namespaces segmentee. Les nam
 | sophia-dmz       | acquisition web controlee                 |
 | sophia-sandbox   | environnements de developpement           |
 | sophia-test      | environnements de validation              |
-| sophia-apps      | interfaces utilisateur                    |
+| sophia-apps      | modules                                   |
+| sophia-interface | interface de discussion                   |
+| sophia-workflow  | outil de visualisation                    |
+| sophia-workspace | bureautique                               |
+| sophia-skills-build | builds des outils MCP, sans compte d'agent |
+| namespace des agents | panthéon et assistant de code         |
 | sophia-identity  | identité et SSO (Keycloak)                |
 | sophia-storage   | stockage objet S3 commun                  |
 
