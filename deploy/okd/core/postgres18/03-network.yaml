@@ -1,0 +1,43 @@
+# Entrées de PostgreSQL 18 : une seule règle pour tous les consommateurs, chacun par son étiquette.
+# S'ajoute au refus par défaut de sophia-core (../network/default-deny-ingress.yaml).
+# Attention : un consommateur dont le namespace limite la SORTIE doit aussi ouvrir 5432 vers
+# app=postgres-sophia-18 dans sa propre règle (README, « Le rituel », étape 0).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-18-ingress
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchLabels: { app: postgres-sophia-18 }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        # sophia-core : routeur de modèles, moteur de workflows et son Job de schémas
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [litellm, temporal, temporal-schema] }
+        # Fournisseur d'identité
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-identity }
+        # Applications (un bloc par application qui a sa base)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-apps }
+          podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [recettes, courses] }  # une étiquette par application
+        # Interface de discussion, dans son namespace dédié
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-interface }
+          podSelector:
+            matchLabels: { app: sophia-interface }
+        # Gestion de fichiers de la bureautique (l'éditeur de documents n'y a pas accès)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: "${WORKSPACE_NAMESPACE}" }
+          podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [fichiers-backend, fichiers-worker, fichiers-beat, fichiers-migrate, fichiers-configure-wopi]
+      ports:
+        - { protocol: TCP, port: 5432 }

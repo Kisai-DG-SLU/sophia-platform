@@ -1,0 +1,67 @@
+# PostgreSQL 18, instance commune de toutes les bases de la plateforme.
+# Image sclorg en version 18, figée par empreinte : un redémarrage ne tire jamais une autre version.
+# Un rôle propriétaire par base, sans superutilisateur : l'image crée le rôle et la base du routeur de
+# modèles (« litellm ») avec un mot de passe neuf (Secret postgres-sophia-18-creds) ; les autres rôles
+# et bases sont créés par psql (README). Seul « postgres » est superutilisateur, par le socket local du
+# pod, sans mot de passe réseau.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-sophia-18
+  namespace: sophia-core
+  labels: { app: postgres-sophia-18 }
+spec:
+  replicas: 1
+  # Volume local RWO : jamais deux PostgreSQL sur le même répertoire de données
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: postgres-sophia-18 }
+  template:
+    metadata:
+      labels: { app: postgres-sophia-18 }
+    spec:
+      priorityClassName: sophia-chat  # la discussion et ses dépendances (../../cluster/)
+      enableServiceLinks: false
+      containers:
+        - name: postgres
+          image: quay.io/sclorg/postgresql-18-c10s@${PG18_DIGEST}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: postgres, containerPort: 5432, protocol: TCP }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
+          env:
+            - { name: POSTGRESQL_USER, value: litellm }
+            - name: POSTGRESQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: postgres-sophia-18-creds, key: password } }
+            - { name: POSTGRESQL_DATABASE, value: litellm }
+          readinessProbe:
+            exec: { command: [pg_isready, -h, 127.0.0.1, -p, "5432"] }
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: [pg_isready, -h, 127.0.0.1, -p, "5432"] }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/pgsql/data }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: postgres-18-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-sophia-18
+  namespace: sophia-core
+  labels: { app: postgres-sophia-18 }
+spec:
+  selector: { app: postgres-sophia-18 }
+  ports:
+    - { name: postgres, port: 5432, targetPort: postgres }

@@ -1,0 +1,37 @@
+# Volume de PostgreSQL 18. Préalable sur le nœud (README, étape 1) : volume logique XFS dédié, monté par
+# fstab sur ${PG_MOUNT_POINT}, étiqueté container_file_t. Extensible à chaud (lvextend -r).
+# PV local lié à ce seul PVC (claimRef), Retain : supprimer le PV ne touche pas aux données.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-postgres-18
+  labels: { app: postgres-sophia-18 }
+spec:
+  capacity: { storage: "${PG_SIZE}" }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: ${PG_MOUNT_POINT}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: ["${NODE_NAME}"] }
+  claimRef:
+    namespace: sophia-core
+    name: postgres-18-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-18-data
+  namespace: sophia-core
+  labels: { app: postgres-sophia-18 }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-postgres-18
+  resources:
+    requests: { storage: "${PG_SIZE}" }
