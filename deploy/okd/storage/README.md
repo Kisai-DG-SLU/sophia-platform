@@ -25,6 +25,7 @@ Job d'initialisation ───────────────────�
 | Administration interne | gardée, protégée par mot de passe (variable `WEED_ADMIN_PASSWORD`, Secret `s3-admin`) | sans elle, le travailleur de maintenance (nettoyage, rééquilibrage) tourne en boucle sur une connexion refusée ; une variable plutôt qu'un argument, qu'on lirait dans la liste des processus du nœud |
 | Identités | une identité `admin`, puis **une par application, limitée à son seau** (`Read:fichiers`, `Write:fichiers`…) ; aucune identité anonyme | une application ne voit ni ne crée d'autre seau |
 | Seau `fichiers` | versioning activé, CORS limitée à l'origine de l'application de fichiers (GET, PUT, HEAD), politique `ProtegerVersions` | le navigateur envoie directement par PUT présigné ; une écriture ou une suppression reste réversible |
+| Corbeille | cycle de vie `corbeille-30-jours` : une version non courante expire 30 jours après avoir été remplacée (`NoncurrentDays: 30`), un marqueur de suppression resté seul est retiré (`ExpiredObjectDeleteMarker`) ; la version courante n'expire jamais | une suppression ou un écrasement se rattrape pendant 30 jours, sans que les anciennes versions remplissent le volume ; la tâche quotidienne de `weed mini` l'exécute |
 | Politique de seau | refus explicite, pour l'identité de l'application seule, de suspendre le versioning, de changer la CORS, le cycle de vie ou la politique, et de supprimer une version | sans elle, le droit `Write` de SeaweedFS couvrirait tout cela ; avec le principal `*`, l'admin serait bloqué aussi, sans retour possible |
 | Réseau | `default-deny` en **entrée et en sortie** ; entrée 8443 depuis le routeur, le namespace de l'espace de travail et le Job d'initialisation ; sortie DNS seulement | le stockage n'a besoin ni d'Internet ni d'un autre service |
 | Télémétrie | `-master.telemetry=false` | objectif 100 % local ; de toute façon, la sortie fermée l'aurait empêchée de partir |
@@ -52,7 +53,7 @@ Job d'initialisation ───────────────────�
 | `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`) | `node-0` |
 | `${S3_MOUNT_POINT}` | point de montage du volume sur le nœud | `/var/mnt/s3` |
 | `${S3_SIZE}` | taille du PV et de la PVC | `200Gi` |
-| `${S3_PRIORITY_CLASS}` | classe de priorité des services de fond | `background` |
+| `${S3_PRIORITY_CLASS}` | classe de priorité des services de fond ([`../cluster/`](../cluster/)) | `sophia-agents` |
 | `${SEAWEEDFS_VERSION}`, `${SEAWEEDFS_DIGEST}` | version et empreinte de l'image SeaweedFS | `4.48`, `sha256:…` |
 | `${AWSCLI_VERSION}`, `${AWSCLI_DIGEST}` | version et empreinte de l'image du client S3 du Job | `2.37.9`, `sha256:…` |
 
@@ -84,7 +85,7 @@ Depuis un clone propre et à jour du dépôt interne ; chemins relatifs à `depl
    Attendu : deux Secrets, avec 1 et 3 clés.
 4. **Réseau, puis SeaweedFS** : `03-network.yaml`, puis `02-seaweedfs.yaml` et `oc -n sophia-storage rollout status deploy/s3`. Attendu : pod prêt ; le journal annonce la passerelle S3 en HTTPS sur 8443, sans erreur fatale. Quelques « connection refused » du travailleur de maintenance au démarrage sont normaux : il attend l'administration.
 5. **Route** : `04-route.yaml`.
-6. **Réglage du seau** : `05-init-job.yaml`, puis `oc -n sophia-storage wait --for=condition=complete job/s3-init` et son journal. Attendu : `"Status": "Enabled"` pour le versioning, la règle CORS avec `${FILES_ORIGIN}`, puis la politique `ProtegerVersions`. Pour rejouer : supprimer le Job, puis l'appliquer de nouveau.
+6. **Réglage du seau** : `05-init-job.yaml`, puis `oc -n sophia-storage wait --for=condition=complete job/s3-init` et son journal. Attendu : `"Status": "Enabled"` pour le versioning, la règle CORS avec `${FILES_ORIGIN}`, la politique `ProtegerVersions`, puis la règle `corbeille-30-jours`. La première exécution du cycle de vie vient au passage quotidien de la tâche de maintenance. Pour rejouer : supprimer le Job, puis l'appliquer de nouveau.
 7. **Contrôle par le vrai chemin**, depuis un poste du VPN : `curl -s -o /dev/null -w '%{http_code}\n' https://${S3_HOST}/fichiers/`. Attendu : **`403`** : la Route, le TLS de bout en bout et la passerelle répondent, et l'accès anonyme est refusé.
 
 Les clés de l'identité de l'application sont recopiées dans le Secret de l'application, dans son namespace, à son propre déploiement : lues dans `s3-config` vers des variables du shell, sans affichage, passées par un tube, puis `unset`.

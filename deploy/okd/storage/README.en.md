@@ -25,6 +25,7 @@ initialization Job ────────────────────�
 | Internal administration | kept, password-protected (`WEED_ADMIN_PASSWORD` variable, `s3-admin` Secret) | without it, the maintenance worker (cleanup, rebalancing) loops on a refused connection; a variable rather than an argument, which would show in the node's process list |
 | Identities | one `admin` identity, then **one per application, limited to its bucket** (`Read:fichiers`, `Write:fichiers`…); no anonymous identity | an application neither sees nor creates another bucket |
 | `fichiers` bucket | versioning enabled, CORS limited to the file application's origin (GET, PUT, HEAD), `ProtegerVersions` policy | the browser uploads directly through presigned PUT; a write or a delete stays reversible |
+| Trash | `corbeille-30-jours` lifecycle: a noncurrent version expires 30 days after being replaced (`NoncurrentDays: 30`), a delete marker left alone is removed (`ExpiredObjectDeleteMarker`); the current version never expires | a delete or an overwrite can be recovered for 30 days, without old versions filling the volume; the daily `weed mini` task runs it |
 | Bucket policy | explicit deny, for the application's identity only, of suspending versioning, changing CORS, lifecycle or policy, and deleting a version | without it, SeaweedFS's `Write` right would cover all of this; with the `*` principal, admin would be locked out too, with no way back |
 | Network | `default-deny` on **ingress and egress**; 8443 ingress from the router, the workspace namespace and the initialization Job; DNS egress only | storage needs neither the Internet nor any other service |
 | Telemetry | `-master.telemetry=false` | 100 % local goal; the closed egress would have stopped it anyway |
@@ -52,7 +53,7 @@ initialization Job ────────────────────�
 | `${NODE_NAME}` | node carrying the volume (`oc get nodes`) | `node-0` |
 | `${S3_MOUNT_POINT}` | mount point of the volume on the node | `/var/mnt/s3` |
 | `${S3_SIZE}` | size of the PV and PVC | `200Gi` |
-| `${S3_PRIORITY_CLASS}` | priority class of background services | `background` |
+| `${S3_PRIORITY_CLASS}` | priority class of background services ([`../cluster/`](../cluster/)) | `sophia-agents` |
 | `${SEAWEEDFS_VERSION}`, `${SEAWEEDFS_DIGEST}` | SeaweedFS image version and digest | `4.48`, `sha256:…` |
 | `${AWSCLI_VERSION}`, `${AWSCLI_DIGEST}` | version and digest of the Job's S3 client image | `2.37.9`, `sha256:…` |
 
@@ -84,7 +85,7 @@ From a clean, up-to-date clone of the internal repository; paths relative to `de
    Expected: two Secrets, with 1 and 3 keys.
 4. **Network, then SeaweedFS**: `03-network.yaml`, then `02-seaweedfs.yaml` and `oc -n sophia-storage rollout status deploy/s3`. Expected: pod ready; the log announces the S3 gateway over HTTPS on 8443, with no fatal error. A few "connection refused" from the maintenance worker at startup are normal: it waits for the administration.
 5. **Route**: `04-route.yaml`.
-6. **Bucket setup**: `05-init-job.yaml`, then `oc -n sophia-storage wait --for=condition=complete job/s3-init` and its log. Expected: `"Status": "Enabled"` for versioning, the CORS rule with `${FILES_ORIGIN}`, then the `ProtegerVersions` policy. To replay: delete the Job, then apply it again.
+6. **Bucket setup**: `05-init-job.yaml`, then `oc -n sophia-storage wait --for=condition=complete job/s3-init` and its log. Expected: `"Status": "Enabled"` for versioning, the CORS rule with `${FILES_ORIGIN}`, the `ProtegerVersions` policy, then the `corbeille-30-jours` rule. The lifecycle first runs at the daily pass of the maintenance task. To replay: delete the Job, then apply it again.
 7. **Check through the real path**, from a VPN client: `curl -s -o /dev/null -w '%{http_code}\n' https://${S3_HOST}/fichiers/`. Expected: **`403`**: the Route, end-to-end TLS and the gateway answer, and anonymous access is refused.
 
 The application identity's keys are copied into the application's own Secret, in its namespace, when it is deployed: read from `s3-config` into shell variables without display, passed through a pipe, then `unset`.
