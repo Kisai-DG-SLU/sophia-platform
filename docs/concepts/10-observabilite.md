@@ -19,8 +19,9 @@ Une plateforme qui sert un foyer ou une organisation doit savoir quand elle va m
 | Métrologie de la plateforme (Prometheus, Alertmanager fournis par OKD) | état du nœud et des composants du cluster | en service |
 | Accès en lecture à la métrologie pour la supervision | requêtes, pointes sur plusieurs jours | en service |
 | Surveillance des charges applicatives | métriques des services de SophIA : bus de messages, moteur de workflows, serveur d'inférence ; 15 jours de rétention | en service |
-| Règles d'alerte | 27 règles : mémoire épuisée et redémarrages en boucle (répétées dans chaque namespace, une règle ne voyant que le sien), répartiteur indisponible, lettres mortes et alarmes du bus, workflows en échec, modèle local indisponible ou saturé | en service : chargées, aucune en erreur |
-| Exporteur du nœud | la carte graphique (mémoire, utilisation, température, puissance) et les fichiers de métriques que déposent les scripts du nœud | en service |
+| Règles d'alerte | 29 règles : mémoire épuisée et redémarrages en boucle (répétées dans chaque namespace, une règle ne voyant que le sien), répartiteur indisponible, lettres mortes et alarmes du bus, workflows en échec, modèle local indisponible ou saturé, volumes presque pleins ou pleins | en service : chargées, aucune en erreur |
+| Exporteur du nœud | la carte graphique (mémoire, utilisation, température, puissance), l'occupation des volumes du nœud et les fichiers de métriques que déposent les scripts du nœud | en service |
+| État mesuré des composants, contrôle des miroirs | chaque composant vu par ses sondes, jamais supposé ; miroirs des dépôts contrôlés toutes les heures ([module Visualisation](../modules/visualisation/README.md)) | en service |
 | Garde-fou du filtre VPN en métrique | son code à chaque passage ; alertes : filtre retiré, vérification impossible, garde-fou muet | en service |
 
 Coût mesuré : environ 0,2 cœur et un à deux gigaoctets de mémoire, sans toucher aux services. Recette : [`deploy/okd/monitoring/`](../../deploy/okd/monitoring/).

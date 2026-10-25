@@ -19,8 +19,9 @@ A platform serving a household or an organization must know it is unwell before 
 | Platform metrics (Prometheus, Alertmanager provided by OKD) | state of the node and the cluster components | in service |
 | Read access to metrics for supervision | queries, peaks over several days | in service |
 | Application workload monitoring | metrics of SophIA's services: message bus, workflow engine, inference server; 15 days of retention | in service |
-| Alert rules | 27 rules: memory exhausted and crash loops (repeated in each namespace, since a rule only sees its own), dispatcher unavailable, bus dead letters and alarms, failed workflows, local model unavailable or saturated | in service: loaded, none in error |
-| Node exporter | the graphics card (memory, utilisation, temperature, power) and the metric files dropped by the node's scripts | in service |
+| Alert rules | 29 rules: memory exhausted and crash loops (repeated in each namespace, since a rule only sees its own), dispatcher unavailable, bus dead letters and alarms, failed workflows, local model unavailable or saturated, volumes nearly full or full | in service: loaded, none in error |
+| Node exporter | the graphics card (memory, utilisation, temperature, power), the node's volume usage and the metric files dropped by the node's scripts | in service |
+| Measured state of components, mirror check | each component seen through its probes, never assumed; repository mirrors checked every hour ([Visualisation module](../modules/visualisation/README.en.md)) | in service |
 | VPN filter safeguard as a metric | its code on each run; alerts: filter removed, check impossible, safeguard silent | in service |
 
 Measured cost: about 0.2 core and one to two gigabytes of memory, without touching the services. Recipe: [`deploy/okd/monitoring/`](../../deploy/okd/monitoring/).

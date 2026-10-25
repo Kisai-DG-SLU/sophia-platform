@@ -61,7 +61,7 @@ A pitfall of moving to local: a remote model accepted two `system` messages in a
 RAM has headroom, **CPU does not**. Actual consumption is low (a few cores in normal times, an 11-core peak over a week), but declared limits exceeded the node's capacity, and upcoming workloads (office suite, hybrid model, memory re-indexing) are heavy. **In service** (recipe: [`deploy/okd/cluster/`](../../deploy/okd/cluster/)):
 
 - **Priorities, without preemption**: a **base** above everything (the cluster read pod, which lets you understand an outage, and the Git forge, where every deployment starts: never evicted), then chat and language model > voice > dispatcher and agents > office > images > development and child clusters. Only the language model server keeps the right to preempt;
-- **quotas** on limits, per namespace, and explicit requests and limits for every container; the agents namespace quota waits for the read pod's slot;
+- **quotas** on limits, per namespace, and explicit requests and limits for every container; the agents namespace quota is set, after the read pod's class;
 - image generation capped at 8 cores.
 
 **Lesson**: a priority class only protects pods that declare their requests. A pod without requests is the first evicted under memory pressure, whatever its class: every base pod requests at least its measured peak.
