@@ -2,7 +2,10 @@
 
 ## What the module does
 
-- **Paths** per level (from primary to the end of lower secondary) and subject: lessons, practical work at home, challenges, stars and badges; ≈ 790 activities published today.
+- **Paths** per level (from primary to the end of lower secondary) and subject: lessons, practical work at home, challenges, stars and badges; ≈ 800 activities published today.
+- **Mental arithmetic drills** on a list of calculations written in the content (`faits:`), with the same spaced repetition, timer and replay of misses as the times tables: 17 drills, 314 calculations, following each sheet's methods and examples. No random generator, to stay faithful to each lesson's numbers.
+- **Geometry figures**: 29 SVG figures in 15 lessons, inserted after the passage they illustrate, without changing the text.
+- **Review mode** for the administrator: everything is open, nothing is recorded, a banner says so in every place; a child keeps their locks. It is not a security barrier (all the content is already in the page), but the means to validate what one is asked to validate.
 - **Avatar** shared by the chat and the school (a drawing, or a small photo).
 - The child's **progress log**, and a **read-only record book** for parents.
 - **Exercise sheets** (statement, answers, self-assessment) and linked videos.
@@ -13,7 +16,7 @@
 
 - **Publishing content without rebuilding the image**: the `contenus` container syncs the repositories read-only every minute and keeps the live version if the new one is invalid (incident fixed, see lessons).
 
-Planned: a sharing version with a recorded open-licence synthetic voice, MCP tools for progress and opening, the report book served over MCP with a signed token limited to the child.
+Planned: the school on its own address, outside the chat's origin (see [the interface](../../../deploy/okd/apps/chat-interface/README.en.md)), a decimal-point key for decimal and fraction calculations, a sharing version with a recorded open-licence synthetic voice, MCP tools for progress and opening, the report book served over MCP with a signed token limited to the child.
 
 ## Architecture
 
@@ -50,8 +53,8 @@ The build **refuses** any invalid content: correct answer missing from the choic
 
 ## Measurements
 
-- ≈ 790 activities published; a physics-chemistry module fully reviewed: 19 lessons, 13 practical works, 19 challenges, ≈ 120 questions checked against reference answers, no contradiction.
-- 86 automated tests (content, build, progress, sync, browser journeys).
+- ≈ 800 activities published (806); a physics-chemistry module fully reviewed: 19 lessons, 13 practical works, 19 challenges, ≈ 120 questions checked against reference answers, no contradiction.
+- 91 automated tests (content, build, progress, sync, browser journeys, review mode).
 - Pod: nginx capped at 64 Mi, sync at 256 Mi.
 
 ## Lessons
@@ -60,4 +63,7 @@ The build **refuses** any invalid content: correct answer missing from the choic
 - **Atomic switch and fallback content**: a broken sync never breaks the site.
 - **OpenShift's arbitrary UID**: `ssh` requires an entry in `/etc/passwd` — hence `chmod g+w /etc/passwd` in the image and paths owned by group 0.
 - **Separate engine and content**: content evolves through Git, checked before publication, without rebuilding the image.
+- **Engine before content**: content using a new field is only published after the build of the engine that understands it; otherwise sync rejects the whole content ("unknown operation") and publishes nothing more, the live version staying served.
+- **A written image must become an image**: an unclosed bracket in the text ("[EF)") turned a figure into a link. The build now refuses a lesson image that does not become an `<img>`.
+- **The symmetry axis is drawn after the filled shape**, otherwise the shape hides it; before the small markings, which its dashes would hide.
 - **Redistribution rights carried by each resource**: the sharing version builds itself, without manual sorting.

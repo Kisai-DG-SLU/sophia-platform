@@ -2,7 +2,10 @@
 
 ## Ce que fait le module
 
-- **Parcours** par niveau (du primaire à la fin du collège) et par matière : leçons, travaux pratiques à la maison, défis, étoiles et badges ; ≈ 790 activités publiées aujourd'hui.
+- **Parcours** par niveau (du primaire à la fin du collège) et par matière : leçons, travaux pratiques à la maison, défis, étoiles et badges ; ≈ 800 activités publiées aujourd'hui.
+- **Entraînements de calcul mental** sur une liste de calculs écrite dans le contenu (`faits:`), avec la même répétition espacée, le même chronomètre et la reprise des ratés que les tables : 17 entraînements, 314 calculs, qui reprennent les méthodes et les exemples de chaque fiche. Pas de générateur aléatoire, pour rester fidèle aux nombres de chaque leçon.
+- **Figures de géométrie** : 29 figures SVG dans 15 leçons, insérées après le passage qu'elles illustrent, sans modifier le texte.
+- **Mode relecture** pour l'administrateur : tout est ouvert, rien n'est compté, un bandeau le dit dans chaque lieu ; un enfant garde ses verrous. Ce n'est pas une barrière de sécurité (tout le contenu est déjà dans la page), mais le moyen de valider ce qu'on demande de valider.
 - **Avatar** commun à la discussion et à l'école (un dessin, ou une petite photo).
 - **Journal de progression** de l'enfant, et un **livret en lecture seule** pour les parents.
 - **Fiches d'exercices** (énoncé, corrigé, auto-évaluation) et vidéos en lien.
@@ -13,7 +16,7 @@
 
 - **Publication des contenus sans reconstruction d'image** : le conteneur `contenus` synchronise les dépôts en lecture seule chaque minute et garde la version en ligne si la nouvelle est invalide (incident corrigé, voir les leçons).
 
-Prévu : version de partage avec une voix de synthèse libre enregistrée, outils MCP de progression et d'ouverture, carnet servi en MCP avec un jeton signé limité à l'enfant.
+Prévu : l'école sur sa propre adresse, hors de l'origine de la discussion (voir [l'interface](../../../deploy/okd/apps/chat-interface/README.md)), une touche virgule pour les calculs à décimaux et à fractions, version de partage avec une voix de synthèse libre enregistrée, outils MCP de progression et d'ouverture, carnet servi en MCP avec un jeton signé limité à l'enfant.
 
 ## Architecture
 
@@ -50,8 +53,8 @@ Le build **refuse** tout contenu invalide : bonne réponse absente des choix, no
 
 ## Mesures
 
-- ≈ 790 activités publiées ; un module de physique-chimie relu en entier : 19 leçons, 13 TP, 19 défis, ≈ 120 questions vérifiées contre des corrigés de référence, aucune contradiction.
-- 86 tests automatisés (contenus, build, progression, synchronisation, parcours dans le navigateur).
+- ≈ 800 activités publiées (806) ; un module de physique-chimie relu en entier : 19 leçons, 13 TP, 19 défis, ≈ 120 questions vérifiées contre des corrigés de référence, aucune contradiction.
+- 91 tests automatisés (contenus, build, progression, synchronisation, parcours dans le navigateur, relecture).
 - Pod : nginx limité à 64 Mi, synchronisation à 256 Mi.
 
 ## Leçons
@@ -60,4 +63,7 @@ Le build **refuse** tout contenu invalide : bonne réponse absente des choix, no
 - **Bascule atomique et contenu de secours** : une synchronisation en panne ne casse jamais le site.
 - **UID arbitraire d'OpenShift** : `ssh` exige une entrée dans `/etc/passwd` — d'où `chmod g+w /etc/passwd` dans l'image et des chemins donnés au groupe 0.
 - **Séparer moteur et contenus** : les contenus évoluent par Git, vérifiés avant publication, sans reconstruire l'image.
+- **Le moteur avant les contenus** : un contenu qui utilise un nouveau champ ne se publie qu'après le build du moteur qui le comprend ; sinon la synchronisation refuse tout le contenu (« opération inconnue ») et ne publie plus rien, la version en ligne restant servie.
+- **Une image écrite doit devenir une image** : un crochet non refermé dans le texte (« [EF) ») faisait d'une figure un lien. Le build refuse désormais une image de leçon qui ne devient pas une `<img>`.
+- **L'axe de symétrie se trace après la forme** remplie, sinon elle le cache ; avant les petits codages, que ses tirets cacheraient.
 - **Droits de redistribution portés par chaque ressource** : la version de partage se construit d'elle-même, sans tri à la main.

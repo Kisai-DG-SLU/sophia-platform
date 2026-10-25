@@ -6,7 +6,8 @@
 - **Analyse puis choix** : le modèle comprend chaque ligne ; des règles choisissent le produit ; un produit nouveau choisi automatiquement porte l'étiquette « auto ».
 - **Gestes** sur une liste : choisir, chercher autre chose, ajuster, retirer ou remettre une ligne, **valider** (par l'un ou l'autre adulte), marquer commandée, supprimer.
 - **Prix et promotions réels**, lus dans le navigateur distant, recherche automatique en file d'attente.
-- **Remplissage du vrai panier** sur demande, et **panier express** depuis la discussion (« ajoute du lait »), une question à la fois.
+- **Remplissage du vrai panier** sur demande, et **panier express** depuis la discussion (« ajoute du lait »), une question à la fois. Chaque outil MCP déclare son **parcours** dans ses métadonnées (`sophia/parcours` : `express`, `lecture`, `liste`) : la discussion choisit par règles, appelle elle-même les outils express et écrit la réponse à partir des messages du service, sans que le modèle reformule. Le service refuse lui-même un compte hors du foyer.
+- **Modèle par usage** : l'achat express, que la discussion attend, reste sur l'alias principal ; les listes non urgentes passent par l'alias de fond, avec repli sur l'alias principal si le routeur le refuse (alias inconnu ou non permis à la clé).
 - **Prix de référence** pour la table des ingrédients du module Cuisine : outil MCP **en lecture** `prix_reference` (voir ci-dessous).
 
 Prévu : plusieurs drives, comparaison entre enseignes, signal quand un site devient illisible.

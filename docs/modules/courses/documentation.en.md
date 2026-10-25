@@ -6,7 +6,8 @@
 - **Analysis then choice**: the model understands each line; rules choose the product; a new product chosen automatically carries an "auto" tag.
 - **Actions** on a list: choose, search something else, adjust, remove or restore a line, **validate** (by either adult), mark as ordered, delete.
 - **Real prices and offers**, read in the remote browser, automatic queued search.
-- **Filling the real basket** on request, and an **express basket** from the chat ("add some milk"), one question at a time.
+- **Filling the real basket** on request, and an **express basket** from the chat ("add some milk"), one question at a time. Each MCP tool declares its **path** in its metadata (`sophia/parcours`: `express`, `lecture`, `liste`): the chat picks by rules, calls the express tools itself and writes the answer from the service's messages, without the model rephrasing. The service itself refuses an account outside the household.
+- **Model per use**: the express purchase, which the chat waits for, stays on the main alias; non-urgent lists go through the background alias, falling back to the main alias if the router refuses it (unknown alias or not allowed for the key).
 - **Reference prices** for the Cooking module's ingredient table: **read-only** MCP tool `prix_reference` (see below).
 
 Planned: several stores, comparison between chains, a signal when a site becomes unreadable.

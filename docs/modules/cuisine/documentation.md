@@ -11,7 +11,7 @@
 - **Courses** agrégées par rayon, coches partagées entre les membres du foyer, historique annulable ; un onglet transmet la liste validée au [module Courses](../courses/README.md), qui remplit le panier d'un drive.
 - **Import** d'une recette depuis un lien ou un texte collé : le modèle la met en fiche, des règles la contrôlent, le foyer relit un aperçu avant l'enregistrement.
 - **Photo du plat** générée localement par l'outil MCP `image` de la plateforme.
-- **Dans la discussion** : « on mange quoi ce soir ? » est répondu par l'assistant, à partir du planning.
+- **Dans la discussion** : « on mange quoi ce soir ? » est répondu par l'assistant, à partir du planning. Le service annonce toujours le créneau retenu (`_trace`) ; si tous les repas demandés sont vides, c'est lui qui écrit la réponse (`_fin` : « Rien de prévu… Tu veux que je te propose un plat ? »), affichée telle quelle : le modèle ne peut plus inventer un repas « prévu ». Une fête secrète cachée à un enfant donne la réponse du créneau vide, sans un mot sur la fête. Depuis la discussion, les adultes ouvrent aussi l'application sur le planning de la semaine ou sur l'onglet des courses.
 
 - **Table des ingrédients** (en recette) : calories, saison et prix de chaque ingrédient, pour **calculer** le coût, les calories et les mois de saison des recettes au lieu de les estimer (voir ci-dessous).
 
@@ -59,6 +59,8 @@ Tous par le routeur de modèles, avec une clé virtuelle propre et l'identité d
 | génération d'une recette | 0,9 |
 | import d'une recette (mise en fiche) | 0,1 |
 | consigne courte en anglais pour la photo, longueur contrôlée | — |
+
+La génération et la table des ingrédients sont des **tâches de fond** : elles passent par l'alias de fond du routeur, qui laisse la priorité à la discussion, avec repli sur l'alias principal tant que l'alias de fond n'est pas ouvert à la clé du module (relu toutes les 10 minutes, sans redémarrage). L'import et la photo, lancés par un clic, restent sur l'alias principal. Le modèle réellement utilisé est noté dans le journal de génération.
 
 ## Règles : le modèle propose, les règles décident
 
