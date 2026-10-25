@@ -1,0 +1,261 @@
+# Règles d'alerte SophIA, évaluées par Thanos Ruler (surveillance des charges utilisateur).
+# Une règle ne voit que les séries de SON namespace : les règles communes (OOM, redémarrages en boucle)
+# sont donc répétées dans chaque namespace surveillé, à l'identique.
+# Seuils de départ, à recalibrer après une semaine de mesures.
+# Les règles du nœud (GPU, garde-fou du filtre VPN) sont dans 40-node-metrics.yaml.
+#
+# Substitution : seule ${AGENT_NAMESPACE} est à remplacer, et SEULEMENT elle :
+#   envsubst '${AGENT_NAMESPACE}' < 20-regles.yaml
+# Un envsubst sans liste viderait aussi les {{ $labels… }} et {{ $value }} des annotations.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: sophia-core
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sophia-core
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="sophia-core",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="sophia-core"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="sophia-core"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'
+    - alert: SophiaRepartiteurIndisponible
+      expr: kube_deployment_status_replicas_available{namespace="sophia-core",deployment="repartiteur"} < 1
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: Le répartiteur des délégations n'a aucune réplique disponible depuis 5 min
+    - alert: SophiaRabbitMQDLQ
+      expr: max(rabbitmq_detailed_queue_messages{vhost="/sophia",queue="sophia.dlq"}) > 0
+      for: 5m
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $value }} message(s) dans la file des messages morts sophia.dlq'
+        action: Lire la DLQ (compte administrateur) ; un message y arrive après 5 livraisons sans accusé ou un refus.
+    - alert: SophiaRabbitMQAlarme
+      expr: max(rabbitmq_alarms_memory_used_watermark) > 0 or max(rabbitmq_alarms_free_disk_space_watermark) > 0
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'RabbitMQ en alarme mémoire ou disque : publications bloquées'
+    - alert: SophiaTemporalWorkflowsEnEchec
+      expr: sum(increase(workflow_failed[15m])) + sum(increase(workflow_timeout[15m])) > 0
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $value }} workflow(s) Temporal en échec ou en dépassement de délai en 15 min'
+        action: Ouvrir l'interface Temporal, namespace sophia, filtre Failed.
+    - alert: SophiaMetriquesAbsentes
+      expr: up{namespace="sophia-core",job=~"rabbitmq-metrics|temporal-metrics"} == 0
+      for: 10m
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: La collecte des métriques {{ $labels.job }} échoue depuis 10 min
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: sophia-inference
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sophia-inference
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="sophia-inference",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="sophia-inference"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="sophia-inference"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'
+    - alert: SophiaLLMLocalIndisponible
+      expr: up{namespace="sophia-inference",job="llama-server"} == 0 or absent(up{namespace="sophia-inference",job="llama-server"})
+      for: 3m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'llama-server (sophia-local) ne répond plus depuis 3 min : chat et agents sans LLM local'
+    - alert: SophiaLLMLocalSature
+      expr: max(llamacpp:requests_deferred{namespace="sophia-inference"}) > 0
+      for: 10m
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: Des requêtes attendent un emplacement libre sur llama-server depuis 10 min (4 emplacements occupés)
+        action: Vérifier qui consomme (agents, chat) ; seuil à calibrer après une semaine de mesures.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: sophia-apps
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sophia-apps
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="sophia-apps",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="sophia-apps"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="sophia-apps"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: sophia-memory
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sophia-memory
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="sophia-memory",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="sophia-memory"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="sophia-memory"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: sophia-identity
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sophia-identity
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="sophia-identity",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="sophia-identity"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="sophia-identity"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: sophia-dmz
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sophia-dmz
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="sophia-dmz",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="sophia-dmz"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="sophia-dmz"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-alertes
+  namespace: ${AGENT_NAMESPACE}
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-${AGENT_NAMESPACE}
+    rules:
+    - alert: SophiaConteneurOOM
+      expr: (kube_pod_container_status_last_terminated_reason{namespace="${AGENT_NAMESPACE}",reason="OOMKilled"} == 1) and on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace="${AGENT_NAMESPACE}"}[15m])
+        > 0)
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) tué par manque de mémoire (OOMKilled) dans les 15 dernières minutes'
+        action: Relever la consommation et la limite mémoire du conteneur ; ne rien changer sans décision.
+    - alert: SophiaRedemarragesEnBoucle
+      expr: increase(kube_pod_container_status_restarts_total{namespace="${AGENT_NAMESPACE}"}[30m]) > 3
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: '{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) a redémarré plus de 3 fois en 30 min'

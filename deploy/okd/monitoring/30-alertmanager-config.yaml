@@ -1,0 +1,35 @@
+# Routage des alertes SophIA vers le récepteur /v1/alertes du répartiteur (demandeur « alertes »).
+# PRÊT, NON ACTIVÉ : ne pas appliquer avant l'étape 6 du README, qui suppose
+#   (1) une image du répartiteur qui contient le récepteur /v1/alertes,
+#   (2) le Secret repartiteur-alertes (clé « jeton ») dans sophia-core, lu par le répartiteur,
+#   (3) une règle d'entrée du répartiteur depuis l'Alertmanager des charges utilisateur (port 8443).
+# Une AlertmanagerConfig ne reçoit que les alertes de SON namespace : une par namespace à alerter
+# (ici sophia-core ; les autres sur le même modèle).
+apiVersion: monitoring.coreos.com/v1beta1
+kind: AlertmanagerConfig
+metadata:
+  name: sophia-vers-repartiteur
+  namespace: sophia-core
+spec:
+  route:
+    receiver: repartiteur
+    matchers:
+      - { name: sophia, value: oui, matchType: "=" }
+    groupBy: [alertname]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+  receivers:
+    - name: repartiteur
+      webhookConfigs:
+        - url: https://repartiteur.sophia-core.svc:8443/v1/alertes
+          sendResolved: true
+          maxAlerts: 64
+          httpConfig:
+            authorization:
+              type: Bearer
+              credentials: { name: repartiteur-alertes, key: jeton }
+            tlsConfig:
+              ca:
+                configMap: { name: temporal-service-ca, key: service-ca.crt }
+              serverName: repartiteur.sophia-core.svc

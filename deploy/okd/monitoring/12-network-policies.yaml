@@ -1,0 +1,40 @@
+# Le Prometheus des charges utilisateur (openshift-user-workload-monitoring) doit joindre les ports de
+# métriques : sophia-core et sophia-inference refusent toute entrée par défaut. Seuls ces ports, et seul
+# ce Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metrics-from-user-workload-monitoring
+  namespace: sophia-core
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [rabbitmq, temporal] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-user-workload-monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+      ports:
+        - { protocol: TCP, port: 15692 }
+        - { protocol: TCP, port: 9090 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metrics-from-user-workload-monitoring
+  namespace: sophia-inference
+spec:
+  podSelector:
+    matchLabels: { app: llama-server }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-user-workload-monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+      ports:
+        - { protocol: TCP, port: 8080 }

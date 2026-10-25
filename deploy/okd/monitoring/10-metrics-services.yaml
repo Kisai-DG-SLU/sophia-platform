@@ -1,0 +1,24 @@
+# Services de métriques, à part : les Services existants ne changent pas.
+# llama-server expose déjà /metrics sur son port http (option --metrics) : pas de Service à ajouter.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-metrics
+  namespace: sophia-core
+  labels: { app: rabbitmq, sophia-metrics: "true" }
+spec:
+  selector: { app: rabbitmq }
+  ports:
+    - { name: metrics, port: 15692, targetPort: 15692 }
+---
+# Temporal : PROMETHEUS_ENDPOINT=0.0.0.0:9090 (../core/temporal/02-server.yaml)
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-metrics
+  namespace: sophia-core
+  labels: { app: temporal, sophia-metrics: "true" }
+spec:
+  selector: { app: temporal }
+  ports:
+    - { name: metrics, port: 9090, targetPort: 9090 }
