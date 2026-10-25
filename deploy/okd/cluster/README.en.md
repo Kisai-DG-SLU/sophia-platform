@@ -36,6 +36,10 @@ A single node carries chat, the language model, voice, agents, office suite, ima
 | `sophia-apps` | 24 | 40 Gi | 30 | builds run here, including a CUDA compilation at 16 CPU / 24 Gi |
 | `${AGENT_NAMESPACE}` | 28 | 48 Gi | 15 | read pod 16 CPU / 32 Gi at most; explicit resources on **every** container, init included |
 | office suite | 10 | 10 Gi | 15 | plus requests 2 CPU / 4 Gi |
+| chat interface (dedicated namespace) | 4 | 3 Gi | 6 | |
+| workflow dashboard (dedicated namespace) | 3 | 3 Gi | 5 | |
+| object storage | 3 | 3 Gi | 4 | |
+| MCP tool builds | one build at a time | | | no agent account in the namespace |
 
 Template: `01-namespace-quota.yaml` (one copy per namespace).
 
@@ -62,6 +66,14 @@ One step at a time, from a clean, up-to-date clone of the internal repository, f
 
    For each: `oc diff -f <file>`, `oc apply -f <file>`, `oc rollout status`, then `oc get pod -o jsonpath='{.items[0].spec.priorityClassName} {.items[0].status.containerStatuses[0].ready}'`, expected `<class> true`. Rollback: `oc rollout undo`.
 4. **Base, in its slot**: the cluster read pod gets its class and explicit resources; recreating it cuts the sessions it carries. **Only then**, its namespace's quota.
+
+## Status
+
+| Item | Status |
+|---|---|
+| Seven classes, no preemption except inference | in service |
+| Classes set on workloads, including the base (cluster reading pod and forge) | in service; the reading pod got it in its slot, with explicit resources (`Burstable` QoS class) |
+| Quotas and `LimitRange` of the namespaces in the table, including the agents' | in service; the agents' one was set after the reading pod's slot, as step 4 requires |
 
 ## Checks
 

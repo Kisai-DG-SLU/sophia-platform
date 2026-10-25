@@ -36,6 +36,10 @@ Un seul nœud porte la discussion, le modèle de langage, la voix, les agents, l
 | `sophia-apps` | 24 | 40 Gi | 30 | les builds y tournent, dont une compilation CUDA en 16 CPU / 24 Gi |
 | `${AGENT_NAMESPACE}` | 28 | 48 Gi | 15 | pod de lecture 16 CPU / 32 Gi au plus ; ressources explicites sur **tous** les conteneurs, init compris |
 | bureautique | 10 | 10 Gi | 15 | plus requests 2 CPU / 4 Gi |
+| interface de discussion (namespace dédié) | 4 | 3 Gi | 6 | |
+| tableau de bord des workflows (namespace dédié) | 3 | 3 Gi | 5 | |
+| stockage objet | 3 | 3 Gi | 4 | |
+| builds des outils MCP | un build à la fois | | | aucun compte d'agent dans le namespace |
 
 Gabarit : `01-namespace-quota.yaml` (une copie par namespace).
 
@@ -62,6 +66,14 @@ Une étape à la fois, depuis un clone propre et à jour du dépôt interne, com
 
    Pour chacune : `oc diff -f <fichier>`, `oc apply -f <fichier>`, `oc rollout status`, puis `oc get pod -o jsonpath='{.items[0].spec.priorityClassName} {.items[0].status.containerStatuses[0].ready}'`, attendu `<classe> true`. Retour arrière : `oc rollout undo`.
 4. **Socle, dans son créneau** : le pod de lecture du cluster reçoit sa classe et ses ressources explicites ; le recréer coupe les sessions qu'il porte. **Ensuite seulement**, le quota de son namespace.
+
+## État
+
+| Élément | État |
+|---|---|
+| Sept classes, sans préemption hors inférence | en service |
+| Classes posées sur les charges, dont le socle (pod de lecture du cluster et forge) | en service ; le pod de lecture l'a reçue dans son créneau, avec ses ressources explicites (classe de service `Burstable`) |
+| Quotas et `LimitRange` des namespaces du tableau, dont celui des agents | en service ; celui des agents est posé après le créneau du pod de lecture, comme le veut l'étape 4 |
 
 ## Contrôles
 
