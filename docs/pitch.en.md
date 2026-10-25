@@ -75,17 +75,19 @@ SophIA is an experimental architecture under construction. We separate what work
 - Isolated web acquisition through the airlock, first brick of the Paranoid Airlock.
 - Delegation dispatcher, durable workflows and event bus; first executor agent (development) in acceptance testing.
 - Self-hosted Git forge, source of truth for code and project memory; isolated development environments.
-- Vector database and embedding service.
+- Vector database with its schema, embedding service, S3 object storage.
+- Pantheon agents on the local model, with priority to chat on the graphics card; one router key per agent.
+- Minimal observability: service metrics, alert rules, graphics card, VPN filter safeguard; CPU priorities without preemption and per-namespace quotas.
 
 **In progress**
 
 - The interface as a requester of the dispatcher.
-- Memory API, ingestion pipeline and graph dimension.
+- Memory service (designed), ingestion pipeline and graph dimension.
 
 **Planned**
 
-- Pantheon agents on the local model, with priority to chat on the graphics card; planner for open goals.
-- Observability and "incident" workflow; supervision, deployment and maintenance behind the dispatcher.
+- Planner for open goals.
+- "Incident" workflow; supervision, deployment and maintenance behind the dispatcher.
 - Semantic Tribunal, Ghost Search, DLP filter.
 - Memory confidentiality levels.
 - Reproducible, multi-tenant deployment packages.
@@ -103,7 +105,7 @@ Details are in the [roadmap](roadmap.en.md).
 ## Frequently asked questions
 
 **Is SophIA sovereign today?**
-Largely: infrastructure, memory, access control and inference for the interface and modules are local. Agents still use remote models for testing; their move to the local model is planned, changing nothing but routing.
+Yes for everyday use: infrastructure, memory, access control and inference for the interface, the modules and the agents are local. A remote model remains only a development exception, chosen by routing.
 
 **Do you need a very large model?**
 No. Confinement, rules, human approval and constrained output do not depend on the model's capabilities. Tasks are broken into small decisions, within reach of a modest local model.

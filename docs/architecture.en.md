@@ -63,10 +63,11 @@ SOPHIA is built on a Kubernetes platform (OKD / OpenShift). Core services are is
 |---|---|---|
 | **Dispatcher** (`sophia-core`) | single entry point for requests; identity proven by service account token; deterministic rules (who asks what of whom, approvals, quotas); one durable workflow per request; destination filters; two-level human approvals | in service |
 | **Temporal** (`sophia-core`) | durable workflows; **single application client: the dispatcher**; each workflow's history serves as its log | in service |
-| **RabbitMQ** (`sophia-core`) | **events**: each step of a delegation is published on an events exchange by the dispatcher, the only publisher; dead-letter queues | in service; consumers planned |
+| **RabbitMQ** (`sophia-core`) | **events**: each step of a delegation is published on an events exchange by the dispatcher, the only publisher; dead-letter queues | in service, without agent accounts; consumers planned |
 | **Autonomous agents** (Hermes Agent, pinned version) | where a free loop with tools is the job: development, then maintenance and deployment with a closed tool list and every command approved | development in acceptance testing, the rest planned |
 | **Planner** | open goals: a workflow in code that asks the model for one decision at a time, has it validated by rules and executed by the dispatcher | planned, prototype to be compared with a planner agent |
-| **Supervision** | deterministic read functions exposed to the dispatcher; interpretation is left to the model inside a workflow | planned |
+| **Supervision** | deterministic read functions exposed to the dispatcher, in a separate pod; interpretation is left to the model inside an "incident" workflow | planned: designed and tested |
+| **Metrics and alerts** | monitoring of the platform's workloads, alert rules, node exporter | in service |
 
 Details: [Agent Pantheon](concepts/08-pantheon-agentique.en.md), [Observability](concepts/10-observabilite.en.md).
 
@@ -100,6 +101,12 @@ Technologies (example): Forgejo.
 
 Local tools: MCP servers, context injection, tools for the interface and the agents.
 
+## sophia-storage
+
+Shared S3 object storage: one identity and one bucket per application, default deny on ingress and egress.
+
+Technologies (example): SeaweedFS.
+
 ## sophia-dmz
 
 Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
@@ -114,6 +121,7 @@ Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 | sophia-sandbox | development environments, child clusters per project |
 | sophia-test | CI/CD validation |
 | sophia-apps | user interfaces and modules |
+| dedicated namespaces (planned) | the chat interface and the visualisation tool, out of the deployment agent's reach |
 | prod-* | tenant workloads |
 
 ---
@@ -148,4 +156,4 @@ These mechanisms work with any model, from the smallest (a few billion parameter
 
 # Status
 
-The architecture is experimental. Infrastructure, model routing, local inference, identity, the dispatcher and its workflows are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).
+The architecture is experimental. Infrastructure, model routing, local inference (agents included), identity, the dispatcher and its workflows, metrics and alerts, CPU priorities and object storage are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).

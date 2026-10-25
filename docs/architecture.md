@@ -63,10 +63,11 @@ SophIA repose sur une plateforme Kubernetes (OKD / OpenShift). Les services cent
 |---|---|---|
 | **Répartiteur** (`sophia-core`) | point d'entrée unique des demandes ; identité prouvée par jeton de compte de service ; règles déterministes (qui demande quoi à qui, validations, quotas) ; un workflow durable par demande ; filtres de la destination ; validations humaines à deux niveaux | en service |
 | **Temporal** (`sophia-core`) | workflows durables ; **seul client applicatif : le répartiteur** ; l'historique de chaque workflow sert de journal | en service |
-| **RabbitMQ** (`sophia-core`) | **événements** : chaque étape d'une délégation est publiée sur un exchange d'événements par le répartiteur, seul éditeur ; files en lettres mortes | en service ; consommateurs prévus |
+| **RabbitMQ** (`sophia-core`) | **événements** : chaque étape d'une délégation est publiée sur un exchange d'événements par le répartiteur, seul éditeur ; files en lettres mortes | en service, sans compte d'agent ; consommateurs prévus |
 | **Agents autonomes** (Hermes Agent, version figée) | là où une boucle libre avec des outils est le métier : le développement, puis la maintenance et le déploiement avec une liste fermée d'outils et chaque commande approuvée | développement en recette, le reste prévu |
 | **Planificateur** | objectifs ouverts : un workflow en code qui demande au modèle une décision à la fois, la fait valider par des règles et exécuter par le répartiteur | prévu, prototype à comparer à un agent planificateur |
-| **Supervision** | fonctions de lecture déterministes exposées au répartiteur ; l'interprétation revient au modèle dans un workflow | prévu |
+| **Supervision** | fonctions de lecture déterministes exposées au répartiteur, dans un pod à part ; l'interprétation revient au modèle dans un workflow « incident » | prévu : conçu et testé |
+| **Métrologie et alertes** | supervision des charges de la plateforme, règles d'alerte, exporteur du nœud | en service |
 
 Détail : [Panthéon Agentique](concepts/08-pantheon-agentique.md), [Observabilité](concepts/10-observabilite.md).
 
@@ -100,6 +101,12 @@ Technologies (exemple) : Forgejo.
 
 Outils locaux : serveurs MCP, injection de contexte, outils pour l'interface et les agents.
 
+### sophia-storage
+
+Stockage objet S3 commun : une identité et un seau par application, refus par défaut en entrée et en sortie.
+
+Technologies (exemple) : SeaweedFS.
+
 ### sophia-dmz
 
 Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
@@ -114,6 +121,7 @@ Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 | sophia-sandbox | environnements de développement, clusters enfants par projet |
 | sophia-test | validation CI/CD |
 | sophia-apps | interfaces utilisateur et modules |
+| namespaces dédiés (prévus) | l'interface de discussion et l'outil de visualisation, hors de la portée de l'agent de déploiement |
 | prod-* | charges de travail des locataires |
 
 ---
@@ -148,4 +156,4 @@ Ces mécanismes fonctionnent avec n'importe quel modèle, du plus petit (quelque
 
 ## Statut
 
-L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale, l'identité, le répartiteur et ses workflows sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).
+L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale (agents compris), l'identité, le répartiteur et ses workflows, la métrologie et les alertes, les priorités CPU et le stockage objet sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).
