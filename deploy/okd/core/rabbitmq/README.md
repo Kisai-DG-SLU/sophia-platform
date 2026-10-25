@@ -1,6 +1,6 @@
-# RabbitMQ — communication entre agents (`sophia-core`)
+# RabbitMQ — bus d'événements (`sophia-core`)
 
-Le bus de messages des agents : chaque agent reçoit ses demandes dans sa file, et une demande qui échoue part dans une file de rebut au lieu de disparaître. Un seul nœud RabbitMQ, sur un volume local du serveur ; l'interface d'administration n'est joignable que par le VPN et **derrière Keycloak**, le port AMQP que depuis le namespace des agents. Chaque agent a **son compte**, qui ne lit que sa file.
+Le bus des événements de la plateforme : chaque étape d'une délégation y est publiée par le [répartiteur](../repartiteur/), **seul éditeur**, et un relais de visualisation la lit en direct. Les agents ne sont **pas** clients du bus : ce sont des exécutants, joints par le seul répartiteur. Un seul nœud RabbitMQ, sur un volume local du serveur ; l'interface d'administration n'est joignable que par le VPN et **derrière Keycloak**, le port AMQP que depuis le répartiteur et le relais de visualisation. Trois comptes en tout : le répartiteur, le relais, l'administrateur.
 
 ## Choix
 
@@ -15,28 +15,25 @@ Le bus de messages des agents : chaque agent reçoit ses demandes dans sa file, 
 | Journal des files quorum | `raft.wal_max_size_bytes` à 64 Mo | 512 Mo par défaut, presque tout le seuil mémoire d'un conteneur de 1 Gi |
 | Disque | `disk_free_limit.absolute = 1GB` | publications suspendues avant que le disque système ne soit plein (50 Mo par défaut) |
 | Déploiement | `Recreate`, une réplique | volume `ReadWriteOnce` : jamais deux RabbitMQ sur le même répertoire |
-| Comptes | **définitions importées à chaque démarrage** : vhost `/sophia`, un compte par agent et un pour le relais de visualisation, droits ; gabarit **sans secret** dans le `ConfigMap`, mots de passe insérés par un initContainer depuis un Secret, dans un volume en mémoire | les comptes et leurs droits sont décrits dans le dépôt et rejoués à l'identique ; le mot de passe est haché à l'import ; l'initContainer échoue si un compte du gabarit n'a pas de mot de passe |
-| Droits d'un agent | aucune écriture ; lecture de sa file `sophia.agent.<nom>`, sans usage depuis le répartiteur, en attendant son retrait ; ne rien configurer | les agents sont des exécutants, joints par le seul répartiteur, **seul éditeur** sur `sophia.events` (clés `<demandeur>.delegate.<événement>`, par `topic_permissions`) |
+| Comptes | **définitions importées à chaque démarrage** : vhost `/sophia`, un compte pour le répartiteur, un pour le relais de visualisation, l'administrateur, droits ; gabarit **sans secret** dans le `ConfigMap`, mots de passe insérés par un initContainer depuis un Secret, dans un volume en mémoire | les comptes et leurs droits sont décrits dans le dépôt et rejoués à l'identique ; le mot de passe est haché à l'import ; l'initContainer échoue si un compte du gabarit n'a pas de mot de passe |
+| Agents | **aucun compte** : les comptes, les files `sophia.agent.<nom>`, l'exchange `sophia.agents` et la politique des agents ont été retirés (vides et sans consommateur) | les agents sont des exécutants, joints par le seul répartiteur, **seul éditeur** sur `sophia.events` (clés `<demandeur>.delegate.<événement>`, par `topic_permissions`) |
 | Relais de visualisation | file temporaire (`amq.gen-*`) liée à `sophia.events`, sans publier | lecture en direct des événements, sans rien pouvoir émettre |
 | Administrateur interne | dans les définitions (Secret `rabbitmq-admin-creds`) | avec des définitions, RabbitMQ ne crée plus `RABBITMQ_DEFAULT_USER` sur un volume neuf |
-| Interface d'administration | plugin `rabbitmq_auth_backend_oauth2` : jetons du realm, client **public PKCE** `rabbitmq` ; **connexion par mot de passe désactivée** (`management.oauth_disable_basic_auth`) | une seule identité pour toutes les consoles ; les agents gardent leurs comptes internes en AMQP (`auth_backends` : OAuth2, puis interne) |
+| Interface d'administration | plugin `rabbitmq_auth_backend_oauth2` : jetons du realm, client **public PKCE** `rabbitmq` ; **connexion par mot de passe désactivée** (`management.oauth_disable_basic_auth`) | une seule identité pour toutes les consoles ; le répartiteur et le relais gardent leurs comptes internes en AMQP (`auth_backends` : OAuth2, puis interne) |
 | Droits des personnes | les groupes Keycloak (claim `groups`) deviennent des scopes (`additional_scopes_key`) ; seul le groupe `admin` reçoit un alias de droits complets (`scope_aliases.admin`) | un compte du realm hors du groupe `admin` n'a aucun droit dans RabbitMQ |
 | Clés de signature | `jwks_uri` en **HTTPS** par le nom public de Keycloak, certificat vérifié (`hostname_verification = wildcard` pour le certificat joker du routeur) | RabbitMQ refuse un `jwks_uri` en HTTP, or l'adresse interne de Keycloak est en HTTP |
 
 ## Topologie
 
-Les délégations entre agents passent par [Temporal](../temporal/) ; RabbitMQ ne porte que les **événements** et les **messages simples**. Tout est déclaré par l'import des définitions (`00-config.yaml`) : aucun client ne configure quoi que ce soit.
+Les délégations passent par [Temporal](../temporal/) ; RabbitMQ ne porte que les **événements**. Tout est déclaré par l'import des définitions (`00-config.yaml`) : aucun client ne configure quoi que ce soit.
 
 | Objet | Type | Rôle |
 |---|---|---|
-| `sophia.agents` | exchange `direct` | message simple à un agent, clé de routage = nom de l'agent |
-| `sophia.agent.<nom>` | file quorum, une par agent | boîte de l'agent ; politique `sophia-agents` : lettres mortes vers `sophia.dlx`, 5 livraisons au plus, `at-least-once`, 10 000 messages puis **refus à la publication** (l'émetteur reçoit un *nack* : rien ne se perd en silence) |
 | `sophia.events` | exchange `topic` | événements (délégation commencée, terminée…), clé `<demandeur>.delegate.<événement>`, publiés par le répartiteur seul ; lu en direct par le relais de visualisation |
-| `sophia.dlx` → `sophia.dlq` | `fanout` → file quorum | lettres mortes ; politique `sophia-dlq` : 30 jours, 10 000 messages (les plus anciens tombent) ; lue par l'administrateur |
+| `sophia.dlx` → `sophia.dlq` | `fanout` → file quorum | lettres mortes ; politique `sophia-dlq` : 30 jours, 10 000 messages (les plus anciens tombent) ; lue par l'administrateur ; gardée pour de futures files durables (aucune aujourd'hui) |
 
 | Compte | configure | write | read |
 |---|---|---|---|
-| agent `<nom>` | rien | rien | `sophia.agent.<nom>` |
 | répartiteur | rien | `sophia.events` (clés `<demandeur>.delegate.<événement>`) | rien |
 | relais de visualisation | `amq.gen-*` | `amq.gen-*` | `sophia.events`, `amq.gen-*` |
 | administrateur | tout | tout | tout |
@@ -52,7 +49,7 @@ Côté clients : déclarer files et exchanges en `passive=True` (pas de droit `c
 | `02-deployment.yaml` | initContainers du cookie et des définitions, RabbitMQ, sondes, limites |
 | `03-service.yaml` | AMQP (5672) et administration (15672) |
 | `04-route.yaml` | interface d'administration, TLS `edge`, HTTP redirigé vers HTTPS |
-| `05-network-policy.yaml` | AMQP : namespace des agents et réseau du nœud (assistant de code en `hostNetwork`) ; 15672 : routeur |
+| `05-network-policy.yaml` | 15672 : routeur ; AMQP : relais de visualisation, depuis son namespace. L'entrée du répartiteur est dans [`../repartiteur/04-network-policy.yaml`](../repartiteur/04-network-policy.yaml) |
 
 ## Variables
 
@@ -60,6 +57,7 @@ Côté clients : déclarer files et exchanges en `passive=True` (pas de droit `c
 |---|---|
 | `${RABBITMQ_HOST}` | nom DNS de l'interface d'administration, résolu vers l'adresse du VPN |
 | `${IDP_HOST}` | nom public de Keycloak (émetteur des jetons, clés de signature) |
+| `${VIEWER_NAMESPACE}` | namespace propre au relais de visualisation, sans compte d'agent lié |
 
 Le nom du nœud (`master-0` dans `01-storage.yaml`) se remplace par celui de `oc get nodes`.
 
@@ -69,28 +67,39 @@ Le nom du nœud (`master-0` dans `01-storage.yaml`) se remplace par celui de `oc
 2. Secrets, jamais versionnés :
    - `rabbitmq-admin-creds` (clés `username`, `password`) : compte d'administration créé au premier démarrage ;
    - `rabbitmq-erlang-cookie` (clé `cookie`) : `openssl rand -hex 32`, identique pour tous les nœuds si le cluster RabbitMQ s'agrandit ;
-   - `rabbitmq-users` (`sophia-core`) : une clé par compte du gabarit, le mot de passe en valeur ; et, pour chaque agent, `rabbitmq-agent-<nom>` (`username`, `password`) dans le namespace des agents — **le même mot de passe**, généré une fois, sans fichier temporaire :
+   - `rabbitmq-users` (`sophia-core`) : une clé par compte du gabarit (`repartiteur`, `sophia-workflow`), le mot de passe en valeur. Les valeurs passent par un tube, jamais par les arguments d'`oc` (visibles par `ps`) :
 
 ```bash
-ARGS=()
-for a in ${AGENTS}; do                    # ex. "sophia athena hephaistos ouranos dionysos"
-  p=$(openssl rand -hex 32)
-  ARGS+=(--from-literal=$a=$p)
-  oc -n ${NS_AGENTS} create secret generic rabbitmq-agent-$a --from-literal=username=$a --from-literal=password=$p
-done
-ARGS+=(--from-literal=sophia-workflow=$(openssl rand -hex 32))   # relais de visualisation
-oc -n sophia-core create secret generic rabbitmq-users "${ARGS[@]}"
-unset ARGS p
+printf 'repartiteur=%s\nsophia-workflow=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" | oc -n sophia-core create secret generic rabbitmq-users --from-env-file=/dev/stdin
 ```
 
 3. Keycloak : client `rabbitmq` du realm ([`../../identity/`](../../identity/)) ; EgressFirewall du namespace ouvert vers `${IDP_HOST}` en 443 ([`../network/policies.yaml`](../network/policies.yaml)) — **sans cette règle, la connexion à l'interface échoue** : le nom public résout vers le nœud, hors des réseaux internes autorisés.
 4. `00` à `05` : `--dry-run=server`, puis `apply`.
-5. Vérifier : pod `Running` et prêt, `rabbitmq-diagnostics status` sans alarme, `rabbitmqctl list_users`, `list_permissions`, `list_queues name type policy`, `list_exchanges` et `list_bindings` (`-p /sophia`) conformes au gabarit, interface d'administration joignable par le VPN (connexion par Keycloak, refusée hors du groupe `admin`), port 5672 refusé depuis un autre namespace que celui des agents.
+5. Vérifier : pod `Running` et prêt, `rabbitmq-diagnostics status` sans alarme, `rabbitmqctl list_users`, `list_permissions`, `list_queues name type policy`, `list_exchanges` et `list_bindings` (`-p /sophia`) conformes au gabarit, interface d'administration joignable par le VPN (connexion par Keycloak, refusée hors du groupe `admin`), port 5672 refusé depuis tout autre pod que le répartiteur et le relais.
 
-**Ajouter un compte** : l'ajouter au gabarit de `00-config.yaml`, ajouter sa clé à `rabbitmq-users`, redémarrer RabbitMQ. Un compte retiré du gabarit n'est **pas** supprimé : `rabbitmqctl delete_user`.
+**Ajouter un compte** : l'ajouter au gabarit de `00-config.yaml`, ajouter sa clé à `rabbitmq-users`, redémarrer RabbitMQ. Un compte retiré du gabarit n'est **pas** supprimé du serveur : voir ci-dessous.
+
+## Retirer un compte ou une file
+
+**L'import des définitions ne supprime rien** : un compte, une file, un exchange ou une politique retiré du gabarit reste sur le serveur. Le retrait est une étape à part, sans redémarrage :
+
+1. Appliquer le nouveau `00-config.yaml` (`oc diff` d'abord : il ne doit montrer que des retraits).
+2. Vérifier que les files visées sont vides et sans consommateur : `rabbitmqctl list_queues -p /sophia name messages consumers`.
+3. **Files quorum** : `rabbitmqctl delete_queue --if-empty` y est refusé (code 69, « not supported by quorum queues »). Relire le nombre de messages dans la même commande, et ne supprimer qu'à 0 :
+
+```bash
+for q in ${QUEUES}; do n=$(oc -n sophia-core exec deploy/rabbitmq -- rabbitmqctl list_queues -p /sophia -q --no-table-headers name messages | awk -v q="$q" '$1==q {print $2}'); if [ "$n" = "0" ]; then oc -n sophia-core exec deploy/rabbitmq -- rabbitmqctl delete_queue -p /sophia "$q"; else echo "$q : [$n] message(s), non supprimée"; fi; done
+```
+
+4. Politiques et comptes : `rabbitmqctl clear_policy -p /sophia <politique>`, puis `rabbitmqctl delete_user <compte>` (ses droits partent avec lui). Une fois les comptes supprimés, plus personne ne peut publier dans les files restantes.
+5. **Exchange** : `rabbitmqctl` n'a pas de commande pour en supprimer un ; passer par l'interface d'administration (Exchanges, vhost `/sophia`, « Delete this exchange »). Sans file liée, il est inoffensif : l'étape peut attendre.
+6. Règles réseau devenues inutiles : les supprimer.
+7. Vérifier : `list_queues` et `list_users`, et aucune erreur nouvelle dans le journal du répartiteur.
+
+Les mots de passe retirés restent **une semaine** dans `rabbitmq-users` : ce sont eux qui permettent le retour arrière (réappliquer l'ancien gabarit, puis `rollout restart deploy/rabbitmq` : l'import recrée files, comptes et droits).
 
 **Changer de volume** (ancienne PVC liée au mauvais PV) : relever d'abord le contenu du répertoire sur le nœud. Puis arrêter RabbitMQ, appliquer `01-storage.yaml`, basculer le Deployment, et seulement ensuite supprimer l'ancienne PVC ; le PV qu'elle occupait (`Retain`) reste à libérer à la main.
 
 ## Suite
 
-Les événements des délégations sont publiés par le [répartiteur](../repartiteur/). Restent leurs consommateurs, et le retrait des files `sophia.agent.<nom>` et de l'exchange `sophia.agents`, devenus inutiles.
+Les événements des délégations sont publiés par le [répartiteur](../repartiteur/). Le relais de visualisation refuse tout message dont le `user_id` n'est pas `repartiteur` (le nom du compte, posé et vérifié par RabbitMQ). Restent à faire : les consommateurs des événements, et l'élargissement de `topic_permissions` aux événements des incidents ([observabilité](../../../../docs/concepts/10-observabilite.md)).
