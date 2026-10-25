@@ -71,18 +71,21 @@ SophIA is an experimental architecture under construction. We separate what work
 - Single-node Kubernetes (OKD) cluster on a physical server, VPN-only access, single sign-on (SSO) for every interface.
 - Local inference on the server's GPU (text and vision), voice and images on CPU, without network access; local model by default for the interface and modules.
 - Unified model router: local and remote behind the same aliases.
-- Chat interface connected to the router and to local tools (geography, images), with no key in the browser.
+- Chat interface in its own namespace, connected to the router and to local tools (geography, images, the person's files), with no key in the browser; model enforced by the server per role, one router key per use.
+- Office suite (files and online editing); the chat finds, opens and reads the person's documents under their identity, the content going to the local model only.
+- Shared relational database on PostgreSQL 18, on a dedicated volume.
 - Isolated web acquisition through the airlock, first brick of the Paranoid Airlock.
 - Delegation dispatcher, durable workflows and event bus; first executor agent (development) in acceptance testing.
 - Self-hosted Git forge, source of truth for code and project memory; isolated development environments.
-- Vector database with its schema, embedding service, S3 object storage.
-- Pantheon agents on the local model, with priority to chat on the graphics card; one router key per agent.
-- Minimal observability: service metrics, alert rules, graphics card, VPN filter safeguard; CPU priorities without preemption and per-namespace quotas.
+- Vector database with its schema on its dedicated volume, embedding service, S3 object storage with a trash.
+- Pantheon agents on the local model, with priority to chat on the graphics card; one router key per agent, master key confined to the router.
+- Minimal observability: service metrics, alert rules, graphics card, VPN filter safeguard; CPU priorities without preemption and per-namespace quotas; measured state of each component and repository mirror check.
 
 **In progress**
 
 - The interface as a requester of the dispatcher.
 - Memory service (designed), ingestion pipeline and graph dimension.
+- Scheduled backups, vulnerability watch, compliance (GDPR, AI Act, ISO 27001).
 
 **Planned**
 

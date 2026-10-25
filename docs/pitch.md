@@ -71,18 +71,21 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Cluster Kubernetes (OKD) mono-nœud sur serveur physique, accès par VPN seulement, identité unique (SSO) pour toutes les interfaces.
 - Inférence locale sur le GPU du serveur (texte et vision), voix et images sur CPU, sans accès réseau ; modèle local par défaut de l'interface et des modules.
 - Routeur de modèles unifié : local et distant derrière les mêmes alias.
-- Interface de discussion connectée au routeur et à des outils locaux (géographie, images), sans aucune clé dans le navigateur.
+- Interface de discussion dans son namespace, connectée au routeur et à des outils locaux (géographie, images, fichiers de la personne), sans aucune clé dans le navigateur ; modèle imposé par le serveur selon le rôle, une clé du routeur par usage.
+- Bureautique (fichiers et édition en ligne) ; la discussion retrouve, ouvre et lit les documents de la personne sous son identité, le contenu ne partant qu'au modèle local.
+- Base relationnelle commune en PostgreSQL 18, sur un volume dédié.
 - Acquisition web isolée par le sas, première brique du Sas Paranoïaque.
 - Répartiteur des délégations, workflows durables et bus d'événements ; premier agent exécutant (développement) en recette.
 - Forge Git auto-hébergée, source de vérité du code et de la mémoire des projets ; environnements de développement isolés.
-- Base vectorielle avec son schéma, service d'embedding, stockage objet S3.
-- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique ; une clé du routeur par agent.
-- Observabilité minimale : métriques des services, règles d'alerte, carte graphique, garde-fou du filtre VPN ; priorités CPU sans préemption et quotas par namespace.
+- Base vectorielle avec son schéma sur son volume dédié, service d'embedding, stockage objet S3 avec corbeille.
+- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique ; une clé du routeur par agent, clé maître confinée au routeur.
+- Observabilité minimale : métriques des services, règles d'alerte, carte graphique, garde-fou du filtre VPN ; priorités CPU sans préemption et quotas par namespace ; état mesuré de chaque composant et contrôle des miroirs des dépôts.
 
 **En cours**
 
 - L'interface comme demandeur du répartiteur.
 - Service mémoire (conçu), pipeline d'ingestion et dimension graphe.
+- Sauvegardes planifiées, veille des failles, conformité (RGPD, AI Act, ISO 27001).
 
 **Prévu**
 

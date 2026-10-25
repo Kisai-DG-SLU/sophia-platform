@@ -24,14 +24,18 @@ Each namespace belongs to a security zone. Communication is restricted by Kubern
 | Zone | Namespaces | Role | Isolation status |
 |---|---|---|---|
 | Orchestration | `sophia-core` | model router, dispatcher, workflows, bus, relational database | **in place**: default ingress deny, one rule per service (the model router only admits applications, agents, development, memory, the ingress router and the node network); egress bounded by an EgressFirewall |
-| Identity and forge | `sophia-identity`, `sophia-git` | SSO, repositories | **in place**: ingress closed except intended flows |
+| Identity and forge | `sophia-identity`, `sophia-git` | SSO, repositories | **in place**: ingress closed except intended flows. **Caveat**: the rule set by the identity provider's operator opens its internal HTTP port to the whole cluster, which cancels the restriction; to be fixed |
 | Inference | `sophia-inference` | local models | **in place**: deny all, ingress from the model router and the image tool only, no egress |
-| Local tools | `sophia-skills` | MCP servers | **in place**: no egress besides DNS and image models |
+| Local tools | `sophia-skills` | MCP servers | **in place**: no egress besides DNS and image models, except the files tool (identity provider and the office suite's internal port) |
 | Airlock | `sophia-dmz` | web acquisition | **in place**: default deny; egress to the web reserved for acquisition |
-| Applications | `sophia-apps` | interfaces and modules | **in place**: default ingress deny, one rule per application. The deployment agent is administrator there and could read an application's Secrets: the chat interface and the visualisation tool each get their own namespace (**planned**: designed, manifests ready), with no binding to any agent, and the school its own address |
+| Applications | `sophia-apps` | modules | **in place**: default ingress deny, one rule per application. The deployment agent is administrator there and could read an application's Secrets: that is why the chat interface and the visualisation tool moved out |
+| Chat interface | `sophia-interface` | chat | **in place**: its own namespace, with no binding to any agent; quota, defaults, default ingress deny, rules of the services it reaches duplicated then reduced |
+| Visualisation | `sophia-workflow` | measured state of the platform, mirror check | **in place**: its own namespace, no binding to any agent; a read account that does not read Secrets; default ingress deny |
+| Office suite | `sophia-workspace` | files and online editing | **in place**: default ingress deny, one rule per flow; the API for tools is open only to the tool's pod, on an internal read-only port |
+| Builds | `sophia-skills-build` | building MCP tools | **in place**: no agent account; egress bounded by an EgressFirewall to the internal registry, cluster services, the cluster API and the Python package index |
 | Object storage | `sophia-storage` | shared S3 | **in place**: default deny on ingress **and** egress (DNS only); one identity per application, limited to its bucket; no anonymous access |
 | Agents | agents namespace | pantheon | **in place**: agents' ingress open to the dispatcher only; one service account and one UID per pod; one model-router key per agent. **Target**: Internet egress, uncontrolled today, to be inventoried then closed by an EgressFirewall, first in observation mode |
-| Memory | `sophia-memory` | vector database, embedding, graph | **target**: default deny to apply after the memory service; the zone is not isolated yet, and the vector database answers without a key |
+| Memory | `sophia-memory` | vector database, embedding, graph | **target**: default deny to apply after the memory service; the zone is not isolated yet, and the vector database answers without a key (empty collection, ingestion suspended) |
 | Development | `sophia-sandbox` | development environments, child clusters | **target**: default deny to apply |
 
 Templates: `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` and the model router's ingress rule, `deploy/okd/core/litellm/network-policy.yaml`.
@@ -70,7 +74,7 @@ Agents are executors, reached by the dispatcher only, which decides by rules wit
 - **No agent reaches the workflow engine or writes to the bus**: the dispatcher is their only client and only publisher.
 - **Proven identity**: each request presents a short-lived projected service account token, checked against the Kubernetes API.
 - **One key per executor**, known to it and to the dispatcher only.
-- **One model-router key per agent**, limited to the local background model and embedding; the router's master key no longer leaves its pod, then gets rotated.
+- **One model-router key per agent**, limited to the local background model and embedding; the router's master key no longer leaves its pod, and it has been rotated ([Models by Role](concepts/13-modeles-par-role.en.md)).
 - **Agents' web tools without internal addresses** (`allow_private_urls` off, against request forgery towards the cluster); online model catalog off.
 - **Administration availability**: the cluster read pod and the Git forge are in a priority class no other workload can evict ([`deploy/okd/cluster/`](../deploy/okd/cluster/)).
 - **Human approvals** through a single path today, the workflow engine's interface, restricted to the administration group (the chat interface, with the person's token relayed, will become the first path); the authenticated author of each signal is checked against the approver list; an approval is valid once.
@@ -90,8 +94,14 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 - strict access control: SSO, groups; models enforced by the server per role (children and guests on the local model), one model-router virtual key per use, the master key confined to the router (see [Models by Role](concepts/13-modeles-par-role.en.md));
 - a tool acting for the person receives their identity through a token relayed on a single route, to a closed list of servers, verified then exchanged for a token issued to the tool; the service keeps its own permissions, and the model never sees the token (see [Identity Relay](concepts/12-relais-identite.en.md));
 - secrets managed through Kubernetes: manifests contain none; a Secret is created from standard input, never as a command argument (visible in the process list), and no value is printed; a value found in a repository's history is changed, without rewriting history;
-- repositories read through a read-only deploy key, specific to each repository, never through a forge administrator's token: **in place** for the school's content sync, **planned** for the builds of the interface and of the visualisation tool;
+- repositories read through a read-only deploy key, specific to each repository, never through a forge administrator's token: **in place** for the school's content sync and for the builds of the interface and of the visualisation tool. **Remaining**: the forge administrator's token is still used for pushing and for other builds; inventory of its uses, then tokens limited per use;
+- relational database: **one role per database, no superuser**; the superuser only connects locally;
+- tokens masked in the relays' access logs; model-router logs at `INFO`, never `DEBUG` (which would write every full request);
+- retention: the model router's detailed log and workflow history 30 days; object-storage trash 30 days; metrics 15 days; conversations and applications without automatic purge;
+- **scheduled backups: target**. Today, full manual backups before each operation; forge repositories each have **one** private mirror at an external host, checked every hour ([Visualisation module](modules/visualisation/README.en.md)), and some repositories never get one (transcripts of the coding-assistant sessions). Target: an encrypted backup in Europe for sensitive repositories, mandatory in a professional setting;
+- **minimisation of working notes**: the logs and plans read by coding assistants contain no child's first name and no sensitive data (health, schooling, address), only roles; a pre-commit hook rejects forbidden terms by their fingerprints (HMAC), without ever displaying them; history is not rewritten;
 - audit logging;
+- two-factor authentication: **target**;
 - encrypted volumes: **target**, not yet in place (unencrypted local volumes).
 
 Persistent data (vector databases, relational databases, repositories) lives on the server's local volumes; encryption at rest is still to be set up.
@@ -112,7 +122,9 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 - Semantic Tribunal before storing anything from the web;
 - default deny in `sophia-memory` and `sophia-sandbox`;
 - egress control for the agents namespace;
-- dedicated namespaces for the chat interface and the visualisation tool;
-- rotation of the model router's master key;
+- restricting the identity provider's internal port to client namespaces;
+- update and vulnerability watch for pinned images (local scanner, update requests opened without automatic merge, report to the administrator);
+- scheduled, encrypted backups, with a restore test;
+- two-factor authentication for administration accounts and guardians;
 - mutual TLS between the dispatcher and executors;
 - encrypted volumes.

@@ -19,12 +19,14 @@ In service.
 
 In service.
 
-- model routing through LiteLLM: remote and local models behind the same aliases ([`deploy/okd/core/`](../deploy/okd/core/))
+- model routing through LiteLLM: remote and local models behind the same aliases, one virtual key per use, master key confined to the router ([`deploy/okd/core/`](../deploy/okd/core/), [models by role](concepts/13-modeles-par-role.en.md))
+- shared relational database on PostgreSQL 18, one role per database, on a dedicated extensible volume ([`deploy/okd/core/`](../deploy/okd/core/))
 - local inference: text and vision on GPU, voice and images on CPU, without network egress ([`deploy/okd/inference/`](../deploy/okd/inference/))
 - identity and SSO: Keycloak for every interface ([`deploy/okd/identity/`](../deploy/okd/identity/))
-- chat interface ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/))
+- chat interface, in its own namespace ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/))
+- office suite: files and online editing, found and read from the chat under the person's identity ([Office module](modules/bureautique/README.en.md), [identity relay](concepts/12-relais-identite.en.md))
 - web search through an isolated airlock, first brick of the Paranoid Airlock ([`deploy/okd/dmz/`](../deploy/okd/dmz/))
-- local MCP tools: geography, images with protection rules ([`deploy/okd/skills/`](../deploy/okd/skills/))
+- local MCP tools: geography, images with protection rules, the person's files ([`deploy/okd/skills/`](../deploy/okd/skills/))
 - Git platform and persistent coding assistant ([`deploy/okd/hermes-system/`](../deploy/okd/hermes-system/))
 
 ---
@@ -36,10 +38,10 @@ In progress. Work follows this order:
 | # | Work | Status |
 |---|---|---|
 | 0 | **Event bus and durable workflows**: RabbitMQ (topology, rights, dead letters), Temporal; the delegation **dispatcher**, only client of Temporal and only publisher of events ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | in service ([`deploy/okd/core/repartiteur/`](../deploy/okd/core/repartiteur/)); agents' queues and accounts removed from the bus; event consumers to do |
-| 1 | **Minimal observability** and **CPU priorities**: service metrics, alert rules, priority classes, per-namespace quotas ([observability](concepts/10-observabilite.en.md), [inference and hardware](concepts/11-inference-materiel.en.md)) | in service ([`deploy/okd/monitoring/`](../deploy/okd/monitoring/), [`deploy/okd/cluster/`](../deploy/okd/cluster/)); alert routing to the dispatcher and the agents namespace quota to do |
+| 1 | **Minimal observability** and **CPU priorities**: service metrics, alert rules, priority classes, per-namespace quotas ([observability](concepts/10-observabilite.en.md), [inference and hardware](concepts/11-inference-materiel.en.md)) | in service ([`deploy/okd/monitoring/`](../deploy/okd/monitoring/), [`deploy/okd/cluster/`](../deploy/okd/cluster/)), agents namespace quota and volume-fill alert included; alert routing to the dispatcher to do |
 | 2 | **Agents on the local model**, with a "background" alias that leaves priority to chat, one router key per agent and card slots by time of day | in service ([`deploy/okd/hermes-system/`](../deploy/okd/hermes-system/)); mission cap at the dispatcher's next build |
-| 3 | **Memory (RAG)**: collection and schema with tags, **memory API** (per-tag rights, long-term writes by the memory service), graph and ingestion, object storage for files | in progress: schema, embedding alias ([`deploy/okd/memory/`](../deploy/okd/memory/)) and object storage ([`deploy/okd/storage/`](../deploy/okd/storage/)) in service; memory API designed; graph and ingestion to rebuild |
-| 4 | **The interface as a requester** of the dispatcher, with a return channel for approvals and notifications; a dedicated namespace for the interface | designed; first step in service: models per role, opening an application ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/)) |
+| 3 | **Memory (RAG)**: collection and schema with tags, **memory API** (per-tag rights, long-term writes by the memory service), graph and ingestion, object storage for files | in progress: schema, vector database on its dedicated volume, embedding alias ([`deploy/okd/memory/`](../deploy/okd/memory/)) and object storage ([`deploy/okd/storage/`](../deploy/okd/storage/)) in service; memory API designed; graph and ingestion to rebuild |
+| 4 | **The interface as a requester** of the dispatcher, with a return channel for approvals and notifications | designed; first steps in service: dedicated namespace, models per role, opening an application, the person's token relayed to a tool ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/)) |
 | 5 | Delegations to **supervision** (read), **deployment** and **maintenance** (two-level approvals); mutual TLS | to do |
 | 6 | **Planner** for open goals: workflow prototype, compared with a planner agent on real goals | to do |
 | 7 | **n8n** (with the first tool that needs it), **leak filter**, **Semantic Tribunal** | to do |
@@ -61,6 +63,9 @@ Future work.
 - memory confidentiality levels, role-based permissions on memory
 - default deny in memory and development
 - encrypted volumes, full memory isolation
+- scheduled, encrypted backups, with a restore test; two-factor authentication
+- update and vulnerability watch for pinned images
+- compliance (GDPR, AI Act, ISO 27001 aimed at "certifiable"): measured status, action plan, follow-up (designed, [Visualisation module](modules/visualisation/README.en.md))
 - advanced audit logging, raw history of exchanges, knowledge verification workflows
 - "incident" workflow: from alarm to approved plan ([observability](concepts/10-observabilite.en.md))
 
@@ -71,7 +76,7 @@ Future work.
 Future work.
 
 - opening to other users
-- system dashboard, knowledge interface
+- system dashboard: first step in service, the measured state of each component and the mirror check ([Visualisation module](modules/visualisation/README.en.md)); knowledge interface
 - arbiter: an external model consulted after the leak filter
 
 ---

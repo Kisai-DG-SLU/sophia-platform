@@ -71,7 +71,12 @@ flowchart TB
     WG[WireGuard Access]
     U --> WG
 
-    WG --> APPS[sophia-apps\nFrontends / UI]
+    WG --> APPS[sophia-apps\nModules]
+    WG --> ITF[sophia-interface\nChat]
+    WG --> WS[sophia-workspace\nOffice suite]
+    ITF --> CORE
+    ITF --> SKILLS
+    SKILLS --> WS
     WG --> CORE[sophia-core\nOrchestration / LiteLLM]
     WG --> GIT[sophia-git\nForgejo / Project Memory]
 
@@ -109,7 +114,7 @@ SOPHIA is currently an **experimental architecture project**.
 
 Current stage:
 
-- initial infrastructure deployed
+- core platform in service in the reference installation (local inference, model router, SSO, chat, office suite, bus and workflows, agents on the local model, observability); agents and memory in progress — see [Where the project stands](docs/pitch.en.md) and the [roadmap](docs/roadmap.en.md)
 - architectural documentation in progress
 - whitepaper under preparation
 - public repository structure being established
