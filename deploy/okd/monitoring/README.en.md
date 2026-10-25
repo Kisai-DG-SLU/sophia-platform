@@ -3,7 +3,7 @@
 See the platform's state before its users do: a saturated model, a pod killed for lack of memory, dead-lettered messages, a failed workflow, a full graphics card, a VPN access filter removed. This directory relies on the monitoring stack provided by OKD, with no extra component besides a small exporter for the node. Concept: [Observability and Incident Response](../../../docs/concepts/10-observabilite.en.md).
 
 ```
-RabbitMQ, Temporal, llama-server ──┐            ┌─ Thanos Ruler: 27 "Sophia…" rules
+RabbitMQ, Temporal, llama-server ──┐            ┌─ Thanos Ruler: 29 "Sophia…" rules
 node exporter (GPU, .prom) ────────┼─ Prometheus ┤
                                    │  (user      └─ user workload Alertmanager
        OKD metrics (kube-state-metrics…)  workload) ─┐       │ (ready, not enabled)
@@ -17,8 +17,9 @@ node exporter (GPU, .prom) ────────┼─ Prometheus ┤
 |---|---|
 | User workload monitoring (its own Prometheus, Thanos Ruler, Alertmanager) | in service |
 | Scraping of RabbitMQ, Temporal and llama-server | in service |
-| 27 alert rules: 21 in `20-regles.yaml`, 6 for the node in `40-node-metrics.yaml` | in service: loaded, none in error |
-| Node exporter: GPU through NVML, `.prom` files dropped by the node's scripts | in service |
+| 29 alert rules: 21 in `20-regles.yaml`, 8 for the node in `40-node-metrics.yaml` | in service: loaded, none in error |
+| Node exporter: GPU through NVML, `.prom` files dropped by the node's scripts, volume usage (`/var` and each logical volume mounted under `/var/mnt`); `sophia-agents` class | in service |
+| Volume fill alert, at 80% then 90% | in service |
 | VPN filter safeguard writing its code as a metric | in service |
 | Alert routing to the dispatcher (`30-alertmanager-config.yaml`, `/v1/alertes` receiver) | ready, **not enabled** |
 | OKD platform alerts (`alertmanager-main`) through the same path | planned, after enabling |
@@ -37,6 +38,7 @@ node exporter (GPU, .prom) ────────┼─ Prometheus ┤
 | `sophia: oui` label | on every rule and every alert | it is what the AlertmanagerConfig routes, and the only thing |
 | GPU | Python standard-library exporter reading NVML through `ctypes` in the driver library mounted from the node; privileged pod in `sophia-inference`, whose account already has llama-server's `privileged` SCC | no GPU operator or DCGM on a "driver only" path; no new right; NVML only reads, with no effect on llama-server |
 | Node metrics | the node's scripts drop `.prom` files into a node directory, which the exporter reads read-only | the OKD node-exporter `textfile` collector is an `emptyDir`: the node cannot write to it |
+| Volume usage | measured by the exporter, which mounts `/var/mnt` read-only (`HostToContainer` propagation, to also see a volume mounted after it started); a directory that is not a mount is ignored | the OKD node-exporter series live in the platform's namespace, which a rule in a SophIA namespace cannot read |
 | VPN filter safeguard | one function added: on each run it writes its code (0 readable, 1 filter removed, 2 check impossible) and a timestamp; atomic write (temporary file then `mv`), **errors ignored** | its decisions, actions and exit codes are unchanged; one alert warns if the filter is removed, another if the safeguard has been silent for more than 45 minutes |
 | Exposition format | one `# TYPE` line above each family, its series grouped below | a single `TYPE` line at the top, for a single family, leaves the others untyped |
 | Alerts to the dispatcher | AlertmanagerConfig (user workload) and a route added to `alertmanager-main` (OKD), with a bearer token and service TLS | an alarm becomes a request like any other, with a verified identity; the receiver only validates and logs until the "incident" workflow exists |
@@ -53,7 +55,7 @@ node exporter (GPU, .prom) ────────┼─ Prometheus ┤
 | `12-network-policies.yaml` | metrics ports ingress from the user workload Prometheus only |
 | `20-regles.yaml` | 7 `sophia-alertes` `PrometheusRule`s: dispatcher unavailable, RabbitMQ dead letters and alarms, failed workflows, local model unavailable or saturated, failed scraping, and the common rules |
 | `30-alertmanager-config.yaml` | routing to the dispatcher: **ready, not enabled** |
-| `40-node-metrics.yaml` | node exporter (Deployment, Service, ServiceMonitor, NetworkPolicy) and its 6 rules: VPN filter removed, check impossible, safeguard silent; GPU not measurable, memory full, temperature |
+| `40-node-metrics.yaml` | node exporter (Deployment, Service, ServiceMonitor, NetworkPolicy) and its 8 rules: VPN filter removed, check impossible, safeguard silent; GPU not measurable, memory full, temperature; volume almost full (80%), full (90%) |
 | `node-metrics/exporteur.py` | exporter code, standard library only |
 | `alertmanager-main-ajout.py` | adds the receiver and the leading route to the `alertmanager-main` configuration, removing nothing; replayable |
 

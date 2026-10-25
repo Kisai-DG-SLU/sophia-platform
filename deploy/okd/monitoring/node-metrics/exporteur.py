@@ -4,6 +4,9 @@
   outil NVIDIA ni opérateur. Mémoire, utilisation, température, puissance. Échec NVML → gpu_nvml_ok 0.
 - Fichiers *.prom déposés par les scripts du nœud dans /var/lib/sophia/metrics (lecture seule),
   par exemple wg_filter.prom, écrit par le garde-fou du filtre VPN.
+- Occupation des volumes du nœud : chaque LV monté sous /var/mnt, et /var (volumes en hostPath dans
+  /var/lib/sophia). Les métriques du node-exporter de la plateforme portent son propre namespace,
+  qu'une règle d'un namespace SophIA ne peut pas lire.
 Sert GET /metrics sur le port 9400. Bibliothèque standard seulement.
 """
 import ctypes
@@ -15,6 +18,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 LIB = os.environ.get("NVML_LIB", "/opt/nvidia-libs/libnvidia-ml.so.1")
 REP = os.environ.get("METRIQUES_NOEUD", "/var/lib/sophia/metrics")
 PORT = int(os.environ.get("PORT", "9400"))
+HOTE_MNT = os.environ.get("HOTE_MNT", "/hote/var/mnt")       # /var/mnt du nœud, en lecture seule
+HOTE_VAR = os.environ.get("HOTE_VAR", "/hote/var/lib/sophia")  # un répertoire de /var du nœud
 
 
 class _Memoire(ctypes.Structure):
@@ -76,6 +81,34 @@ def fichiers_noeud() -> list[str]:
     return lignes
 
 
+def volumes() -> list[str]:
+    """Octets totaux et libres (pour un utilisateur non root) de /var et de chaque point de montage
+    de /var/mnt. Un répertoire de /var/mnt qui n'est pas un montage (même périphérique que son parent)
+    est ignoré : il compterait /var une seconde fois."""
+    points = []
+    if os.path.isdir(HOTE_VAR):
+        points.append(("/var", HOTE_VAR))
+    if os.path.isdir(HOTE_MNT):
+        parent = os.stat(HOTE_MNT).st_dev
+        for nom in sorted(os.listdir(HOTE_MNT)):
+            chemin = os.path.join(HOTE_MNT, nom)
+            try:
+                if os.path.isdir(chemin) and os.stat(chemin).st_dev != parent:
+                    points.append((f"/var/mnt/{nom}", chemin))
+            except OSError:
+                continue
+    total, libres = ["# TYPE sophia_volume_octets_total gauge"], ["# TYPE sophia_volume_octets_libres gauge"]
+    for point, chemin in points:
+        try:
+            v = os.statvfs(chemin)
+        except OSError as e:
+            print(f"{chemin} illisible : {e}", file=sys.stderr)
+            continue
+        total.append(f'sophia_volume_octets_total{{point="{point}"}} {v.f_blocks * v.f_frsize}')
+        libres.append(f'sophia_volume_octets_libres{{point="{point}"}} {v.f_bavail * v.f_frsize}')
+    return total + libres if len(total) > 1 else []
+
+
 class Gestionnaire(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -85,7 +118,7 @@ class Gestionnaire(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        corps = ("\n".join(gpu() + fichiers_noeud()) + "\n").encode()
+        corps = ("\n".join(gpu() + volumes() + fichiers_noeud()) + "\n").encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; version=0.0.4")
         self.send_header("Content-Length", str(len(corps)))

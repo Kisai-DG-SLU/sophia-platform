@@ -3,7 +3,7 @@
 Voir l'état de la plateforme avant ses utilisateurs : un modèle saturé, un pod tué faute de mémoire, des messages en lettres mortes, un workflow en échec, une carte graphique pleine, un filtre d'accès VPN retiré. Ce dossier s'appuie sur la pile de supervision fournie par OKD, sans composant de plus qu'un petit exporteur pour le nœud. Concept : [Observabilité et réaction aux incidents](../../../docs/concepts/10-observabilite.md).
 
 ```
-RabbitMQ, Temporal, llama-server ──┐            ┌─ Thanos Ruler : 27 règles « Sophia… »
+RabbitMQ, Temporal, llama-server ──┐            ┌─ Thanos Ruler : 29 règles « Sophia… »
 exporteur du nœud (GPU, .prom) ────┼─ Prometheus ┤
                                    │  (charges   └─ Alertmanager des charges utilisateur
        métriques d'OKD (kube-state-metrics…)       ─┐        │ (prêt, non activé)
@@ -17,8 +17,9 @@ exporteur du nœud (GPU, .prom) ────┼─ Prometheus ┤
 |---|---|
 | Surveillance des charges utilisateur (Prometheus, Thanos Ruler, Alertmanager propres) | en service |
 | Collecte de RabbitMQ, Temporal et llama-server | en service |
-| 27 règles d'alerte : 21 dans `20-regles.yaml`, 6 pour le nœud dans `40-node-metrics.yaml` | en service : chargées, aucune en erreur |
-| Exporteur du nœud : GPU par NVML, fichiers `.prom` déposés par les scripts du nœud | en service |
+| 29 règles d'alerte : 21 dans `20-regles.yaml`, 8 pour le nœud dans `40-node-metrics.yaml` | en service : chargées, aucune en erreur |
+| Exporteur du nœud : GPU par NVML, fichiers `.prom` déposés par les scripts du nœud, occupation des volumes (`/var` et chaque volume logique monté sous `/var/mnt`) ; classe `sophia-agents` | en service |
+| Alerte de remplissage des volumes, à 80 % puis 90 % | en service |
 | Garde-fou du filtre VPN qui écrit son code en métrique | en service |
 | Routage des alertes vers le répartiteur (`30-alertmanager-config.yaml`, récepteur `/v1/alertes`) | prêt, **non activé** |
 | Alertes de la plateforme OKD (`alertmanager-main`) par le même circuit | prévu, après l'activation |
@@ -37,6 +38,7 @@ exporteur du nœud (GPU, .prom) ────┼─ Prometheus ┤
 | Étiquette `sophia: oui` | sur chaque règle et chaque alerte | c'est elle que route l'AlertmanagerConfig, et elle seule |
 | GPU | exporteur en bibliothèque standard Python, qui lit NVML par `ctypes` dans la bibliothèque du pilote montée depuis le nœud ; pod privilégié dans `sophia-inference`, dont le compte a déjà la SCC `privileged` de llama-server | pas d'opérateur GPU ni de DCGM sur un chemin « pilote seul » ; aucun droit nouveau ; NVML ne fait que lire, sans effet sur llama-server |
 | Métriques du nœud | les scripts du nœud déposent des fichiers `.prom` dans un répertoire du nœud, que l'exporteur lit en lecture seule | le collecteur `textfile` du node-exporter d'OKD est un `emptyDir` : le nœud ne peut pas y écrire |
+| Occupation des volumes | mesurée par l'exporteur, qui monte `/var/mnt` en lecture seule (propagation `HostToContainer`, pour voir aussi un volume monté après son démarrage) ; un répertoire non monté est ignoré | les séries du node-exporter d'OKD vivent dans le namespace de la plateforme, qu'une règle d'un namespace SophIA ne peut pas lire |
 | Garde-fou du filtre VPN | une seule fonction ajoutée : à chaque passage, il écrit son code (0 lisible, 1 filtre retiré, 2 vérification impossible) et un horodatage ; écriture atomique (fichier temporaire puis `mv`), **erreurs ignorées** | ses décisions, ses actions et ses codes de sortie ne changent pas ; une alerte prévient si le filtre est retiré, et une autre si le garde-fou se tait plus de 45 minutes |
 | Format d'exposition | une ligne `# TYPE` au-dessus de chaque famille, ses séries regroupées dessous | une seule ligne `TYPE` en tête, pour une seule famille, laisse les autres sans type |
 | Alertes vers le répartiteur | AlertmanagerConfig (charges utilisateur) et route ajoutée à `alertmanager-main` (OKD), avec jeton porteur et TLS de service | une alarme devient une demande comme une autre, avec une identité vérifiée ; le récepteur ne fait que valider et journaliser tant que le workflow « incident » n'existe pas |
@@ -53,7 +55,7 @@ exporteur du nœud (GPU, .prom) ────┼─ Prometheus ┤
 | `12-network-policies.yaml` | entrée des ports de métriques depuis le seul Prometheus des charges utilisateur |
 | `20-regles.yaml` | 7 `PrometheusRule` `sophia-alertes` : répartiteur indisponible, lettres mortes et alarmes de RabbitMQ, workflows en échec, modèle local indisponible ou saturé, collecte en échec, et les règles communes |
 | `30-alertmanager-config.yaml` | routage vers le répartiteur : **prêt, non activé** |
-| `40-node-metrics.yaml` | exporteur du nœud (Deployment, Service, ServiceMonitor, NetworkPolicy) et ses 6 règles : filtre VPN retiré, vérification impossible, garde-fou muet ; GPU non mesurable, mémoire pleine, température |
+| `40-node-metrics.yaml` | exporteur du nœud (Deployment, Service, ServiceMonitor, NetworkPolicy) et ses 8 règles : filtre VPN retiré, vérification impossible, garde-fou muet ; GPU non mesurable, mémoire pleine, température ; volume presque plein (80 %), plein (90 %) |
 | `node-metrics/exporteur.py` | code de l'exporteur, bibliothèque standard seulement |
 | `alertmanager-main-ajout.py` | ajoute le récepteur et la route en tête à la configuration de `alertmanager-main`, sans rien retirer ; rejouable |
 
