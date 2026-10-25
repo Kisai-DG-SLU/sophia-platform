@@ -80,6 +80,22 @@ The Tribunal Semantique validates information before it enters the system. The S
 
 ---
 
+## Status in the reference install
+
+| Brick | Status |
+|---|---|
+| Embedding (bge-m3, 1,024 dimensions, CPU), through the router's `sophia-embedder` alias | in service |
+| Vector collection and its schema: 18 tags in French (owner, type, project, confidentiality, provenance, validation…), 17 metadata indexes, `source` not indexed; idempotent script, without deletion | in service, empty |
+| **Memory service**: REST with an MCP façade; proven identity (service account token or OIDC); rights filter set by the service, never by the caller; writes "pending" with a confidence set by rule; validation reserved to humans and to the [Semantic Tribunal](05-tribunal-semantique.en.md); audit log | designed |
+| Graph database (dimension 5) | image pinned, at 0 replicas for now |
+| Ingestion | suspended, to be rebuilt (its image could not be rebuilt) |
+| S3 object storage for source files | in service for the platform ([`deploy/okd/storage/`](../../deploy/okd/storage/)); memory has no identity or bucket there yet |
+| Default deny in the memory zone | target, after the memory service: the vector database currently answers without a key ([security](../security.en.md)) |
+
+Recipe: [`deploy/okd/memory/`](../../deploy/okd/memory/).
+
+---
+
 ## Objective
 
 RAG 5D transforms the system's memory into a set of certified, contextually rich, and governable data. The goal is to reduce hallucinations by providing the model not with raw corpus, but with structured, filtered, and verifiable knowledge.

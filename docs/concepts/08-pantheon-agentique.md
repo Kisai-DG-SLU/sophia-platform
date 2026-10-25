@@ -42,7 +42,7 @@ L'architecture définit quatre rôles fondamentaux, plus un planificateur. La li
 | **Hephaistos** | développement | pleins pouvoirs dans son environnement de développement, un cluster enfant par projet ; tout ce qu'il produit est versionné dans la forge Git | agent autonome | en recette, premier exécutant derrière le répartiteur |
 | **Ouranos** | déploiement d'applications | limité au namespace des applications | agent, liste fermée d'outils, chaque commande approuvée | prévu |
 | **Athena** | maintenance de la plateforme | administratrice du cluster, **chaque commande approuvée** par un humain après approbation du plan | agent, liste fermée d'outils (le terminal sous approbation) | prévu |
-| **Dionysos** | supervision | lecture seule de tout le cluster et de la métrologie ; peut alerter, jamais agir | fonctions de lecture déterministes exposées au répartiteur ; l'interprétation revient au modèle, dans un workflow | prévu |
+| **Dionysos** | supervision | lecture seule de tout le cluster et de la métrologie ; peut alerter, jamais agir | fonctions de lecture déterministes exposées au répartiteur, dans un pod à part, sans accès au réseau du nœud ni secret, avec un compte en lecture seule ; l'interprétation revient au modèle, dans un workflow | prévu : conçu et testé, non déployé |
 | **Planificateur** | objectifs ouverts : découper, puis répartir entre agents | aucun droit propre : il ne fait que des demandes au répartiteur | workflow en code, une décision du modèle à la fois | prévu, prototype à comparer à un agent planificateur |
 
 Athena et Dionysos ne demandent jamais rien. Seul le planificateur, ou l'interface, confie une mission.
@@ -60,9 +60,9 @@ Le répartiteur est un service sans modèle, dans `sophia-core`. Il est le **seu
 5. **Filtres de la destination.** Étapes déterministes du workflow, choisies selon la destination : détection de secrets sur les réponses de supervision, filtre anti-fuite avant toute sortie vers un modèle extérieur, tribunal sémantique au retour. Un filtre absent ou incertain arrête le workflow : rien ne passe par défaut.
 6. **Événements.** Chaque étape publie un événement daté sur le bus, signé par le compte du répartiteur ; les consommateurs refusent tout autre émetteur.
 
-**Validations humaines.** Deux niveaux : l'approbation du plan avant le départ, puis l'approbation de chaque commande. Elles passent par un seul chemin, l'interface du moteur de workflows, réservée au groupe d'administration : l'auteur authentifié de chaque signal est inscrit dans l'historique, et seul un approbateur de la liste est accepté. Un signal ne porte qu'une décision et une empreinte, jamais une commande. Une approbation n'est valable qu'une fois : rien ne s'inscrit dans une liste permanente.
+**Validations humaines.** Deux niveaux : l'approbation du plan avant le départ, puis l'approbation de chaque commande. Elles passent aujourd'hui par un seul chemin, l'interface du moteur de workflows, réservée au groupe d'administration ; elles passeront dans l'interface de discussion, avec le jeton de la personne relayé et vérifié, l'interface du moteur de workflows restant le secours : l'auteur authentifié de chaque signal est inscrit dans l'historique, et seul un approbateur de la liste est accepté. Un signal ne porte qu'une décision et une empreinte, jamais une commande. Une approbation n'est valable qu'une fois : rien ne s'inscrit dans une liste permanente.
 
-État : **en service** pour les règles, le workflow, les événements et la mission vers le développement (en recette). **Prévus** : l'interface comme demandeur, la lecture vers la supervision, les missions de déploiement et de maintenance, la consultation d'un modèle extérieur (après le filtre anti-fuite et le tribunal), le TLS mutuel.
+État : **en service** pour les règles, le workflow, les événements et la mission vers le développement (en recette) ; le premier demandeur réel, l'agent Sophia, a fait l'aller-retour complet entièrement sur le modèle local. **Prêts** (écrits et testés, au prochain build) : une mission à la fois par exécutant, et les places du modèle local selon l'heure. **Prévus** : l'interface comme demandeur, la lecture vers la supervision, les missions de déploiement et de maintenance, la consultation d'un modèle extérieur (après le filtre anti-fuite et le tribunal), le TLS mutuel.
 
 ---
 
@@ -71,6 +71,8 @@ Le répartiteur est un service sans modèle, dans `sophia-core`. Il est le **seu
 - **Un namespace commun aux agents.** L'isolation ne vient pas du namespace, mais d'un compte de service et d'un UID propres à chaque pod, de NetworkPolicies qui n'ouvrent l'entrée des agents qu'au répartiteur, et des droits de chaque compte.
 - **Aucun accès des agents au moteur de workflows ni en écriture sur le bus.** Un exécutant n'a aucun moyen de joindre un autre agent : ni clé d'un autre, ni moteur de workflows, ni bus.
 - **Une clé propre à chaque exécutant**, connue de lui et du répartiteur seulement.
+- **Une clé du routeur de modèles par agent**, limitée au modèle local de fond et à l'embedding : aucun agent ne détient la clé maître du routeur ni un modèle distant.
+- **Le bus n'a plus de comptes d'agents** : leurs files sont retirées ; les agents ne sont pas clients du bus.
 - **Liste fermée d'outils** par agent, vérifiée en recette de non-régression : les outils réellement donnés au modèle sont relevés à chaque mise à jour du moteur d'agent, dont les valeurs par défaut peuvent changer.
 
 ---

@@ -80,6 +80,22 @@ Le Tribunal Sémantique valide les informations avant leur entrée dans le syst�
 
 ---
 
+## État dans l'installation de référence
+
+| Brique | État |
+|---|---|
+| Embedding (bge-m3, 1 024 dimensions, CPU), par l'alias `sophia-embedder` du routeur | en service |
+| Collection vectorielle et son schéma : 18 étiquettes en français (propriétaire, type, projet, confidentialité, provenance, validation…), 17 index de métadonnées, `source` non indexée ; script idempotent, sans suppression | en service, vide |
+| **Service mémoire** : REST avec une façade MCP ; identité prouvée (jeton de compte de service ou OIDC) ; filtre de droits posé par le service, jamais par l'appelant ; écriture « en attente » avec une confiance fixée par règle ; validation réservée aux humains et au [Tribunal Sémantique](05-tribunal-semantique.md) ; journal d'audit | conçu |
+| Base graphe (dimension 5) | image figée, à 0 réplique en attendant |
+| Ingestion | suspendue, à reconstruire (son image ne se reconstruisait pas) |
+| Stockage objet S3 pour les fichiers sources | en service pour la plateforme ([`deploy/okd/storage/`](../../deploy/okd/storage/)) ; la mémoire n'y a pas encore son identité ni son seau |
+| Refus par défaut dans la zone mémoire | cible, après le service mémoire : la base vectorielle répond aujourd'hui sans clé ([sécurité](../security.md)) |
+
+Recette : [`deploy/okd/memory/`](../../deploy/okd/memory/).
+
+---
+
 ## Objectif
 
 Le RAG 5D transforme la mémoire du système en un ensemble de données certifiées, contextuellement riches et gouvernables. L'objectif est de réduire les hallucinations en donnant au modèle non pas un corpus brut, mais une connaissance structurée, filtrée et vérifiable.
