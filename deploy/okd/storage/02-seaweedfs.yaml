@@ -1,0 +1,120 @@
+# SeaweedFS en « weed mini » : maître, volume, filer et passerelle S3 dans un seul processus, prévu
+# pour un nœud en production (plusieurs nœuds : weed volume ajoutés, ou composants séparés).
+# Exposé : la passerelle S3 seule, en TLS (certificat de service OKD), Service s3 port 9000.
+# Fermés : WebDAV, Iceberg, Lance. Internes au pod (NetworkPolicy, 03-network.yaml) : maître, filer,
+# volume, gRPC, la passerelle en HTTP, et l'administration, gardée parce que sans elle le travailleur
+# de maintenance (nettoyage, rééquilibrage) tourne en boucle sur une connexion refusée ; protégée par
+# mot de passe (WEED_ADMIN_PASSWORD, Secret s3-admin).
+# Identités S3 (Secret s3-config, clé s3.json) : admin, et une par application, limitée à son seau
+# (actions « Read:fichiers », « Write:fichiers »…). Aucune identité anonyme.
+# Toute option se vérifie dans « weed mini -h » de la version déployée : une option inconnue arrête
+# le processus au démarrage.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3
+  namespace: sophia-storage
+  labels: { app: s3 }
+spec:
+  replicas: 1
+  # Volume RWO : jamais deux SeaweedFS sur le même répertoire
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: s3 }
+  template:
+    metadata:
+      labels: { app: s3 }
+    spec:
+      # SeaweedFS lit les variables d'environnement comme des options (S3_PORT → -s3.port) : la
+      # variable injectée par Kubernetes pour le Service « s3 » (S3_PORT=tcp://…:9000) le fait
+      # échouer au démarrage. Aucun lien de service n'est utile ici.
+      enableServiceLinks: false
+      priorityClassName: ${S3_PRIORITY_CLASS}
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: seaweedfs
+          image: docker.io/chrislusf/seaweedfs:${SEAWEEDFS_VERSION}@${SEAWEEDFS_DIGEST}
+          imagePullPolicy: IfNotPresent
+          args:
+            - mini
+            - -dir=/data
+            # Identité stable d'un démarrage à l'autre (l'IP du pod change) ; écoute sur toutes les
+            # interfaces, l'entrée est filtrée par la NetworkPolicy
+            - -ip=127.0.0.1
+            - -ip.bind=0.0.0.0
+            - -webdav=false
+            - -s3.port.iceberg=0
+            - -s3.port.lance=0
+            - -s3.port.https=8443
+            - -s3.cert.file=/etc/seaweedfs/tls/tls.crt
+            - -s3.key.file=/etc/seaweedfs/tls/tls.key
+            - -s3.config=/etc/seaweedfs/s3/s3.json
+            # Seaux créés par l'administration seulement, jamais par un envoi ; pas de suppression
+            # récursive d'un seau non vide
+            - -s3.autoCreateBucket=false
+            - -s3.allowDeleteBucketNotEmpty=false
+            # CORS par défaut restreinte à l'application de fichiers (la règle du seau prévaut)
+            - -s3.allowedOrigins=${FILES_ORIGIN}
+            - -bucket=fichiers
+            # Aucune statistique envoyée à l'éditeur (objectif 100 % local). L'option est
+            # -master.telemetry ; -telemetry n'existe pas en mode mini
+            - -master.telemetry=false
+          env:
+            - { name: HOME, value: /tmp }
+            # Variable et non argument : un argument serait lisible dans la liste des processus du nœud
+            - name: WEED_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: s3-admin, key: admin-password } }
+          ports:
+            - { name: s3-https, containerPort: 8443 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          readinessProbe:
+            tcpSocket: { port: s3-https }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: s3-https }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tls, mountPath: /etc/seaweedfs/tls, readOnly: true }
+            - { name: s3-config, mountPath: /etc/seaweedfs/s3, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: s3-data }
+        # Certificat de service (Service s3 ci-dessous), renouvelé par le cluster, relu au redémarrage
+        - name: tls
+          secret: { secretName: s3-tls }
+        - name: s3-config
+          secret: { secretName: s3-config, defaultMode: 0440 }
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3
+  namespace: sophia-storage
+  labels: { app: s3 }
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: s3-tls
+spec:
+  selector: { app: s3 }
+  ports:
+    - { name: https, port: 9000, targetPort: s3-https }
+---
+# Autorité de service d'OKD pour les clients du namespace (Job d'initialisation)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-ca
+  namespace: sophia-storage
+  annotations: { service.beta.openshift.io/inject-cabundle: "true" }

@@ -1,0 +1,17 @@
+# API S3 joignable dans le VPN : l'application de fichiers fait envoyer les fichiers par le navigateur,
+# en PUT présigné direct. Reencrypt : TLS jusqu'au pod (certificat de service, reconnu par le
+# routeur). Délai long : gros fichiers.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: s3
+  namespace: sophia-storage
+  annotations:
+    haproxy.router.openshift.io/timeout: 900s
+spec:
+  host: ${S3_HOST}
+  to: { kind: Service, name: s3 }
+  port: { targetPort: https }
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect

@@ -1,0 +1,66 @@
+# Réglage des seaux par l'API S3 (rejouable) : seau fichiers versionné, CORS de l'application de
+# fichiers (PUT présigné depuis le navigateur), politique qui interdit à l'identité de l'application
+# de défaire ces protections.
+# Identité admin du Secret s3-admin ; TLS vérifié par l'autorité de service d'OKD.
+# Rejouer : oc -n sophia-storage delete job s3-init, puis oc apply de ce fichier.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-init
+  namespace: sophia-storage
+  labels: { app: s3-init }
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: s3-init }
+    spec:
+      # Comme le Deployment s3 : pas de variables de service S3_* injectées
+      enableServiceLinks: false
+      restartPolicy: Never
+      containers:
+        - name: init
+          image: docker.io/amazon/aws-cli:${AWSCLI_VERSION}@${AWSCLI_DIGEST}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              A="aws --endpoint-url https://s3.sophia-storage.svc:9000"
+              for i in 1 2 3 4 5 6 7 8 9 10 11 12; do $A s3api head-bucket --bucket fichiers && break; sleep 5; done
+              $A s3api put-bucket-versioning --bucket fichiers --versioning-configuration Status=Enabled
+              $A s3api put-bucket-cors --bucket fichiers --cors-configuration '{"CORSRules":[{"AllowedOrigins":["${FILES_ORIGIN}"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["Content-Type","Content-Length","Content-MD5","x-amz-*"],"ExposeHeaders":["ETag","x-amz-version-id"],"MaxAgeSeconds":3600}]}'
+              # L'identité de l'application écrit et supprime (marqueur de suppression, réversible),
+              # mais ne change ni le versioning, ni la CORS, ni le cycle de vie, ni la politique, et ne
+              # supprime aucune version : le droit « Write » de SeaweedFS couvrirait sinon tout cela.
+              # Principal user/fichiers seul : « * » bloquerait aussi l'admin, sans retour possible.
+              $A s3api put-bucket-policy --bucket fichiers --policy '{"Version":"2012-10-17","Statement":[{"Sid":"ProtegerVersions","Effect":"Deny","Principal":{"AWS":["arn:aws:iam::*:user/fichiers"]},"Action":["s3:PutBucketVersioning","s3:PutBucketCors","s3:DeleteBucketCors","s3:PutBucketLifecycleConfiguration","s3:PutLifecycleConfiguration","s3:PutBucketPolicy","s3:DeleteBucketPolicy","s3:DeleteObjectVersion","s3:PutBucketObjectLockConfiguration"],"Resource":["arn:aws:s3:::fichiers","arn:aws:s3:::fichiers/*"]}]}'
+              echo "versioning :"; $A s3api get-bucket-versioning --bucket fichiers
+              echo "politique :"; $A s3api get-bucket-policy --bucket fichiers
+              echo "cors :"; $A s3api get-bucket-cors --bucket fichiers
+          env:
+            - { name: HOME, value: /tmp }
+            - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+            - { name: AWS_CA_BUNDLE, value: /etc/ca/service-ca.crt }
+            # Sommes de contrôle seulement si l'opération les exige (compatibilité S3 hors AWS)
+            - { name: AWS_REQUEST_CHECKSUM_CALCULATION, value: when_required }
+            - { name: AWS_RESPONSE_CHECKSUM_VALIDATION, value: when_required }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: s3-admin, key: access-key } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: s3-admin, key: secret-key } }
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: ca, mountPath: /etc/ca, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: ca
+          configMap: { name: service-ca }
+        - name: tmp
+          emptyDir: {}
