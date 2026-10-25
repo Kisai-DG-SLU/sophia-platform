@@ -109,6 +109,10 @@ data:
       database_url: "os.environ/DATABASE_URL"
       master_key: "os.environ/LITELLM_MASTER_KEY"
       allow_unmapped_models: true
+      # Rétention des journaux de dépense détaillés : 30 jours. Purge quotidienne par lots, de
+      # LiteLLM_SpendLogs seulement : les agrégats quotidiens (LiteLLM_Daily*Spend) restent.
+      # Pris au prochain redémarrage de LiteLLM.
+      maximum_spend_logs_retention_period: "30d"
 
   custom_cost_map.json: |
     {

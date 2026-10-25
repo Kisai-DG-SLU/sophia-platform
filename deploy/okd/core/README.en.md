@@ -7,7 +7,8 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 | Directory | Role |
 |---|---|
 | `litellm/` | model router: stable aliases (`sophia-local`, `sophia-local-fond`, `sophia-embedder`, `sophia-stt`, `sophia-tts`, and remote aliases for development), restricted virtual keys, costs |
-| `postgres/` | PostgreSQL 15: databases for LiteLLM, Keycloak, the interface, Temporal and the modules, one account per database |
+| [`postgres18/`](postgres18/) | **PostgreSQL 18**, shared instance for every database (LiteLLM, Keycloak, interface, Temporal, memory, human approvals, office suite, modules), one owner role per database, no network superuser; dedicated logical volume |
+| `postgres/` | former PostgreSQL 15 instance, replaced by `postgres18/`: at 0 replicas for a 7-day hold, then removed |
 | [`rabbitmq/`](rabbitmq/) | event bus, with the dispatcher as only publisher; management UI behind Keycloak |
 | [`temporal/`](temporal/) | agents' durable workflows (delegation, recovery after failure) |
 | [`repartiteur/`](repartiteur/) | delegation dispatcher: rules without a model, only Temporal client, only event publisher |
@@ -31,7 +32,8 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 | LiteLLM logs | `INFO`, not `DEBUG` | in `DEBUG`, every full request (private conversations, base64 photos) lands in the logs and slows down large requests |
 | Guardrails | namespace quota (16 Gi, 12 CPU, 15 pods) and explicit limits on **every** container, builds included | a container without limits gets 512 Mi by default: LiteLLM, Postgres or a build would be OOM-killed. **Apply the limits before the quota** |
 | LiteLLM | 768 Mi requested, at most 2 Gi and 2 CPU | ≈ 550 Mi at rest, photos inflate requests; the CPU cap also bounds a pathological token count freeze |
-| Postgres | image **pinned by digest**, `IfNotPresent`, `Recreate`, 2 Gi | a restart never pulls another version; never two Postgres on the same local volume; the image derives its buffers from the memory limit |
+| Postgres | **version 18**, image **pinned by digest**, `IfNotPresent`, `Recreate`, 2 Gi, `pg_isready` probes, dedicated logical volume growable online | a restart never pulls another version; never two Postgres on the same local volume; the image derives its buffers from the memory limit; details and migration in [`postgres18/`](postgres18/) |
+| Router retention | detailed call log (`LiteLLM_SpendLogs`) kept 30 days (`maximum_spend_logs_retention_period`); daily aggregates remain | about 3 KB per call: without retention, the table would grow forever |
 | Ingress | default ingress deny, then one rule per service; the model router (`litellm/network-policy.yaml`) only admits the namespaces of its recorded callers, the ingress router and the node network | without a rule, any pod in the cluster reaches the router and spends its keys; per namespace rather than per pod, to cover ephemeral pods |
 | Egress | deny all except cluster Services and pods, the remote model provider, the registries and package indexes used by builds, and the identity provider on 443 | RabbitMQ reads Keycloak's signing keys through its public name, which resolves to the node, outside the internal networks |
 
@@ -50,14 +52,14 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 |---|---|
 | `llm-api-keys` | `DEEPINFRA_API_KEY`, `LITELLM_MASTER_KEY`, `DATABASE_URL`, `LITELLM_SALT_KEY` (encrypts what LiteLLM stores in its database: set it **to the current master key value** before rotating the master key) |
 | `litellm-cle-<agent>` | `cle`: the agent's virtual key (agents namespace) |
-| `postgres-sophia-creds` | `username`, `password` (`openssl rand -base64 24`) |
+| `postgres-sophia-18-creds`, `postgres-18-<role>` | `password`: see [`postgres18/`](postgres18/) |
 | `forgejo-creds` | build read access to the internal repository |
 
 ## Procedure (administrator)
 
-1. Explicit limits first: `litellm/deployment.yaml`, `litellm/build.yaml`, `postgres/instance.yaml` — `--dry-run=server`, then `apply`.
-2. Guardrails: `00-namespace-guardrails.yaml`, then `oc describe quota -n sophia-core`.
-3. Network: `network/policies.yaml`, `postgres/allow-apps-to-postgres.yaml`, `litellm/network-policy.yaml`, and **only then** `network/default-deny-ingress.yaml`. Before and after: the router answers through its Route and from each calling namespace; rollback: delete `default-deny-ingress`.
+1. Explicit limits first: `litellm/deployment.yaml`, `litellm/build.yaml` — `--dry-run=server`, then `apply`.
+2. Guardrails: `00-namespace-guardrails.yaml`, then `oc describe quota -n sophia-core`. Then the database, through its own procedure: [`postgres18/`](postgres18/).
+3. Network: `network/policies.yaml`, `postgres18/03-network.yaml`, `litellm/network-policy.yaml`, and **only then** `network/default-deny-ingress.yaml`. Before and after: the router answers through its Route and from each calling namespace; rollback: delete `default-deny-ingress`.
 4. Router: `litellm/config.yaml` (`oc diff` first: only the expected aliases change), restart LiteLLM, then `add-model-to-keys.py` dry-run and with `--apply` for each new alias:
 
 ```bash

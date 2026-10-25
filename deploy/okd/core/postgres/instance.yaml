@@ -1,3 +1,4 @@
+# Ancienne instance PostgreSQL 15, remplacée par ../postgres18/ : à 0 réplique pendant la garde, puis retirée.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

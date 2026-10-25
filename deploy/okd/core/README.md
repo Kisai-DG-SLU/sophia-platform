@@ -7,7 +7,8 @@ Le cœur de la plateforme : le routeur de modèles (LiteLLM), la base PostgreSQL
 | Dossier | Rôle |
 |---|---|
 | `litellm/` | routeur de modèles : alias stables (`sophia-local`, `sophia-local-fond`, `sophia-embedder`, `sophia-stt`, `sophia-tts`, et des alias distants pour le développement), clés virtuelles restreintes, coûts |
-| `postgres/` | PostgreSQL 15 : bases de LiteLLM, de Keycloak, de l'interface, de Temporal et des modules, un compte par base |
+| [`postgres18/`](postgres18/) | **PostgreSQL 18**, instance commune de toutes les bases (LiteLLM, Keycloak, interface, Temporal, mémoire, validations humaines, bureautique, modules), un rôle propriétaire par base, sans superutilisateur réseau ; volume logique dédié |
+| `postgres/` | ancienne instance PostgreSQL 15, remplacée par `postgres18/` : à 0 réplique pendant une garde de 7 jours, puis retirée |
 | [`rabbitmq/`](rabbitmq/) | bus d'événements, dont le répartiteur est le seul éditeur ; interface d'administration derrière Keycloak |
 | [`temporal/`](temporal/) | workflows durables des délégations (reprise après panne) |
 | [`repartiteur/`](repartiteur/) | répartiteur des délégations : règles sans modèle, seul client de Temporal, seul éditeur des événements |
@@ -32,7 +33,8 @@ Le cœur de la plateforme : le routeur de modèles (LiteLLM), la base PostgreSQL
 | Entrée | refus par défaut en entrée, puis une règle par service ; le routeur de modèles (`litellm/network-policy.yaml`) n'admet que les namespaces de ses appelants relevés, le routeur d'entrée et le réseau du nœud | sans règle, tout pod du cluster joint le routeur et dépense ses clés ; par namespace et non par pod, pour couvrir les pods éphémères |
 | Garde-fous | quota du namespace (16 Gi, 12 CPU, 15 pods) et limites explicites sur **chaque** conteneur, builds compris | un conteneur sans limite reçoit 512 Mi par défaut : LiteLLM, Postgres ou un build mourraient en OOM. **Appliquer les limites avant le quota** |
 | LiteLLM | 768 Mi demandés, 2 Gi et 2 CPU au plus | ≈ 550 Mi au repos, les photos gonflent les requêtes ; le plafond CPU borne aussi le gel d'un comptage de tokens pathologique |
-| Postgres | image **figée par digest**, `IfNotPresent`, `Recreate`, 2 Gi | un redémarrage ne tire jamais une autre version ; jamais deux Postgres sur le même volume local ; l'image dérive ses tampons de la limite mémoire |
+| Postgres | **version 18**, image **figée par digest**, `IfNotPresent`, `Recreate`, 2 Gi, sondes `pg_isready`, volume logique dédié extensible à chaud | un redémarrage ne tire jamais une autre version ; jamais deux Postgres sur le même volume local ; l'image dérive ses tampons de la limite mémoire ; détails et migration dans [`postgres18/`](postgres18/) |
+| Rétention du routeur | journal détaillé des appels (`LiteLLM_SpendLogs`) gardé 30 jours (`maximum_spend_logs_retention_period`) ; les agrégats quotidiens restent | environ 3 Ko par appel : sans rétention, la table grossirait sans fin |
 | Sortie | tout refusé sauf Services et pods du cluster, le fournisseur des modèles distants, les registres et dépôts de paquets des builds, et le fournisseur d'identité en 443 | RabbitMQ lit les clés de signature de Keycloak par son nom public, qui résout vers le nœud, hors des réseaux internes |
 
 ## Variables
@@ -50,14 +52,14 @@ Le cœur de la plateforme : le routeur de modèles (LiteLLM), la base PostgreSQL
 |---|---|
 | `llm-api-keys` | `DEEPINFRA_API_KEY`, `LITELLM_MASTER_KEY`, `DATABASE_URL`, `LITELLM_SALT_KEY` (chiffrement de ce que LiteLLM garde en base : à poser **à la valeur actuelle de la clé maître** avant de renouveler celle-ci) |
 | `litellm-cle-<agent>` | `cle` : clé virtuelle de l'agent (namespace des agents) |
-| `postgres-sophia-creds` | `username`, `password` (`openssl rand -base64 24`) |
+| `postgres-sophia-18-creds`, `postgres-18-<rôle>` | `password` : voir [`postgres18/`](postgres18/) |
 | `forgejo-creds` | accès en lecture du build au dépôt interne |
 
 ## Procédure (l'administrateur)
 
-1. Limites explicites d'abord : `litellm/deployment.yaml`, `litellm/build.yaml`, `postgres/instance.yaml` — `--dry-run=server`, puis `apply`.
-2. Garde-fous : `00-namespace-guardrails.yaml`, puis `oc describe quota -n sophia-core`.
-3. Réseau : `network/policies.yaml`, `postgres/allow-apps-to-postgres.yaml`, `litellm/network-policy.yaml`, puis **seulement ensuite** `network/default-deny-ingress.yaml`. Avant et après : le routeur répond par sa Route et depuis chaque namespace appelant ; retour arrière : supprimer `default-deny-ingress`.
+1. Limites explicites d'abord : `litellm/deployment.yaml`, `litellm/build.yaml` — `--dry-run=server`, puis `apply`.
+2. Garde-fous : `00-namespace-guardrails.yaml`, puis `oc describe quota -n sophia-core`. Puis la base de données, par sa propre procédure : [`postgres18/`](postgres18/).
+3. Réseau : `network/policies.yaml`, `postgres18/03-network.yaml`, `litellm/network-policy.yaml`, puis **seulement ensuite** `network/default-deny-ingress.yaml`. Avant et après : le routeur répond par sa Route et depuis chaque namespace appelant ; retour arrière : supprimer `default-deny-ingress`.
 4. Routeur : `litellm/config.yaml` (`oc diff` d'abord : seuls les alias attendus changent), redémarrage de LiteLLM, puis `add-model-to-keys.py` à blanc et avec `--apply` pour chaque nouvel alias :
 
 ```bash
