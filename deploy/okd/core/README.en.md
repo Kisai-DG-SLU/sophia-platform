@@ -26,6 +26,8 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 | Restricted keys | each client (interface, agents) has a key limited to a model list; `add-model-to-keys.py` adds a new alias to it | a new alias is invisible until it is added to the keys that need it |
 | One key per agent | `agent-<name>` (`litellm/create-agent-key.py`): background alias and embedding only, 120 requests per minute; Secret `litellm-cle-<agent>` in the agents namespace | the master key administers the router (keys, budgets) and opens every model: it does not leave the router's pod |
 | Prices | copied from the provider's API by `sync-pricing.py`, never by hand | the displayed cost follows the real price |
+| Per-use keys | one virtual key per caller (`litellm/create-virtual-key.py`): chat voice (its two aliases, its own rate), each development pod (the chat's models without voice), each application; never `*` | the rule is held by the router, whatever the request; see [Models by role](../../../docs/concepts/13-modeles-par-role.en.md) |
+| Zero-downtime switch | `readiness` (`/health/readiness`, 3 s) and `liveness` (`/health/liveliness`) probes, `RollingUpdate` strategy (`maxSurge: 1`, `maxUnavailable: 0`) | without a probe, the pod was declared ready before listening: each restart (configuration, master key) cut the chat |
 | LiteLLM logs | `INFO`, not `DEBUG` | in `DEBUG`, every full request (private conversations, base64 photos) lands in the logs and slows down large requests |
 | Guardrails | namespace quota (16 Gi, 12 CPU, 15 pods) and explicit limits on **every** container, builds included | a container without limits gets 512 Mi by default: LiteLLM, Postgres or a build would be OOM-killed. **Apply the limits before the quota** |
 | LiteLLM | 768 Mi requested, at most 2 Gi and 2 CPU | ≈ 550 Mi at rest, photos inflate requests; the CPU cap also bounds a pathological token count freeze |
@@ -69,3 +71,12 @@ The script reads the master key from the pod's environment, never prints it, and
    1. Keys and Secrets, with no effect on what runs: `create-agent-key.py <agent> --dry-run`, then the `--eval CLE_AGENT` form, and a Secret created from standard input (`printf '%s' "$CLE_AGENT" | oc create secret generic litellm-cle-<agent> --from-file=cle=/dev/stdin`), then `unset CLE_AGENT`. No key is printed.
    2. One `apply` per agent ([`../hermes-system/`](../hermes-system/)), one agent at a time. Check inside the agent: `/key/info` with its own key returns `agent-<name>` and its two models, then a "pong" mission.
    3. Once no agent reads it any more: remove the master key from the agents' Secret, set `LITELLM_SALT_KEY`, then rotate the master key. Each value goes through `--patch-file=/dev/stdin`, never in a command's arguments. List every consumer of the master key beforehand (scripts, administration workstations).
+6. **Per-use keys** (voice, development pod, application): `create-virtual-key.py`, always dry-run first.
+
+```bash
+oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --modeles <m1>,<m2> --rpm <N> --dry-run < litellm/create-virtual-key.py
+oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --comme <reference-alias> --sans <m1> --dry-run < litellm/create-virtual-key.py
+oc exec -i -n sophia-core deploy/litellm -- python3 - --info <alias> < litellm/create-virtual-key.py
+```
+
+Creation replaces `--dry-run` with `--eval <VARIABLE>` inside an `eval "$(…)"`, then the key goes into the caller's Secret through standard input. `--info` gives the models, the limits and the start of the key's SHA-256 fingerprint: compared with the fingerprint of the Secret's value, it proves it is the right key, without displaying it.

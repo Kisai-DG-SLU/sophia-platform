@@ -5,6 +5,12 @@ metadata:
   namespace: sophia-core
 spec:
   replicas: 1
+  # Sans coupure : le nouveau pod démarre à côté de l'ancien, qui sert jusqu'à ce que le nouveau
+  # réponde à /health/readiness (migrations comprises, environ 30 s). Possible : aucun volume RWO
+  # (configuration en ConfigMap, emptyDir), base externe. Le quota du namespace doit admettre le second pod.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
   selector:
     matchLabels:
       app: litellm
@@ -13,6 +19,7 @@ spec:
       labels:
         app: litellm
     spec:
+      priorityClassName: sophia-chat
       initContainers:
       - name: build-tiktoken-cache
         image: image-registry.openshift-image-registry.svc:5000/sophia-core/sophia-litellm:latest
@@ -68,6 +75,19 @@ spec:
         image: image-registry.openshift-image-registry.svc:5000/sophia-core/sophia-litellm:latest
         imagePullPolicy: Always
         args: ["--config", "/app/config/config.yaml", "--host", "0.0.0.0", "--port", "4000"]
+        # Prêt seulement quand le serveur écoute, après les migrations : sans sonde, le pod était déclaré
+        # disponible environ 30 s trop tôt (« Connection refused » pendant la bascule).
+        readinessProbe:
+          httpGet: { path: /health/readiness, port: 4000 }
+          periodSeconds: 5
+          timeoutSeconds: 3  # la sonde interroge la base : 1 s par défaut retirerait le pod du Service sous charge
+          failureThreshold: 3
+        livenessProbe:
+          httpGet: { path: /health/liveliness, port: 4000 }
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
 
         securityContext:
           allowPrivilegeEscalation: false
