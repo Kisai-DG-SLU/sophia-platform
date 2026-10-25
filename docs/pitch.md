@@ -75,17 +75,19 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Acquisition web isolée par le sas, première brique du Sas Paranoïaque.
 - Répartiteur des délégations, workflows durables et bus d'événements ; premier agent exécutant (développement) en recette.
 - Forge Git auto-hébergée, source de vérité du code et de la mémoire des projets ; environnements de développement isolés.
-- Base vectorielle et service d'embedding.
+- Base vectorielle avec son schéma, service d'embedding, stockage objet S3.
+- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique ; une clé du routeur par agent.
+- Observabilité minimale : métriques des services, règles d'alerte, carte graphique, garde-fou du filtre VPN ; priorités CPU sans préemption et quotas par namespace.
 
 **En cours**
 
 - L'interface comme demandeur du répartiteur.
-- API mémoire, pipeline d'ingestion et dimension graphe.
+- Service mémoire (conçu), pipeline d'ingestion et dimension graphe.
 
 **Prévu**
 
-- Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique ; planificateur des objectifs ouverts.
-- Observabilité et workflow « incident » ; supervision, déploiement et maintenance derrière le répartiteur.
+- Planificateur des objectifs ouverts.
+- Workflow « incident » ; supervision, déploiement et maintenance derrière le répartiteur.
 - Tribunal Sémantique, Ghost Search, filtre DLP.
 - Niveaux de confidentialité de la mémoire.
 - Paquets de déploiement reproductibles et multi-locataires.
@@ -103,7 +105,7 @@ Le détail est dans la [feuille de route](roadmap.md).
 ## Questions fréquentes
 
 **SophIA est-elle souveraine aujourd'hui ?**
-En grande partie : l'infrastructure, la mémoire, le contrôle d'accès et l'inférence de l'interface et des modules sont locaux. Les agents passent encore par des modèles distants pour les essais ; leur passage au modèle local est prévu, sans rien changer d'autre qu'un routage.
+Oui pour l'usage courant : l'infrastructure, la mémoire, le contrôle d'accès et l'inférence de l'interface, des modules et des agents sont locaux. Un modèle distant ne reste qu'une dérogation de développement, choisie par routage.
 
 **Faut-il un très gros modèle ?**
 Non. Le confinement, les règles, la validation humaine et la sortie contrainte ne dépendent pas des capacités du modèle. Les tâches sont découpées en petites décisions, à la portée d'un modèle local modeste.
