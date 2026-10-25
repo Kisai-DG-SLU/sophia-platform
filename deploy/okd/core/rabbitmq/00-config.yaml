@@ -23,7 +23,9 @@ data:
   # d'ici se retire aussi du serveur, à part (README, « Retirer un compte ou une file »).
   # repartiteur : seul éditeur sur sophia.events, clés <demandeur>.delegate.<événement> seulement
   # (topic_permissions), user_id toujours posé (vérifié par RabbitMQ), ne configure rien (passive=True).
-  # sophia-workflow : relais SSE en direct, file exclusive amq.gen-* liée à sophia.events, sans publier.
+  # sophia-workflow : relais SSE en direct, file exclusive nommée par le serveur liée à sophia.events,
+  # sans publier. RabbitMQ 4.4 nomme ces files amq_<32 hex> (et non plus amq.gen-*) : les deux formes
+  # sont admises.
   # L'administrateur interne (Secret rabbitmq-admin-creds) y figure aussi : avec des définitions,
   # RabbitMQ ne crée plus RABBITMQ_DEFAULT_USER sur un volume neuf.
   definitions.template.json: |
@@ -63,9 +65,9 @@ data:
         {
           "user": "sophia-workflow",
           "vhost": "/sophia",
-          "configure": "^amq\\.gen-.*$",
-          "write": "^amq\\.gen-.*$",
-          "read": "^(sophia\\.events|amq\\.gen-.*)$"
+          "configure": "^(amq\\.gen-.*|amq_[0-9a-f]{32})$",
+          "write": "^(amq\\.gen-.*|amq_[0-9a-f]{32})$",
+          "read": "^(sophia\\.events|amq\\.gen-.*|amq_[0-9a-f]{32})$"
         },
         {
           "user": "repartiteur",

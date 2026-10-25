@@ -17,7 +17,7 @@ Le bus des événements de la plateforme : chaque étape d'une délégation y es
 | Déploiement | `Recreate`, une réplique | volume `ReadWriteOnce` : jamais deux RabbitMQ sur le même répertoire |
 | Comptes | **définitions importées à chaque démarrage** : vhost `/sophia`, un compte pour le répartiteur, un pour le relais de visualisation, l'administrateur, droits ; gabarit **sans secret** dans le `ConfigMap`, mots de passe insérés par un initContainer depuis un Secret, dans un volume en mémoire | les comptes et leurs droits sont décrits dans le dépôt et rejoués à l'identique ; le mot de passe est haché à l'import ; l'initContainer échoue si un compte du gabarit n'a pas de mot de passe |
 | Agents | **aucun compte** : les comptes, les files `sophia.agent.<nom>`, l'exchange `sophia.agents` et la politique des agents ont été retirés (vides et sans consommateur) | les agents sont des exécutants, joints par le seul répartiteur, **seul éditeur** sur `sophia.events` (clés `<demandeur>.delegate.<événement>`, par `topic_permissions`) |
-| Relais de visualisation | file temporaire (`amq.gen-*`) liée à `sophia.events`, sans publier | lecture en direct des événements, sans rien pouvoir émettre |
+| Relais de visualisation | file temporaire nommée par le serveur (`amq.gen-*`, ou `amq_<32 hex>` depuis RabbitMQ 4.4) liée à `sophia.events`, sans publier | lecture en direct des événements, sans rien pouvoir émettre |
 | Administrateur interne | dans les définitions (Secret `rabbitmq-admin-creds`) | avec des définitions, RabbitMQ ne crée plus `RABBITMQ_DEFAULT_USER` sur un volume neuf |
 | Interface d'administration | plugin `rabbitmq_auth_backend_oauth2` : jetons du realm, client **public PKCE** `rabbitmq` ; **connexion par mot de passe désactivée** (`management.oauth_disable_basic_auth`) | une seule identité pour toutes les consoles ; le répartiteur et le relais gardent leurs comptes internes en AMQP (`auth_backends` : OAuth2, puis interne) |
 | Droits des personnes | les groupes Keycloak (claim `groups`) deviennent des scopes (`additional_scopes_key`) ; seul le groupe `admin` reçoit un alias de droits complets (`scope_aliases.admin`) | un compte du realm hors du groupe `admin` n'a aucun droit dans RabbitMQ |
@@ -35,7 +35,7 @@ Les délégations passent par [Temporal](../temporal/) ; RabbitMQ ne porte que l
 | Compte | configure | write | read |
 |---|---|---|---|
 | répartiteur | rien | `sophia.events` (clés `<demandeur>.delegate.<événement>`) | rien |
-| relais de visualisation | `amq.gen-*` | `amq.gen-*` | `sophia.events`, `amq.gen-*` |
+| relais de visualisation | `amq.gen-*`, `amq_<32 hex>` | `amq.gen-*`, `amq_<32 hex>` | `sophia.events`, `amq.gen-*`, `amq_<32 hex>` |
 | administrateur | tout | tout | tout |
 
 Côté clients : déclarer files et exchanges en `passive=True` (pas de droit `configure`), `ack` manuel, `user_id` = nom du compte (RabbitMQ refuse une valeur différente). Un compte, une file ou une liaison s'ajoute dans le gabarit, jamais depuis un client.
@@ -78,6 +78,8 @@ printf 'repartiteur=%s\nsophia-workflow=%s\n' "$(openssl rand -hex 32)" "$(opens
 5. Vérifier : pod `Running` et prêt, `rabbitmq-diagnostics status` sans alarme, `rabbitmqctl list_users`, `list_permissions`, `list_queues name type policy`, `list_exchanges` et `list_bindings` (`-p /sophia`) conformes au gabarit, interface d'administration joignable par le VPN (connexion par Keycloak, refusée hors du groupe `admin`), port 5672 refusé depuis tout autre pod que le répartiteur et le relais.
 
 **Ajouter un compte** : l'ajouter au gabarit de `00-config.yaml`, ajouter sa clé à `rabbitmq-users`, redémarrer RabbitMQ. Un compte retiré du gabarit n'est **pas** supprimé du serveur : voir ci-dessous.
+
+**Nom des files du serveur** : RabbitMQ 4.4 nomme une file déclarée sans nom `amq_<32 hex>`, et non plus `amq.gen-*`. Un droit écrit pour l'ancienne forme refuse la file d'écoute du relais (accès refusé à la déclaration). Les droits admettent donc les deux formes ; une correction en direct passe par `rabbitmqctl set_permissions`, sans redémarrage, puis par le gabarit.
 
 ## Retirer un compte ou une file
 
