@@ -1,5 +1,5 @@
 # Exporteur des métriques du nœud : GPU (NVML) et fichiers .prom déposés par les scripts du nœud
-# (garde-fou du filtre VPN). Code : node-metrics/exporteur.py, monté par le ConfigMap sophia-node-metrics
+# (garde-fou du filtre VPN), et occupation des volumes du nœud. Code : node-metrics/exporteur.py, monté par le ConfigMap sophia-node-metrics
 # (créé depuis le fichier, voir le README).
 # Namespace sophia-inference : son compte default a déjà la SCC privileged, comme llama-server ; aucun
 # droit nouveau. Privilégié pour ouvrir /dev/nvidia* ; lecture seule de deux répertoires du nœud ; aucune
@@ -22,7 +22,7 @@ spec:
     metadata:
       labels: { app: sophia-node-metrics }
     spec:
-      priorityClassName: sophia-agents  # classe des services de fond, si elle existe
+      priorityClassName: sophia-agents  # supervision, au rang des services de fond
       containers:
         - name: exporteur
           image: docker.io/library/python:3.13.17-slim-trixie@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
@@ -47,6 +47,10 @@ spec:
             - { name: code, mountPath: /app, readOnly: true }
             - { name: nvidia-libs, mountPath: /opt/nvidia-libs, readOnly: true }
             - { name: metriques-noeud, mountPath: /var/lib/sophia/metrics, readOnly: true }
+            # Occupation des volumes : /var/mnt et ses montages (HostToContainer : les LV montés après le
+            # démarrage du pod apparaissent aussi), et un répertoire de /var pour /var lui-même
+            - { name: hote-mnt, mountPath: /hote/var/mnt, readOnly: true, mountPropagation: HostToContainer }
+            - { name: hote-var, mountPath: /hote/var/lib/sophia, readOnly: true }
       volumes:
         - name: code
           configMap: { name: sophia-node-metrics }
@@ -54,6 +58,10 @@ spec:
           hostPath: { path: "${NVIDIA_LIB_DIR}", type: Directory }
         - name: metriques-noeud
           hostPath: { path: /var/lib/sophia/metrics, type: DirectoryOrCreate }
+        - name: hote-mnt
+          hostPath: { path: /var/mnt, type: Directory }
+        - name: hote-var
+          hostPath: { path: /var/lib/sophia, type: Directory }
 ---
 apiVersion: v1
 kind: Service
@@ -137,6 +145,20 @@ spec:
           labels: { severity: warning, sophia: oui }
           annotations:
             summary: "Mémoire du GPU utilisée à plus de 97 % depuis 10 min ({{ $value | humanizePercentage }})"
+        - alert: SophiaVolumePresquePlein
+          expr: (1 - max by (point) (sophia_volume_octets_libres) / max by (point) (sophia_volume_octets_total)) > 0.80
+          for: 15m
+          labels: { severity: warning, sophia: oui }
+          annotations:
+            summary: "Volume {{ $labels.point }} rempli à {{ $value | humanizePercentage }}"
+            action: "Agrandir sans coupure : sudo lvextend -r -L +10G <vg>/<lv> (deploy/stockage-persistant.md) ; /var : voir ce qui le remplit"
+        - alert: SophiaVolumePlein
+          expr: (1 - max by (point) (sophia_volume_octets_libres) / max by (point) (sophia_volume_octets_total)) > 0.90
+          for: 5m
+          labels: { severity: critical, sophia: oui }
+          annotations:
+            summary: "Volume {{ $labels.point }} rempli à {{ $value | humanizePercentage }} : écritures bientôt refusées"
+            action: "Agrandir aussitôt : sudo lvextend -r -L +10G <vg>/<lv> ; place libre : sudo vgs <vg>"
         - alert: SophiaGPUTemperature
           expr: max(sophia_gpu_temperature_celsius) > 85
           for: 10m
