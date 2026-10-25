@@ -104,7 +104,7 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 |---|---|
 | Relais du jeton (oauth2-proxy, nginx, liste fermée) | en service |
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
-| Lecture du contenu d'un document, réservée aux modèles locaux | conçu |
+| Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
 | Validations humaines par le chat, avec le même jeton relayé | prévu (voir [Observabilité](10-observabilite.md)) |
 
 ---
