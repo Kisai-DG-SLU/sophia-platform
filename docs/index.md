@@ -34,6 +34,7 @@ Bienvenue dans la documentation de l'architecture SophIA.
 | 09 | [Automation Déterministe](concepts/09-automation-deterministe.md) | Le code orchestre, le modèle réfléchit, les règles décident |
 | 10 | [Observabilité](concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
 | 11 | [Inférence et matériel](concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
+| 12 | [Relais de l'identité](concepts/12-relais-identite.md) | Un outil MCP agit sous l'identité de la personne : relais, vérification et échange du jeton |
 
 ---
 

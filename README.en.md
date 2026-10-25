@@ -146,6 +146,7 @@ Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 | [Deterministic Automation](docs/concepts/09-automation-deterministe.en.md) | Code orchestrates, the model thinks, rules decide |
 | [Observability](docs/concepts/10-observabilite.en.md) | Alarms, "incident" workflow, human approval |
 | [Inference and Hardware](docs/concepts/11-inference-materiel.en.md) | One card per task family, sharing and priority, CPU budget |
+| [Identity Relay](docs/concepts/12-relais-identite.en.md) | An MCP tool acts under the person's identity: token relay, verification and exchange |
 
 ### Deployment
 

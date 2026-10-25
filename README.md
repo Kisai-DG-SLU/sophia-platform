@@ -137,6 +137,7 @@ La documentation est organisee dans le repertoire [`docs/`](docs/index.md).
 | [Automation Déterministe](docs/concepts/09-automation-deterministe.md) | Le code orchestre, le modèle réfléchit, les règles décident |
 | [Observabilité](docs/concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
 | [Inférence et matériel](docs/concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
+| [Relais de l'identité](docs/concepts/12-relais-identite.md) | Un outil MCP agit sous l'identité de la personne : relais, vérification et échange du jeton |
 
 ### Deploiement
 
