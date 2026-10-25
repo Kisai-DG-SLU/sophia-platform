@@ -1,114 +1,113 @@
-# Stockage persistant : preparation de l'hote
+# Stockage persistant : préparation de l'hôte
 
-Les manifestes de ce depot declarent des `PersistentVolume` de type `local:`. Un volume local ne cree rien : il designe un chemin du systeme de fichiers du noeud, qui doit donc deja exister et etre monte au moment ou le manifeste est applique.
+Les manifestes de ce dépôt déclarent des `PersistentVolume` de type `local:`. Un volume local ne crée rien : il désigne un chemin du système de fichiers du nœud, qui doit donc déjà exister et être monté au moment où le manifeste est appliqué.
 
-Si le point de montage est absent, le pod reste `Pending` indefiniment, et aucune erreur ne designe la vraie cause. C'est le piege le plus courant de ce type de volume, et la raison pour laquelle la preparation de l'hote est une etape a part entiere.
+Si le point de montage est absent, le pod reste `Pending` indéfiniment, et aucune erreur ne désigne la vraie cause. C'est le piège le plus courant de ce type de volume, et la raison pour laquelle la préparation de l'hôte est une étape à part entière.
+
+## Règle : un volume logique dédié par donnée qui grossit
+
+Une donnée qui grossit (base relationnelle, base vectorielle, stockage objet, bus) a son **volume logique XFS dédié**, monté sous `/var/mnt/<nom>`, et non un répertoire de `/var` du nœud :
+
+- elle ne remplit pas `/var`, dont dépendent le système, le registre d'images et les journaux du nœud ;
+- elle **s'agrandit à chaud**, sans arrêt ni copie (voir plus bas) ;
+- son occupation est **mesurée et alertée** à 80 % puis 90 % par l'exporteur du nœud ([`okd/monitoring/`](okd/monitoring/)), qui suit `/var` et chaque montage de `/var/mnt`.
 
 ## Ce que chaque composant demande
 
-Deux questions distinctes, et la seconde est celle qu'on oublie. Le composant a-t-il besoin d'un stockage persistant, et si oui, de combien. La taille ne se deduit pas du besoin, elle se justifie.
+Deux questions distinctes, et la seconde est celle qu'on oublie : le composant a-t-il besoin d'un stockage persistant, et si oui, de combien. La taille ne se déduit pas du besoin, elle se justifie.
 
-Etat verifie le 27/09/2026, par lecture du cluster.
+État vérifié le 25/10/2026, par lecture du cluster.
 
-| Composant | Namespace | Persistant | Taille | Etat | Base de la taille |
+| Composant | Namespace | Persistant | Taille | Support | Base de la taille |
 |---|---|---|---|---|---|
-| PostgreSQL | `${NS_CORE}` | oui | 10Gi | lie | 4 utilisateurs, journaux, droits. Non extensible, minimum de depart |
-| Forgejo | `${NS_GIT}` | oui | 50Gi | lie | depots et base SQLite locale, 6 Mo aujourd'hui |
-| Qdrant | `${NS_MEMORY}` | oui | 20Gi | lie | points x dimensions x 4 octets, a calculer des que l'ingestion produit |
-| Neo4j | `${NS_MEMORY}` | oui | 10Gi | lie, 0 replique | graphe a construire, aucune donnee ; image figee, en attente |
-| Service d'embedding | `${NS_MEMORY}` | oui | 5Gi | lie | cache et modele, pas de corpus |
-| Espace de travail | `${NS_APPS}` | oui | 20Gi | lie, consumer arrete | preproduction, notebooks, webapps, API |
-| LiteLLM | `${NS_CORE}` | non | `emptyDir` | sans stockage | configuration et journaux, rien a conserver |
-| Assistant de code (Dionysos) | `${NS_AGENTS}` | non | `emptyDir` + depot Git prive | restaure a chaque creation du pod | configuration et historique repousses regulierement vers un depot dedie (voir `okd/hermes-system/`) |
-| RabbitMQ | `${NS_CORE}` | oui | 5Gi | lie nommement (`claimRef` + `volumeName`) | evenements des delegations et lettres mortes (les files des agents sont retirees) ; volume dedie, voir `okd/core/rabbitmq/` |
-| Stockage objet S3 (SeaweedFS) | `sophia-storage` | oui | 200Gi | lie | volume logique XFS dedie, extensible a chaud ; PV et PVC designes, `Retain` ; voir `okd/storage/` |
-| Agent de controle | `${NS_AGENTS}` | prevu | 2Gi demandes | en attente | regles du controle, a la creation |
+| PostgreSQL 18 (toutes les bases) | `${NS_CORE}` | oui | 20Gi | **volume logique dédié** | environ 190 Mo de données à la migration ; hypothèse haute à un an sous 9 Go sans rétention, environ 2 Go avec ; voir `okd/core/postgres18/` |
+| Qdrant | `${NS_MEMORY}` | oui | 20Gi | **volume logique dédié** | 6 à 8 Ko par segment ; l'optimisation demande jusqu'à deux fois la place ; collection encore vide |
+| Stockage objet S3 (SeaweedFS) | `sophia-storage` | oui | 200Gi | **volume logique dédié** | documents de la bureautique et leurs versions (corbeille de 30 jours) ; voir `okd/storage/` |
+| RabbitMQ | `${NS_CORE}` | oui | 5Gi | répertoire du nœud, lié nommément (`claimRef` + `volumeName`) | événements des délégations et lettres mortes ; voir `okd/core/rabbitmq/` |
+| Forgejo | `${NS_GIT}` | oui | 50Gi | **volume logique dédié** | dépôts et base SQLite locale |
+| Neo4j | `${NS_MEMORY}` | oui | 10Gi | répertoire du nœud, 0 réplique | graphe à construire, aucune donnée ; image figée, en attente |
+| Service d'embedding | `${NS_MEMORY}` | oui | 5Gi | répertoire du nœud | cache et modèle, pas de corpus |
+| Espace de travail | `${NS_APPS}` | oui | 20Gi | répertoire du nœud, consommateur arrêté | préproduction, notebooks, webapps, API |
+| LiteLLM | `${NS_CORE}` | non | `emptyDir` | sans stockage | configuration et journaux, rien à conserver (ses données sont dans PostgreSQL) |
+| Assistant de code (Dionysos) | `${NS_AGENTS}` | non | `emptyDir` + dépôt Git privé | restauré à chaque création du pod | configuration et historique repoussés régulièrement vers un dépôt dédié (voir `okd/hermes-system/`) |
 
-Les namespaces sont variables pour que l'exemple soit reutilisable :
+L'ancienne instance PostgreSQL 15 vivait dans un répertoire de `/var` ; la base vectorielle aussi, partagée avec d'autres services. Toutes deux ont été déplacées sur leur volume dédié, et les anciens répertoires sont gardés une semaine pour un retour arrière avant d'être supprimés.
 
-| Variable | Role |
+Les namespaces sont variables pour que l'exemple soit réutilisable :
+
+| Variable | Rôle |
 |---|---|
 | `${NS_CORE}` | orchestration, base relationnelle, routage |
 | `${NS_MEMORY}` | base vectorielle, graphe, embeddings |
-| `${NS_GIT}` | depot de code et de specifications |
+| `${NS_GIT}` | dépôt de code et de spécifications |
 | `${NS_APPS}` | interfaces et environnements de travail |
-| `${NS_AGENTS}` | systeme d'agents |
+| `${NS_AGENTS}` | système d'agents |
 
-**Ces tailles sont des recommandations de depart, pas des normes.** Elles convenience a un POC et se revisent avec le besoin. Aucune base de la colonne de droite n'est verifiee pour un systeme en production, et les journaux comme les permissions ne sont pas encore en place : une base de dix tables a l'etat quasi vide ne dit rien de sa taille dans deux ans. Ce qui compte ici, c'est que la taille soit ecrite, et que sa base soit elle-meme verifiable.
+**Ces tailles sont des recommandations de départ, pas des normes.** Elles conviennent à un POC et se révisent avec le besoin. La croissance s'estime **par usage prévu** (par appel au modèle, par échange, par document), avec des hypothèses basse, moyenne et haute, et non d'après le volume actuel, presque nul. Ce qui compte, c'est que la taille soit écrite et que sa base soit elle-même vérifiable.
 
-## A verifier avant de commencer
+## À vérifier avant de commencer
 
-| Contrainte | Consequence |
+| Contrainte | Conséquence |
 |---|---|
-| `storageClassName: ""` | aucune StorageClass n'est selectionnee, le PV est resolu par son nom |
-| StorageClass `no-provisioner` | aucun provisionnement automatique, le PV se cree a la main |
-| `ALLOWVOLUMEEXPANSION: false` | un volume ne s'agrandit pas, la taille se choisit une fois pour toutes |
+| `storageClassName` vide ou `local-storage` sans provisionneur | aucun provisionnement automatique : le PV se crée à la main |
+| PV et PVC désignés l'un l'autre (`claimRef` + `volumeName`) | aucune autre PVC ne prend le volume |
+| `persistentVolumeReclaimPolicy: Retain` | supprimer le PV ne touche pas aux données |
 
-## Procedure
+## Procédure
 
-Quatre etapes, sur le noeud qui portera le pod.
+Sur le nœud qui portera le pod :
 
 ```bash
-# 1. Volume logique dans le groupe de volumes existant
+sudo vgs ${VG_NAME}
 sudo lvcreate -L ${LV_SIZE} -n ${LV_NAME} ${VG_NAME}
-
-# 2. Formatage
 sudo mkfs.xfs /dev/${VG_NAME}/${LV_NAME}
-
-# 3. Point de montage
 sudo mkdir -p ${MOUNT_POINT}
-
-# 4. Persistance du montage, puis montage
 echo "/dev/${VG_NAME}/${LV_NAME} ${MOUNT_POINT} xfs defaults 0 0" | sudo tee -a /etc/fstab
-sudo mount ${MOUNT_POINT}
+sudo systemctl daemon-reload && sudo mount ${MOUNT_POINT}
+sudo chcon -t container_file_t ${MOUNT_POINT}
+findmnt ${MOUNT_POINT} && df -h ${MOUNT_POINT}
 ```
 
-Les variables a fournir :
+Le premier contrôle donne la place libre du groupe de volumes. Le `chcon` donne au point de montage le contexte SELinux des conteneurs : sans lui, le pod démarre mais ne peut pas écrire.
 
-| Variable | Role |
+Les variables à fournir :
+
+| Variable | Rôle |
 |---|---|
-| `${VG_NAME}` | groupe de volumes existant sur le noeud |
+| `${VG_NAME}` | groupe de volumes existant sur le nœud |
 | `${LV_NAME}` | nom du volume logique |
-| `${LV_SIZE}` | taille, par exemple `200G` |
-| `${MOUNT_POINT}` | chemin de montage, repris dans le champ `local.path` du PV |
+| `${LV_SIZE}` | taille, par exemple `20G` |
+| `${MOUNT_POINT}` | chemin de montage, sous `/var/mnt`, repris dans le champ `local.path` du PV |
 
-## Verification
+## Vérification
 
-```bash
-df -h ${MOUNT_POINT}
-```
-
-La ligne attendue affiche la taille du volume sur le point de montage. C'est le seul controle utile : si la taille est la bonne, le PV peut etre applique.
-
-Ensuite, appliquer le `PersistentVolume`, puis la `PersistentVolumeClaim`, et lire l'etat :
+`findmnt` doit montrer le volume en `xfs` sur le point de montage, et `df -h` la taille prévue. Ensuite, appliquer le `PersistentVolume`, puis la `PersistentVolumeClaim`, et lire l'état :
 
 ```bash
 oc get pvc
 ```
 
-`Bound` : le stockage est en place. `Pending` apres le montage : le `capacity` du PV est inferieur a la demande de la PVC, ou le `storageClassName` ne correspond pas.
+`Bound` : le stockage est en place. `Pending` après le montage : le `capacity` du PV est inférieur à la demande de la PVC, ou le `storageClassName` ne correspond pas.
 
 ## Agrandir un volume
 
-Quand l'expansion est interdite, la croissance n'est pas un redimensionnement, c'est un remplacement. La procedure suppose que le PV est en `Retain`, ce qui est le cas dans cet exemple.
+Un volume logique XFS **s'agrandit à chaud**, monté et en service :
 
-1. Preparer un second systeme de fichiers sur l'hote, plus grand, a un nouveau point de montage
-2. Creer un second PV pointant dessus, avec une capacite superieure a la demande de la PVC
-3. Arreter le pod : le PV passe `Released` et ses donnees restent sur l'hote, grace a `Retain`
-4. Supprimer la PVC, puis la recreer avec la taille superieure : elle se lie au nouveau PV
-5. Copier les donnees de l'ancien chemin vers le nouveau, cote hote
-6. Relancer le pod, puis liberer l'ancien volume une fois la copie verifiee
+```bash
+sudo lvextend -r -L +10G ${VG_NAME}/${LV_NAME}
+df -h ${MOUNT_POINT}
+```
 
-Les etapes 4 et 5 ne se resolvent pas seules. La copie se fait a la main, sur le noeud, et rien dans le cluster ne verifie qu'elle est terminee. C'est la raison de la marge a prevoir dans le tableau plus haut.
+`-r` agrandit le système de fichiers dans la foulée. Pour un volume `local`, la taille déclarée du PV et de la PVC n'est qu'une étiquette : le pod voit la place réelle. On met quand même à jour `capacity` dans le dépôt, pour qu'il reste exact ; c'est sans effet sur le pod.
 
-## Dimensionner un volume de modeles
+Un **répertoire de `/var`**, lui, ne s'agrandit pas : le déplacer sur un volume dédié demande un arrêt et une copie (arrêter le pod, copier en gardant les droits, comparer les tailles, basculer le PV, relancer, garder l'ancien répertoire quelques jours). C'est le moment de le faire tant que la donnée est petite.
 
-Un volume de modeles se dimensionne sur le poids du fichier a la quantification choisie, plus la marge pour une seconde variante de meme ordre de grandeur.
+## Dimensionner un volume de modèles
 
-La marge n'est pas un confort. L'expansion etant interdite, un volume trop petit ne se corrige pas en ajoutant de l'espace, il se corrige en remplacant le volume, avec un arret et une copie complete. Le calcul se fait donc sur la mesure reelle du telechargement, jamais sur une estimation.
+Un volume de modèles se dimensionne sur le poids du fichier à la quantification choisie, plus la marge pour une seconde variante du même ordre de grandeur. Le calcul se fait sur la mesure réelle du téléchargement, jamais sur une estimation.
 
-## Ce que l'inventaire revele
+## Ce que l'inventaire révèle
 
-Un inventure fait une seule fois revele des accidents que l'affichage des pods ne montre jamais : un volume prepare sur l'hote sans manifeste, un manifeste sans consommateur, un volume lie a un chemin inexistant, une classe supprimee encore referencee, un nom qui ne correspond plus a ce que la ressource sert.
+Un inventaire fait une seule fois révèle des accidents que l'affichage des pods ne montre jamais : un volume préparé sur l'hôte sans manifeste, un manifeste sans consommateur, un volume lié à un chemin inexistant, une classe supprimée encore référencée, un nom qui ne correspond plus à ce que la ressource sert.
 
-Aucun de ces etats n'apparait dans `oc get pods`. Ils apparaissent des qu'on demande la liste des volumes et la liste des demandes, et qu'on les compare.
+Aucun de ces états n'apparaît dans `oc get pods`. Ils apparaissent dès qu'on demande la liste des volumes et la liste des demandes, et qu'on les compare.

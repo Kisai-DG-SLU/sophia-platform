@@ -11,6 +11,7 @@ Les briques de la mémoire (RAG) en service : un service qui transforme du texte
 | Serveur | FastAPI + sentence-transformers, PyTorch CPU | |
 | Sondes | `/health` : prêt après 30 s, vivant après 60 s | le chargement du modèle prend du temps au démarrage |
 | Ressources | 1 CPU et 2 Gi demandés, 2 CPU et 4 Gi au plus | le modèle tient en mémoire sans GPU (la carte reste au modèle de langage) |
+| Base vectorielle | Qdrant, **image figée par empreinte**, `Recreate`, classe `sophia-agents`, `enableServiceLinks: false`, sur un **volume logique XFS dédié** (20 Go au départ, monté sous `/var/mnt`), PV et PVC désignés l'un l'autre | hors de `/var` du nœud, qu'il partageait avec d'autres services ; s'agrandit à chaud (`lvextend -r`) ; l'optimisation de Qdrant demande jusqu'à deux fois la place pendant qu'elle tourne ; alerte de remplissage à 80 % et 90 % ([`../monitoring/`](../monitoring/)) |
 
 **Changer de modèle change la dimension des vecteurs** : tout le contenu déjà indexé est à revectoriser. Le modèle se choisit donc avant la première ingestion.
 
@@ -92,6 +93,7 @@ L'ingestion et le service mémoire appellent l'embedding par l'alias **`sophia-e
 |---|---|
 | Embedding (bge-m3, CPU) et alias `sophia-embedder` | **en service** |
 | Collection vectorielle et ses 17 index | **en service**, vide : rien n'est encore ingéré |
+| Base vectorielle sur son volume dédié | **en service** : déplacée quand la collection était encore vide (copie contrôlée octet pour octet, ancien répertoire gardé une semaine pour un retour arrière) |
 | Quota et valeurs par défaut du namespace | **en service** |
 | Graphe (Neo4j) | **à 0 réplique** : il n'a jamais démarré. Il reviendra avec une image officielle figée par empreinte et un mot de passe dans un Secret, jamais dans le manifeste |
 | Ingestion | **suspendue** (CronJob `suspend: true`), à reconstruire : build reproductible et image figée, lecture des documents dans le stockage objet, aucun mot de passe dans une URL, écriture par le service mémoire |

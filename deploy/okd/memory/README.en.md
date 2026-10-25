@@ -11,6 +11,7 @@ The memory (RAG) bricks in service: a service that turns text into vectors, and 
 | Server | FastAPI + sentence-transformers, CPU PyTorch | |
 | Probes | `/health`: ready after 30 s, alive after 60 s | loading the model takes time at start |
 | Resources | 1 CPU and 2 Gi requested, at most 2 CPU and 4 Gi | the model fits in memory without a GPU (the card stays with the language model) |
+| Vector database | Qdrant, **image pinned by digest**, `Recreate`, `sophia-agents` class, `enableServiceLinks: false`, on a **dedicated XFS logical volume** (20 GB to start, mounted under `/var/mnt`), PV and PVC bound to each other | outside the node's `/var`, which it shared with other services; grows online (`lvextend -r`); Qdrant's optimisation needs up to twice the space while it runs; fill alert at 80% and 90% ([`../monitoring/`](../monitoring/)) |
 
 **Changing the model changes the vector dimension**: everything already indexed must be re-embedded. The model is therefore chosen before the first ingestion.
 
@@ -92,6 +93,7 @@ Ingestion and the memory service call the embedding through the router's **`soph
 |---|---|
 | Embedding (bge-m3, CPU) and `sophia-embedder` alias | **in service** |
 | Vector collection and its 17 indexes | **in service**, empty: nothing ingested yet |
+| Vector database on its dedicated volume | **in service**: moved while the collection was still empty (copy checked byte for byte, old directory kept a week for a rollback) |
 | Namespace quota and defaults | **in service** |
 | Graph (Neo4j) | **at 0 replicas**: it never started. It will come back with an official image pinned by digest and a password in a Secret, never in the manifest |
 | Ingestion | **suspended** (CronJob `suspend: true`), to be rebuilt: reproducible build and pinned image, documents read from object storage, no password in a URL, writes through the memory service |

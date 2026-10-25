@@ -1,4 +1,4 @@
-# Réglage des seaux par l'API S3 (rejouable) : seau fichiers versionné, CORS de l'application de
+# Réglage des seaux par l'API S3 (rejouable) : seau fichiers versionné, corbeille de 30 jours, CORS de l'application de
 # fichiers (PUT présigné depuis le navigateur), politique qui interdit à l'identité de l'application
 # de défaire ces protections.
 # Identité admin du Secret s3-admin ; TLS vérifié par l'autorité de service d'OKD.
@@ -36,9 +36,16 @@ spec:
               # supprime aucune version : le droit « Write » de SeaweedFS couvrirait sinon tout cela.
               # Principal user/fichiers seul : « * » bloquerait aussi l'admin, sans retour possible.
               $A s3api put-bucket-policy --bucket fichiers --policy '{"Version":"2012-10-17","Statement":[{"Sid":"ProtegerVersions","Effect":"Deny","Principal":{"AWS":["arn:aws:iam::*:user/fichiers"]},"Action":["s3:PutBucketVersioning","s3:PutBucketCors","s3:DeleteBucketCors","s3:PutBucketLifecycleConfiguration","s3:PutLifecycleConfiguration","s3:PutBucketPolicy","s3:DeleteBucketPolicy","s3:DeleteObjectVersion","s3:PutBucketObjectLockConfiguration"],"Resource":["arn:aws:s3:::fichiers","arn:aws:s3:::fichiers/*"]}]}'
+              # Corbeille de 30 jours : une version non courante (sauvegarde précédente de l'éditeur,
+              # fichier supprimé) disparaît 30 jours après avoir été remplacée ; la version courante n'expire
+              # jamais. Un marqueur de suppression resté seul est retiré. Exécuté une fois par jour par la
+              # tâche s3_lifecycle de weed mini. Posé par l'admin : la politique interdit à l'identité de
+              # l'application de le changer.
+              $A s3api put-bucket-lifecycle-configuration --bucket fichiers --lifecycle-configuration '{"Rules":[{"ID":"corbeille-30-jours","Status":"Enabled","Filter":{"Prefix":""},"NoncurrentVersionExpiration":{"NoncurrentDays":30},"Expiration":{"ExpiredObjectDeleteMarker":true}}]}'
               echo "versioning :"; $A s3api get-bucket-versioning --bucket fichiers
               echo "politique :"; $A s3api get-bucket-policy --bucket fichiers
               echo "cors :"; $A s3api get-bucket-cors --bucket fichiers
+              echo "cycle de vie :"; $A s3api get-bucket-lifecycle-configuration --bucket fichiers
           env:
             - { name: HOME, value: /tmp }
             - { name: AWS_DEFAULT_REGION, value: us-east-1 }

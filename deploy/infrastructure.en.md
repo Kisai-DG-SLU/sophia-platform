@@ -18,7 +18,7 @@ The reference infrastructure for this POC is based on the following elements:
 - **Orchestration:** Single Node OKD (OpenShift Kubernetes Distribution)
 - **Memory:** 512 GB RAM
 - **Acceleration:** 1 GPU 16 GB
-- **Storage:** Persistent volumes on local disks
+- **Storage:** Persistent volumes on local disks; a dedicated XFS logical volume, growable online, for each data set that grows (relational database, vector database, object storage, forge), with a fill alert — see [persistent storage](stockage-persistant.en.md)
 
 This configuration allows running the entire stack (orchestration, local inference, vector database, Git, tools) on a single node, sufficient for a POC and initial deployment phases.
 
