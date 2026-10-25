@@ -1,0 +1,36 @@
+# Quota et valeurs par défaut d'un namespace, à décliner par namespace.
+# Le quota porte sur les limits : tout nouveau pod doit en déclarer ; sans valeur explicite, le
+# LimitRange en donne une. Les pods déjà lancés ne sont pas touchés.
+# N'appliquer le quota qu'APRÈS avoir donné des ressources explicites à chaque conteneur du
+# namespace : sinon un pod recréé reçoit la valeur par défaut du LimitRange, souvent trop petite.
+#
+# Valeurs de l'installation de référence (limits CPU / mémoire, pods) :
+#   sophia-memory      8 / 16Gi, 10      sophia-dmz         8 / 12Gi, 12
+#   sophia-apps       24 / 40Gi, 30      (les builds y tournent, dont une compilation de 16 CPU / 24Gi)
+#   ${AGENT_NAMESPACE} 28 / 48Gi, 15     (pod de lecture 16 / 32Gi compris)
+#   bureautique       10 / 10Gi, 15      (plus requests 2 CPU / 4Gi)
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ${QUOTA_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  hard:
+    limits.cpu: "${QUOTA_LIMITS_CPU}"
+    limits.memory: "${QUOTA_LIMITS_MEMORY}"
+    pods: "${QUOTA_PODS}"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ${QUOTA_NAME}-defaults
+  namespace: ${NAMESPACE}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "${DEFAULT_CPU_LIMIT}"
+        memory: "${DEFAULT_MEMORY_LIMIT}"
+      defaultRequest:
+        cpu: "${DEFAULT_CPU_REQUEST}"
+        memory: "${DEFAULT_MEMORY_REQUEST}"

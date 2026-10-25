@@ -1,0 +1,73 @@
+# Classes de priorité des charges SophIA.
+# Ordre : socle (pod de lecture du cluster, forge Git) > discussion et modèle de langage > voix
+#         > répartiteur et agents > bureautique > images > développement.
+# Aucune de ces classes ne préempte (preemptionPolicy: Never). Seule la classe d'inférence
+# (sophia-inference-high, 1 000 000, ../inference/00-namespace-guardrails.yaml) garde ce droit, et
+# elle ne peut évincer que des pods de valeur inférieure : sophia-socle, au-dessus d'elle, n'est
+# donc jamais évincé pour faire de la place.
+# Valeurs très en dessous des classes système (system-cluster-critical : 2 000 000 000) et de la
+# borne des classes utilisateur (1 000 000 000). Aucune classe par défaut : un pod sans classe vaut 0,
+# chaque charge nomme la sienne.
+# Une classe ne change rien aux pods déjà lancés : elle s'applique à leur prochaine création.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-socle
+value: 2000000
+preemptionPolicy: Never
+globalDefault: false
+description: "Socle d'administration : pod de lecture du cluster et forge Git ; jamais évincés pour faire de la place, n'évincent personne"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-chat
+value: 100000
+preemptionPolicy: Never
+globalDefault: false
+description: "Discussion et modèle de langage : interface, applications du foyer, routeur de modèles et leurs dépendances (base, identité)"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-voix
+value: 90000
+preemptionPolicy: Never
+globalDefault: false
+description: "Voix (reconnaissance, synthèse)"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-agents
+value: 80000
+preemptionPolicy: Never
+globalDefault: false
+description: "Répartiteur, workflows, bus, agents du panthéon, embedding, sas web"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-workspace-low
+value: 50000
+preemptionPolicy: Never
+globalDefault: false
+description: "Bureautique : ne préempte jamais"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-images
+value: 30000
+preemptionPolicy: Never
+globalDefault: false
+description: "Génération d'images"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sophia-dev
+value: 10000
+preemptionPolicy: Never
+globalDefault: false
+description: "Développement : pods de dev, environnements isolés, clusters enfants"
