@@ -1,24 +1,5 @@
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-rabbitmq-from-hermes
-  namespace: sophia-core
-spec:
-  podSelector:
-    matchLabels:
-      app: rabbitmq
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: hermes-system
-      ports:
-        - port: 5672
-          protocol: TCP
-  policyTypes:
-    - Ingress
----
-# Interface d'administration (15672) depuis le routeur ; l'accès passe par Keycloak
+# Interface d'administration (15672) depuis le routeur ; l'accès passe par Keycloak.
+# L'entrée AMQP du répartiteur est dans ../repartiteur/04-network-policy.yaml.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -39,13 +20,12 @@ spec:
   policyTypes:
     - Ingress
 ---
-# L'assistant de code (dionysos) tourne en hostNetwork ; son trafic n'est pas vu comme venant de
-# hermes-system mais du réseau du nœud. Tout processus du nœud peut donc joindre 5672 : l'accès
-# reste soumis au compte et à ses droits sur /sophia.
+# Relais de visualisation : lecture de sophia.events (compte sophia-workflow), depuis son propre
+# namespace, sans aucun compte d'agent lié. À appliquer avec le déploiement du relais.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-rabbitmq-from-host-network
+  name: allow-rabbitmq-from-workflow-collecteur
   namespace: sophia-core
 spec:
   podSelector:
@@ -55,7 +35,10 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              policy-group.network.openshift.io/host-network: ""
+              kubernetes.io/metadata.name: ${VIEWER_NAMESPACE}
+          podSelector:
+            matchLabels:
+              app: sophia-workflow-collecteur
       ports:
         - port: 5672
           protocol: TCP

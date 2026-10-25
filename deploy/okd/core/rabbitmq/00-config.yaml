@@ -13,15 +13,14 @@ data:
   # Comptes du vhost /sophia. Gabarit sans secret : l'initContainer « definitions » remplace
   # chaque @PW_<compte>@ par la clé <compte> du Secret rabbitmq-users, et RabbitMQ importe le résultat
   # à chaque démarrage (mot de passe haché à l'import ; comptes absents du fichier non touchés).
-  # RabbitMQ ne porte plus que les événements et les messages simples (les délégations passent
-  # par Temporal). Toute la topologie est ici, déclarée par l'import, aucune par les clients :
-  #  - sophia.agents (direct) : message simple à un agent, clé = nom de l'agent → file quorum
-  #    sophia.agent.<nom> ; sophia.events (topic) : DelegateEvent et autres, clé <agent>.<événement> ;
+  # RabbitMQ ne porte plus que les événements (les délégations passent par Temporal). Toute la
+  # topologie est ici, déclarée par l'import, aucune par les clients :
+  #  - sophia.events (topic) : événements des délégations, clé <demandeur>.delegate.<événement> ;
   #  - DLQ : sophia.dlx (fanout) → sophia.dlq (quorum, 30 j, 10 000 messages), lue par l'administrateur ;
-  #    une file d'agent y envoie un message refusé ou livré 5 fois sans ack (at-least-once), et refuse
-  #    les publications au-delà de 10 000 messages (l'émetteur reçoit un nack, rien n'est perdu en silence).
-  # Droits : les agents n'écrivent nulle part (exécutants, joints par le répartiteur seul) ; ils gardent
-  # la lecture de leur file, sans usage, en attendant son retrait.
+  #    gardée pour de futures files durables (aucune aujourd'hui).
+  # Les agents n'ont plus de compte : ce sont des exécutants, joints par le seul répartiteur, qui ne
+  # sont pas clients du bus. L'import ne supprimant rien, un compte, une file ou un exchange retiré
+  # d'ici se retire aussi du serveur, à part (README, « Retirer un compte ou une file »).
   # repartiteur : seul éditeur sur sophia.events, clés <demandeur>.delegate.<événement> seulement
   # (topic_permissions), user_id toujours posé (vérifié par RabbitMQ), ne configure rien (passive=True).
   # sophia-workflow : relais SSE en direct, file exclusive amq.gen-* liée à sophia.events, sans publier.
@@ -43,31 +42,6 @@ data:
           ]
         },
         {
-          "name": "sophia",
-          "password": "@PW_sophia@",
-          "tags": []
-        },
-        {
-          "name": "athena",
-          "password": "@PW_athena@",
-          "tags": []
-        },
-        {
-          "name": "hephaistos",
-          "password": "@PW_hephaistos@",
-          "tags": []
-        },
-        {
-          "name": "ouranos",
-          "password": "@PW_ouranos@",
-          "tags": []
-        },
-        {
-          "name": "dionysos",
-          "password": "@PW_dionysos@",
-          "tags": []
-        },
-        {
           "name": "sophia-workflow",
           "password": "@PW_sophia-workflow@",
           "tags": []
@@ -87,41 +61,6 @@ data:
           "read": ".*"
         },
         {
-          "user": "sophia",
-          "vhost": "/sophia",
-          "configure": "",
-          "write": "",
-          "read": "^sophia\\.agent\\.sophia$"
-        },
-        {
-          "user": "athena",
-          "vhost": "/sophia",
-          "configure": "",
-          "write": "",
-          "read": "^sophia\\.agent\\.athena$"
-        },
-        {
-          "user": "hephaistos",
-          "vhost": "/sophia",
-          "configure": "",
-          "write": "",
-          "read": "^sophia\\.agent\\.hephaistos$"
-        },
-        {
-          "user": "ouranos",
-          "vhost": "/sophia",
-          "configure": "",
-          "write": "",
-          "read": "^sophia\\.agent\\.ouranos$"
-        },
-        {
-          "user": "dionysos",
-          "vhost": "/sophia",
-          "configure": "",
-          "write": "",
-          "read": "^sophia\\.agent\\.dionysos$"
-        },
-        {
           "user": "sophia-workflow",
           "vhost": "/sophia",
           "configure": "^amq\\.gen-.*$",
@@ -137,15 +76,6 @@ data:
         }
       ],
       "exchanges": [
-        {
-          "name": "sophia.agents",
-          "vhost": "/sophia",
-          "type": "direct",
-          "durable": true,
-          "auto_delete": false,
-          "internal": false,
-          "arguments": {}
-        },
         {
           "name": "sophia.events",
           "vhost": "/sophia",
@@ -167,51 +97,6 @@ data:
       ],
       "queues": [
         {
-          "name": "sophia.agent.sophia",
-          "vhost": "/sophia",
-          "durable": true,
-          "auto_delete": false,
-          "arguments": {
-            "x-queue-type": "quorum"
-          }
-        },
-        {
-          "name": "sophia.agent.athena",
-          "vhost": "/sophia",
-          "durable": true,
-          "auto_delete": false,
-          "arguments": {
-            "x-queue-type": "quorum"
-          }
-        },
-        {
-          "name": "sophia.agent.hephaistos",
-          "vhost": "/sophia",
-          "durable": true,
-          "auto_delete": false,
-          "arguments": {
-            "x-queue-type": "quorum"
-          }
-        },
-        {
-          "name": "sophia.agent.ouranos",
-          "vhost": "/sophia",
-          "durable": true,
-          "auto_delete": false,
-          "arguments": {
-            "x-queue-type": "quorum"
-          }
-        },
-        {
-          "name": "sophia.agent.dionysos",
-          "vhost": "/sophia",
-          "durable": true,
-          "auto_delete": false,
-          "arguments": {
-            "x-queue-type": "quorum"
-          }
-        },
-        {
           "name": "sophia.dlq",
           "vhost": "/sophia",
           "durable": true,
@@ -223,46 +108,6 @@ data:
       ],
       "bindings": [
         {
-          "source": "sophia.agents",
-          "vhost": "/sophia",
-          "destination": "sophia.agent.sophia",
-          "destination_type": "queue",
-          "routing_key": "sophia",
-          "arguments": {}
-        },
-        {
-          "source": "sophia.agents",
-          "vhost": "/sophia",
-          "destination": "sophia.agent.athena",
-          "destination_type": "queue",
-          "routing_key": "athena",
-          "arguments": {}
-        },
-        {
-          "source": "sophia.agents",
-          "vhost": "/sophia",
-          "destination": "sophia.agent.hephaistos",
-          "destination_type": "queue",
-          "routing_key": "hephaistos",
-          "arguments": {}
-        },
-        {
-          "source": "sophia.agents",
-          "vhost": "/sophia",
-          "destination": "sophia.agent.ouranos",
-          "destination_type": "queue",
-          "routing_key": "ouranos",
-          "arguments": {}
-        },
-        {
-          "source": "sophia.agents",
-          "vhost": "/sophia",
-          "destination": "sophia.agent.dionysos",
-          "destination_type": "queue",
-          "routing_key": "dionysos",
-          "arguments": {}
-        },
-        {
           "source": "sophia.dlx",
           "vhost": "/sophia",
           "destination": "sophia.dlq",
@@ -272,20 +117,6 @@ data:
         }
       ],
       "policies": [
-        {
-          "vhost": "/sophia",
-          "name": "sophia-agents",
-          "pattern": "^sophia\\.agent\\.[a-z-]+$",
-          "apply-to": "quorum_queues",
-          "priority": 10,
-          "definition": {
-            "dead-letter-exchange": "sophia.dlx",
-            "dead-letter-strategy": "at-least-once",
-            "overflow": "reject-publish",
-            "delivery-limit": 5,
-            "max-length": 10000
-          }
-        },
         {
           "vhost": "/sophia",
           "name": "sophia-dlq",
@@ -319,7 +150,7 @@ data:
     raft.wal_max_size_bytes = 67108864
 
     # --- Interface d'administration derrière Keycloak (realm sophia, client rabbitmq) ---
-    # Jetons OAuth2 d'abord, comptes internes ensuite (agents en AMQP, administrateur du Secret)
+    # Jetons OAuth2 d'abord, comptes internes ensuite (répartiteur et relais en AMQP, administrateur du Secret)
     auth_backends.1 = rabbit_auth_backend_oauth2
     auth_backends.2 = rabbit_auth_backend_internal
     auth_oauth2.resource_server_id = rabbitmq
