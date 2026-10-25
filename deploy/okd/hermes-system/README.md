@@ -32,17 +32,24 @@ Les agents sont des **exécutants**, joints par le seul [répartiteur](../core/r
 | Messagerie limitée | `TELEGRAM_ALLOWED_USERS` chez tout agent qui a un bot ; plus de `GATEWAY_ALLOW_ALL_USERS` | sans liste, la passerelle accepterait tout utilisateur de la messagerie, par Internet, hors VPN |
 | Images figées par empreinte | `@${AGENT_IMAGE_DIGEST}`, `@${EXECUTANT_IMAGE_DIGEST}` en `IfNotPresent` ; base des builds figée elle aussi | un redémarrage ne change jamais d'image sans décision ; changer d'image = un nouveau digest, puis `apply` |
 | Validation humaine | maintenance : `REQUIRE_HITL=systematic`, chaque commande attend une approbation ; derrière le répartiteur, approbation du plan puis de chaque commande (D3a, D3b) par l'interface Temporal | **écart connu** : chez l'agent de déploiement, `prompt` n'est traité par aucun code, la validation n'est donc pas imposée ; passage à `systematic` prévu avant tout usage |
+| Une clé du routeur de modèles par agent | Secret `litellm-cle-<agent>` (clé `cle`), lu par l'init et le conteneur de chaque agent ; clé virtuelle limitée à l'alias de fond et à l'embedding, débit plafonné ; une variable `env` l'emporte sur l'`OPENAI_API_KEY` d'un `envFrom` | une clé commune, ou la clé maître du routeur, ouvrait tous les modèles à tous les agents, sans traçabilité par agent ; contrôle : `/key/info` lancé dans l'agent avec sa clé renvoie son propre alias (la clé maître répond 404) |
+| Outils web sans adresses internes, catalogue de modèles coupé | configuration commune des agents : `browser.allow_private_urls` et `security.allow_private_urls` à `false`, `model_catalog.enabled` à `false` | `allow_private_urls` ouvre aux outils web les adresses internes du cluster (SSRF) ; le catalogue interroge Internet pour rien, puisque les modèles sont fixés par le routeur |
 | Exécutant sur une version récente | `11-executant-build.yaml` (Hermes Agent figé par digest) ; un initContainer migre la configuration commune, puis applique les surcharges de l'agent (bornes de sa délégation interne) | la migration change des valeurs par défaut : les surcharges passent après elle |
 
 Liste fermée d'outils : relever à chaque mise à jour de Hermes les outils réellement donnés au modèle ; une valeur par défaut peut changer d'une version à l'autre.
 
-## Agnosticisme des modeles
+## Modèle local
 
-Chaque pod agent est configure independamment via sa variable d'environnement `AGENT_MODEL`. Sophia peut utiliser un modele de raisonnement puissant (`${MODEL_THINK}`) tandis que ses sous-agents utilisent un modele plus leger et rapide (`${MODEL_ROUTINE}`). Cible : le modele local pour tous, avec un alias « de fond » qui laisse la priorite a la discussion ([Inférence et matériel](../../../docs/concepts/11-inference-materiel.md)). Chaque deite dans `06-gods-deployments.yaml` possede sa propre configuration de modele.
+Tous les agents tournent sur le **modèle local**, par l'alias « de fond » du routeur (`${AGENT_MODEL_ALIAS}`, par défaut `sophia-local-fond`), qui laisse la priorité à la discussion ([Inférence et matériel](../../../docs/concepts/11-inference-materiel.md)). Aucun agent n'appelle un modèle distant. Chaque pod reste configurable seul par `AGENT_MODEL` : l'architecture ne suppose aucune capacité du modèle, puisque le comportement est imposé par l'infrastructure (RBAC, NetworkPolicies, règles du répartiteur, sortie contrainte). Un agent purement déterministe peut même se passer de modèle.
 
-Etant donne que le comportement agentique est enforce par l'infrastructure (RBAC, NetworkPolicies, validation du format de sortie) plutot que par le modele lui-meme, l'architecture fonctionne avec n'importe quel modele — des petits modeles locaux aux grandes API publiques. Vous pouvez meme deployer un agent sans backend IA si son role est purement deterministe.
+Le nombre de missions simultanées n'est pas borné par l'alias, mais par le [répartiteur](../core/repartiteur/) : en flux, le sémaphore du routeur est relâché à la première réponse et ne couvre pas la génération.
 
-Les variables d'environnement `${AGENT_MODEL}`, `${OPENAI_API_BASE_URL}` et `${OPENAI_API_KEY}` dans le ConfigMap et les Secrets controlent le modele utilise par chaque agent.
+| Réglage (configuration commune des agents) | Valeur | Pourquoi |
+|---|---|---|
+| `prefill_messages_file` | `''` (vide) | le prefill de chaque agent était un message `system`, inséré **après** le prompt système : `system, system, user`. Un fournisseur distant l'acceptait ; le gabarit de chat du modèle local le refuse (« System message must be at the beginning »), et chaque appel échouait en erreur 500 |
+| `model.context_length` | `64000` | le serveur local ne publie pas sa fenêtre : l'agent se replie sur 256 000 tokens, ne compresse qu'à la moitié et prend la réserve de la discussion. 64 000 est le plancher accepté par l'agent (61 440, la fenêtre par discussion du serveur, serait refusé) ; la compression part alors à 32 000 |
+
+Chaque réglage s'essaie d'abord sur un seul agent, redémarré seul, puis sur les autres : la configuration commune est relue à chaque démarrage, et un changement non essayé partirait avec le prochain redémarrage de tous. Contrôle : relire les valeurs effectives dans l'agent (`yq`), puis une mission « pong » par le répartiteur, sans erreur de gabarit dans le serveur d'inférence.
 
 ## Assistant de code persistant (Dionysos)
 
@@ -84,8 +91,8 @@ Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 | `${SANDBOX_NAMESPACE}` | Namespace sandbox d'Hephaistos | `sandbox` |
 | `${APPS_NAMESPACE}` | Namespace apps d'Ouranos | `apps` |
 | `${GIT_NAMESPACE}` | Namespace du service Git | `git` |
-| `${MODEL_THINK}` | Modele de raisonnement pour Sophia | `sophia-think` |
-| `${MODEL_ROUTINE}` | Modele leger pour les sous-agents | `sophia-routine` |
+| `${AGENT_MODEL_ALIAS}` | Alias du routeur pour tous les agents (modèle local, de fond) | `sophia-local-fond` |
+| `${AGENT_PRIORITY_CLASS}`, `${SOCLE_PRIORITY_CLASS}` | Classes de priorité des agents et de l'observateur ([`../cluster/`](../cluster/)) | `sophia-agents`, `sophia-socle` |
 | `${TELEGRAM_HITL_CHAT_ID}` | ID du chat Telegram pour les approbations HITL | (requis) |
 | `${TELEGRAM_ALLOWED_USERS}` | Identifiants Telegram autorisés à parler à l'agent (liste) | (requis si bot) |
 | `${OBSERVER_UID}`, `${OBSERVER_FSGROUP}` | UID et groupe propres de l'observateur | (à fixer, hors de la plage des autres agents) |

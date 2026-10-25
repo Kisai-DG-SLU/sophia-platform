@@ -15,6 +15,7 @@ spec:
         app: dionysos
     spec:
       serviceAccountName: ${SERVICE_ACCOUNT}
+      priorityClassName: ${SOCLE_PRIORITY_CLASS:-sophia-socle}
       hostPID: true
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -52,9 +53,12 @@ spec:
           if [ -f "config.yaml" ]; then
             envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
           fi
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: "500m", memory: 256Mi }
         env:
         - name: AGENT_MODEL
-          value: ${MODEL_ROUTINE:-sophia-routine}
+          value: ${AGENT_MODEL_ALIAS:-sophia-local-fond}
         - name: FORGEJO_USER
           valueFrom:
             secretKeyRef:
@@ -65,6 +69,8 @@ spec:
             secretKeyRef:
               name: ${FORGEJO_SECRET_PREFIX}-dionysos
               key: password
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-dionysos, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -115,6 +121,9 @@ spec:
             npm install -g --prefix $CH/npm-global --cache $CH/npm-cache @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} || echo "WARN: installation Claude Code échouée"
           fi
           echo "Claude Code $(node -p "require('$PKG').version" 2>/dev/null) prêt"
+        resources:
+          requests: { cpu: 100m, memory: 256Mi }
+          limits: { cpu: "2", memory: 2Gi }
         env:
         - name: CLAUDE_CODE_VERSION
           value: "${CLAUDE_CODE_VERSION}"
@@ -178,6 +187,9 @@ spec:
             fi
             sleep 10 & wait $!
           done
+        resources:
+          requests: { cpu: 10m, memory: 32Mi }
+          limits: { cpu: "500m", memory: 256Mi }
         env:
         - name: CLAUDE_SYNC_INTERVAL
           value: "${CLAUDE_SYNC_INTERVAL}"
@@ -212,6 +224,9 @@ spec:
           exec hermes gateway run
         tty: true
         stdin: true
+        resources:
+          requests: { cpu: 1, memory: 12Gi }
+          limits: { cpu: "16", memory: 32Gi }
         env:
         - name: AGENT_PERSONA
           value: "DIONYSOS"
@@ -236,6 +251,8 @@ spec:
         # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
           value: "false"
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-dionysos, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}

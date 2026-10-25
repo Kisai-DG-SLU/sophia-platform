@@ -16,6 +16,7 @@ spec:
         app: athena
     spec:
       serviceAccountName: athena-sa
+      priorityClassName: ${AGENT_PRIORITY_CLASS:-sophia-agents}
       initContainers:
       - name: init-workspace
         image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
@@ -39,9 +40,12 @@ spec:
           if [ -d "config/agents/common" ]; then cp -r config/agents/common/* . 2>/dev/null || true ; fi
           if [ -d "config/agents/athena" ]; then cp -r config/agents/athena/* . 2>/dev/null || true ; fi
           rm -rf config/
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: "500m", memory: 256Mi }
         env:
         - name: AGENT_MODEL
-          value: ${MODEL_ROUTINE:-sophia-routine}
+          value: ${AGENT_MODEL_ALIAS:-sophia-local-fond}
         - name: FORGEJO_USER
           valueFrom:
             secretKeyRef:
@@ -52,6 +56,8 @@ spec:
             secretKeyRef:
               name: ${FORGEJO_SECRET_PREFIX}-athena
               key: password
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-athena, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -73,13 +79,16 @@ spec:
           exec hermes gateway run
         tty: true
         stdin: true
+        resources:
+          requests: { cpu: 50m, memory: 256Mi }
+          limits: { cpu: "1", memory: 1Gi }
         env:
         - name: HOME
           value: /opt/hermes
         - name: AGENT_PERSONA
           value: "ATHENA"
         - name: AGENT_MODEL
-          value: ${MODEL_ROUTINE:-sophia-routine}
+          value: ${AGENT_MODEL_ALIAS:-sophia-local-fond}
         - name: REQUIRE_HITL
           value: "systematic"
         - name: POSTGRES_URL
@@ -103,6 +112,8 @@ spec:
         # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
           value: "false"
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-athena, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -142,6 +153,7 @@ spec:
         app: hephaistos
     spec:
       serviceAccountName: hephaistos-sa
+      priorityClassName: ${AGENT_PRIORITY_CLASS:-sophia-agents}
       initContainers:
       - name: init-workspace
         image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
@@ -168,9 +180,12 @@ spec:
           if [ -f "config.yaml" ]; then
             envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
           fi
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: "500m", memory: 256Mi }
         env:
         - name: AGENT_MODEL
-          value: ${MODEL_ROUTINE:-sophia-routine}
+          value: ${AGENT_MODEL_ALIAS:-sophia-local-fond}
         - name: FORGEJO_USER
           valueFrom:
             secretKeyRef:
@@ -181,6 +196,8 @@ spec:
             secretKeyRef:
               name: ${FORGEJO_SECRET_PREFIX}-hephaistos
               key: password
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-hephaistos, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -213,6 +230,9 @@ spec:
           if [ -f surcharges.yaml ]; then
             yq -i '. *= load("surcharges.yaml")' config.yaml
           fi
+        resources:
+          requests: { cpu: 50m, memory: 128Mi }
+          limits: { cpu: "1", memory: 512Mi }
         env:
         - { name: HERMES_HOME, value: /opt/data }
         - { name: HOME, value: /opt/data }
@@ -226,6 +246,9 @@ spec:
         command: ["hermes", "gateway", "run"]
         tty: true
         stdin: true
+        resources:
+          requests: { cpu: 100m, memory: 512Mi }
+          limits: { cpu: "2", memory: 2Gi }
         env:
         - name: AGENT_PERSONA
           value: "HEPHAISTOS"
@@ -239,6 +262,8 @@ spec:
         - { name: API_SERVER_PORT, value: "8642" }
         - { name: HERMES_HOME, value: /opt/data }
         - { name: HOME, value: /opt/data }
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-hephaistos, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -275,6 +300,7 @@ spec:
         app: ouranos
     spec:
       serviceAccountName: ouranos-sa
+      priorityClassName: ${AGENT_PRIORITY_CLASS:-sophia-agents}
       initContainers:
       - name: init-workspace
         image: ${INTERNAL_REGISTRY}/${AGENT_NAMESPACE}/${AGENT_IMAGE_NAME}@${AGENT_IMAGE_DIGEST}
@@ -301,9 +327,12 @@ spec:
           if [ -f "config.yaml" ]; then
             envsubst < config.yaml > config.yaml.tmp && mv config.yaml.tmp config.yaml
           fi
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: "500m", memory: 256Mi }
         env:
         - name: AGENT_MODEL
-          value: ${MODEL_ROUTINE:-sophia-routine}
+          value: ${AGENT_MODEL_ALIAS:-sophia-local-fond}
         - name: FORGEJO_USER
           valueFrom:
             secretKeyRef:
@@ -314,6 +343,8 @@ spec:
             secretKeyRef:
               name: ${FORGEJO_SECRET_PREFIX}-ouranos
               key: password
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-ouranos, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}
@@ -328,6 +359,9 @@ spec:
         command: ["hermes", "gateway", "run"]
         tty: true
         stdin: true
+        resources:
+          requests: { cpu: 50m, memory: 256Mi }
+          limits: { cpu: "1", memory: 1Gi }
         env:
         - name: AGENT_PERSONA
           value: "OURANOS"
@@ -341,6 +375,8 @@ spec:
         # exécutant (clé propre, voir hephaistos). Aucune clé commune.
         - name: API_SERVER_ENABLED
           value: "false"
+        - name: OPENAI_API_KEY
+          valueFrom: { secretKeyRef: { name: litellm-cle-ouranos, key: cle } }
         envFrom:
         - configMapRef:
             name: ${AGENT_CONFIG_MAP}

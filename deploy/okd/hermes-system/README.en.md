@@ -32,17 +32,24 @@ Agents are **executors**, reached by the [dispatcher](../core/repartiteur/) only
 | Restricted messaging | `TELEGRAM_ALLOWED_USERS` on every agent with a bot; no more `GATEWAY_ALLOW_ALL_USERS` | without a list, the gateway would accept any messaging user, over the Internet, outside the VPN |
 | Images pinned by digest | `@${AGENT_IMAGE_DIGEST}`, `@${EXECUTANT_IMAGE_DIGEST}` with `IfNotPresent`; build bases pinned too | a restart never changes image without a decision; changing image = a new digest, then `apply` |
 | Human approval | maintenance: `REQUIRE_HITL=systematic`, every command waits for approval; behind the dispatcher, approval of the plan then of each command (D3a, D3b) through the Temporal UI | **known gap**: on the deployment agent, `prompt` is handled by no code, so approval is not enforced; switching to `systematic` is planned before any use |
+| One model-router key per agent | Secret `litellm-cle-<agent>` (key `cle`), read by each agent's init and container; virtual key limited to the background alias and embedding, rate-capped; an `env` variable takes precedence over an `OPENAI_API_KEY` from `envFrom` | a shared key, or the router's master key, opened every model to every agent, with no per-agent traceability; check: `/key/info` run inside the agent with its key returns its own alias (the master key gets 404) |
+| Web tools without internal addresses, model catalog off | shared agent configuration: `browser.allow_private_urls` and `security.allow_private_urls` set to `false`, `model_catalog.enabled` set to `false` | `allow_private_urls` opens the cluster's internal addresses to web tools (SSRF); the catalog queries the Internet for nothing, since models are set by the router |
 | Executor on a recent version | `11-executant-build.yaml` (Hermes Agent pinned by digest); an initContainer migrates the shared configuration, then applies the agent's overrides (bounds of its internal delegation) | the migration changes defaults: overrides come after it |
 
 Closed tool list: at every Hermes update, list the tools actually given to the model; a default may change from one version to the next.
 
-## Model Agnosticism
+## Local model
 
-Each agent pod is configured independently via its `AGENT_MODEL` environment variable. Sophia can use a powerful reasoning model (`${MODEL_THINK}`) while her sub-agents run a lighter, faster model (`${MODEL_ROUTINE}`). Target: the local model for all, with a "background" alias that leaves priority to chat ([Inference and Hardware](../../../docs/concepts/11-inference-materiel.en.md)). Each god deployment in `06-gods-deployments.yaml` has its own model configuration.
+Every agent runs on the **local model**, through the router's "background" alias (`${AGENT_MODEL_ALIAS}`, default `sophia-local-fond`), which leaves priority to chat ([Inference and Hardware](../../../docs/concepts/11-inference-materiel.en.md)). No agent calls a remote model. Each pod stays configurable on its own through `AGENT_MODEL`: the architecture assumes no model capability, since behavior is enforced by infrastructure (RBAC, NetworkPolicies, dispatcher rules, constrained output). A purely deterministic agent can even do without a model.
 
-Because agentic behavior is enforced by infrastructure (RBAC, NetworkPolicies, output format validation) rather than the model itself, the architecture works with any model -- from small local models to large public APIs. You can even deploy an agent without any AI backend if its role is purely deterministic.
+The number of simultaneous missions is not bounded by the alias but by the [dispatcher](../core/repartiteur/): when streaming, the router's semaphore is released at the first response and does not cover generation.
 
-The `${AGENT_MODEL}`, `${OPENAI_API_BASE_URL}`, and `${OPENAI_API_KEY}` environment variables in the ConfigMap and Secrets control which model each agent uses.
+| Setting (shared agent configuration) | Value | Why |
+|---|---|---|
+| `prefill_messages_file` | `''` (empty) | each agent's prefill was a `system` message, inserted **after** the system prompt: `system, system, user`. A remote provider accepted it; the local model's chat template refuses it ("System message must be at the beginning"), and every call failed with a 500 error |
+| `model.context_length` | `64000` | the local server does not publish its window: the agent falls back to 256,000 tokens, only compresses at half of it and takes chat's reserve. 64,000 is the floor the agent accepts (61,440, the server's per-chat window, would be refused); compression then starts at 32,000 |
+
+Each setting is first tried on a single agent, restarted alone, then on the others: the shared configuration is read at every start, and an untried change would go out with the next restart of all of them. Check: read the effective values inside the agent (`yq`), then a "pong" mission through the dispatcher, with no template error in the inference server.
 
 ## Persistent coding assistant (Dionysos)
 
@@ -84,8 +91,8 @@ Substitute the following variables (via envsubst or Helm) before applying:
 | `${SANDBOX_NAMESPACE}` | Hephaistos sandbox namespace | `sandbox` |
 | `${APPS_NAMESPACE}` | Ouranos apps namespace | `apps` |
 | `${GIT_NAMESPACE}` | Git service namespace | `git` |
-| `${MODEL_THINK}` | Reasoning model for Sophia | `sophia-think` |
-| `${MODEL_ROUTINE}` | Lightweight model for sub-agents | `sophia-routine` |
+| `${AGENT_MODEL_ALIAS}` | Router alias for every agent (local model, background) | `sophia-local-fond` |
+| `${AGENT_PRIORITY_CLASS}`, `${SOCLE_PRIORITY_CLASS}` | Priority classes of the agents and the observer ([`../cluster/`](../cluster/)) | `sophia-agents`, `sophia-socle` |
 | `${TELEGRAM_HITL_CHAT_ID}` | Telegram chat ID for HITL approvals | (required) |
 | `${TELEGRAM_ALLOWED_USERS}` | Telegram IDs allowed to talk to the agent (list) | (required if bot) |
 | `${OBSERVER_UID}`, `${OBSERVER_FSGROUP}` | Observer's own UID and group | (to set, outside the other agents' range) |
