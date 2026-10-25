@@ -89,7 +89,7 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 
 - strict access control: SSO, groups, per-client restricted keys on the model router;
 - secrets managed through Kubernetes: manifests contain none; a Secret is created from standard input, never as a command argument (visible in the process list), and no value is printed; a value found in a repository's history is changed, without rewriting history;
-- builds read-only on their repository: one deploy key per repository, never a forge administrator's token;
+- repositories read through a read-only deploy key, specific to each repository, never through a forge administrator's token: **in place** for the school's content sync, **planned** for the builds of the interface and of the visualisation tool;
 - audit logging;
 - encrypted volumes: **target**, not yet in place (unencrypted local volumes).
 
