@@ -89,7 +89,12 @@ Typical namespaces include:
 | sophia-dmz | controlled web acquisition |
 | sophia-sandbox | development workspaces |
 | sophia-test | validation environments |
-| sophia-apps | user interfaces |
+| sophia-apps | modules |
+| sophia-interface | chat interface |
+| sophia-workflow | visualisation tool |
+| sophia-workspace | office suite |
+| sophia-skills-build | MCP tool builds, no agent account |
+| agents namespace | pantheon and coding assistant |
 | sophia-identity | identity and SSO (Keycloak) |
 | sophia-storage | shared S3 object storage |
 
