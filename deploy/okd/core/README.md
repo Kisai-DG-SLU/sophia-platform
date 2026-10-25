@@ -26,6 +26,8 @@ Le cœur de la plateforme : le routeur de modèles (LiteLLM), la base PostgreSQL
 | Clés restreintes | chaque client (interface, agents) a une clé limitée à une liste de modèles ; `add-model-to-keys.py` y ajoute un nouvel alias | un nouvel alias est invisible tant qu'il n'est pas ajouté aux clés qui en ont besoin |
 | Une clé par agent | `agent-<nom>` (`litellm/create-agent-key.py`) : alias de fond et embedding seulement, 120 requêtes par minute ; Secret `litellm-cle-<agent>` dans le namespace des agents | la clé maître administre le routeur (clés, budgets) et ouvre tous les modèles : elle ne sort pas du pod du routeur |
 | Tarifs | recopiés de l'API du fournisseur par `sync-pricing.py`, jamais à la main | le coût affiché suit le prix réel |
+| Clés par usage | une clé virtuelle par appelant (`litellm/create-virtual-key.py`) : la voix du chat (ses deux alias, débit propre), chaque pod de développement (les modèles du chat sans la voix), chaque application ; jamais `*` | la règle est tenue par le routeur, quelle que soit la requête ; voir [Modèles par rôle](../../../docs/concepts/13-modeles-par-role.md) |
+| Bascule sans coupure | sondes `readiness` (`/health/readiness`, 3 s) et `liveness` (`/health/liveliness`), stratégie `RollingUpdate` (`maxSurge: 1`, `maxUnavailable: 0`) | sans sonde, le pod était déclaré prêt avant d'écouter : chaque redémarrage (configuration, clé maître) coupait le chat |
 | Journaux de LiteLLM | `INFO`, pas `DEBUG` | en `DEBUG`, chaque requête entière (conversations privées, photos en base64) part dans les journaux et ralentit les grosses requêtes |
 | Entrée | refus par défaut en entrée, puis une règle par service ; le routeur de modèles (`litellm/network-policy.yaml`) n'admet que les namespaces de ses appelants relevés, le routeur d'entrée et le réseau du nœud | sans règle, tout pod du cluster joint le routeur et dépense ses clés ; par namespace et non par pod, pour couvrir les pods éphémères |
 | Garde-fous | quota du namespace (16 Gi, 12 CPU, 15 pods) et limites explicites sur **chaque** conteneur, builds compris | un conteneur sans limite reçoit 512 Mi par défaut : LiteLLM, Postgres ou un build mourraient en OOM. **Appliquer les limites avant le quota** |
@@ -69,3 +71,12 @@ Le script lit la clé maître dans l'environnement du pod, ne l'affiche jamais, 
    1. Clés et Secrets, sans effet sur ce qui tourne : `create-agent-key.py <agent> --dry-run`, puis la forme `--eval CLE_AGENT`, et un Secret créé par l'entrée standard (`printf '%s' "$CLE_AGENT" | oc create secret generic litellm-cle-<agent> --from-file=cle=/dev/stdin`), puis `unset CLE_AGENT`. Aucune clé n'est affichée.
    2. Un `apply` par agent ([`../hermes-system/`](../hermes-system/)), un agent à la fois. Contrôle dans l'agent : `/key/info` avec sa propre clé renvoie `agent-<nom>` et ses deux modèles, puis une mission « pong ».
    3. Quand plus aucun agent ne la lit : retirer la clé maître du Secret des agents, poser `LITELLM_SALT_KEY`, puis renouveler la clé maître. Chaque valeur passe par `--patch-file=/dev/stdin`, jamais dans les arguments d'une commande. Relever avant tous les consommateurs de la clé maître (scripts, postes d'administration).
+6. **Clés par usage** (voix, pod de développement, application) : `create-virtual-key.py`, toujours à blanc d'abord.
+
+```bash
+oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --modeles <m1>,<m2> --rpm <N> --dry-run < litellm/create-virtual-key.py
+oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --comme <alias-de-référence> --sans <m1> --dry-run < litellm/create-virtual-key.py
+oc exec -i -n sophia-core deploy/litellm -- python3 - --info <alias> < litellm/create-virtual-key.py
+```
+
+La création remplace `--dry-run` par `--eval <VARIABLE>` dans un `eval "$(…)"`, puis la clé part dans le Secret de l'appelant par l'entrée standard. `--info` donne les modèles, les limites et le début de l'empreinte SHA-256 de la clé : comparé à l'empreinte de la valeur du Secret, il prouve que c'est la bonne clé, sans l'afficher.
