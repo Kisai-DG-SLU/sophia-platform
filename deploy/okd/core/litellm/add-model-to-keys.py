@@ -13,6 +13,7 @@ est lue dans l'environnement du pod, jamais affichée) :
   oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-local --apply < add-model-to-keys.py   # applique
 
 Affiche seulement l'alias de chaque clé et sa liste de modèles.
+Modèle de référence (clés à compléter) : sophia-think par défaut, ou --reference=<alias>.
 """
 
 import json
@@ -38,6 +39,7 @@ def call(method, path, body=None):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     apply = "--apply" in sys.argv[1:]
+    reference = next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--reference=")), REFERENCE)
     if len(args) != 1:
         sys.exit("usage : python3 - <alias> [--apply]")
     model = args[0]
@@ -49,7 +51,7 @@ def main():
             continue
         alias = k.get("key_alias") or "(sans alias)"
         models = list(k.get("models") or [])
-        if not models or REFERENCE not in models:
+        if not models or reference not in models:
             continue
         if model in models:
             print(f"✓ {alias} : déjà {models}")
