@@ -1,41 +1,47 @@
-# SophIA - Interface de production, namespace sophia-apps.
+# SophIA - Interface de production, namespace dédié sophia-interface : hors du namespace des
+# applications, dont l'agent de déploiement est administrateur. Namespace, quota, LimitRange, classe
+# de priorité sophia-chat et entrées des autres namespaces : préparés à part, avant ce manifeste.
+# La Route de production est à part : appliquée à la bascule seulement, quand l'ancienne est supprimée
+# (deux Routes ne réclament pas le même nom d'hôte). Essai avant bascule : une Route temporaire, joignable
+# par le VPN seulement.
 #
-# Prérequis (l'administrateur, opérations sur les secrets) :
-#   - secret forgejo-build-credentials : basic-auth Forgejo (compte de build en lecture)
+# Prérequis (l'administrateur, opérations sur les secrets), dans le namespace sophia-interface :
+#   - secret sophia-interface-git     : clé de déploiement Forgejo en lecture seule (kubernetes.io/ssh-auth :
+#                                       ssh-privatekey, known_hosts du SSH de Forgejo)
 #   - secret sophia-interface-litellm : LITELLM_API_KEY = virtual key LiteLLM dédiée à la prod
-#   - secret sophia-interface-oauth2  : client-secret (client Keycloak sophia-interface)
-#                                       et cookie-secret (32 caractères aléatoires)
-#   - secret sophia-chat-db           : PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
-#                                       (base sophia_chat, étape 6b)
-#   - secret sophia-chat-forgejo      : FORGEJO_TOKEN du compte de service Forgejo « sophia-chat »
-#                                       (projets, étape 6b.2) — optionnel : sans lui, projet global seul
+#                                       et LITELLM_AUDIO_API_KEY (facultative) = virtual key limitée
+#                                       à sophia-stt et sophia-tts (routes de la voix)
+#   - secret sophia-interface-oauth2  : client-secret (client Keycloak sophia-interface) et cookie-secret
+#   - secret sophia-chat-db           : PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (base sophia_chat)
+#   - secret sophia-chat-forgejo      : FORGEJO_TOKEN du compte de service Forgejo « sophia-chat » (facultatif)
 #
 # Chemin d'une requête : Route → oauth2-proxy :4180 (connexion Keycloak, realm sophia)
 # → nginx :8080 (front, liste blanche, clé LiteLLM, identité x-litellm-end-user-id) → LiteLLM.
 #                └ /api/store/ → API des discussions 127.0.0.1:8000 → PostgreSQL sophia_chat.
-# Application : oc apply -f deploy/okd/sophia-interface.yaml ; oc start-build sophia-interface -n sophia-apps
+# Application : README.md de ce dossier.
 ---
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
   name: sophia-interface
-  namespace: sophia-apps
+  namespace: sophia-interface
   labels: { app: sophia-interface }
 ---
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
   name: sophia-interface
-  namespace: sophia-apps
+  namespace: sophia-interface
   labels: { app: sophia-interface }
 spec:
   source:
     type: Git
     git:
-      uri: http://forgejo-svc.sophia-git.svc.cluster.local:3000/ORGANISATION/chat-interface.git
+      # Clé de déploiement en lecture seule : jamais le jeton d'un administrateur de la forge.
+      uri: ssh://git@forgejo-svc.sophia-git.svc.cluster.local:FORGEJO_SSH_PORT/ORGANISATION/chat-interface.git
       ref: main
     sourceSecret:
-      name: forgejo-build-credentials
+      name: sophia-interface-git
   strategy:
     type: Docker
     dockerStrategy:
@@ -54,7 +60,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: sophia-interface
-  namespace: sophia-apps
+  namespace: sophia-interface
   labels: { app: sophia-interface }
   annotations:
     # Nouveau build → nouvelle image → redéploiement automatique.
@@ -67,6 +73,8 @@ spec:
     metadata:
       labels: { app: sophia-interface }
     spec:
+      priorityClassName: sophia-chat
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
@@ -89,7 +97,7 @@ spec:
             - --cookie-secret-file=/etc/oauth2/cookie-secret
             - --cookie-name=_sophia
             - --cookie-secure=true
-            - --cookie-refresh=1h
+            - --cookie-refresh=4m           # sous les 5 min du jeton d'accès de Keycloak : le jeton relayé reste valide
             - --cookie-expire=2160h          # 90 jours, comme la session Keycloak « Se souvenir de moi »
             - --redirect-url=https://chat.example.org/oauth2/callback
             - --whitelist-domain=chat.example.org
@@ -114,6 +122,13 @@ spec:
             # photo, une première compaction ou un long document (lecture ≈ 420 tokens/s sur le GPU).
             # Aligné sur nginx (proxy_read_timeout 300s).
             - --upstream-timeout=300s
+            # École sur sa propre adresse : retour après connexion vers l'école, et préflight CORS
+            # (sans cookie) transmis à nginx, qui ne répond qu'à l'origine exacte de l'école.
+            - --whitelist-domain=ecole.example.org
+            - --skip-auth-preflight=true
+            # Jeton d'accès de la personne vers nginx (X-Forwarded-Access-Token ; une valeur envoyée par le navigateur
+            # est retirée avant). nginx ne le relaie qu'à store-api sur /v1/chat/completions (X-Sophia-Jeton).
+            - --pass-access-token=true
           ports:
             - { name: http, containerPort: 4180 }
           volumeMounts:
@@ -139,6 +154,10 @@ spec:
             - name: LITELLM_API_KEY
               valueFrom:
                 secretKeyRef: { name: sophia-interface-litellm, key: LITELLM_API_KEY }
+            # Clé limitée aux modèles audio locaux (routes de la voix) ; facultative : absente, clé du pod.
+            - name: LITELLM_AUDIO_API_KEY
+              valueFrom:
+                secretKeyRef: { name: sophia-interface-litellm, key: LITELLM_AUDIO_API_KEY, optional: true }
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
@@ -166,8 +185,8 @@ spec:
             - { name: SOPHIA_PROMOTE_TARGETS, value: '{"famille": "Famille", "perso": "Perso"}' }
             # Modèle par défaut (profil sans choix explicite, journal) : inférence locale, rien ne sort du cluster.
             - { name: SOPHIA_DEFAULT_MODEL, value: sophia-local }
-            # Fenêtre de contexte par modèle, en tokens : au-delà, refus expliqué avant le routeur.
-            # sophia-local : 4 × 61 440 (cache partagé en 8 bits du serveur d'inférence).
+            # Fenêtre de contexte par modèle, en tokens : au-delà, refus expliqué
+            # avant le routeur. sophia-local : 4 × 61 440 (cache partagé en 8 bits du serveur d'inférence).
             - { name: SOPHIA_CONTEXT_LIMITS, value: '{"sophia-local": 61440, "sophia-routine": 64000, "sophia-think": 64000, "sophia-architect": 32000}' }
             # Recherche web (PWeb) : serveur sophia-web du sas. Vide = pas de recherche.
             - { name: SOPHIA_WEB_URL, value: "http://sophia-web.sophia-dmz.svc.cluster.local:8000" }
@@ -175,7 +194,10 @@ spec:
             # deploy/okd/skills/README.md). Un module qui expose ses outils s'ajoute à la liste
             # (ex. http://<module>.sophia-apps.svc.cluster.local:8081/mcp) et à la sortie réseau ci-dessous.
             - name: SOPHIA_MCP_URLS
-              value: "http://sophia-web.sophia-dmz.svc.cluster.local:8000/mcp,http://sophia-geo.sophia-skills.svc.cluster.local:8000/mcp,http://sophia-image.sophia-skills.svc.cluster.local:8000/mcp"
+              value: "http://sophia-web.sophia-dmz.svc.cluster.local:8000/mcp,http://sophia-geo.sophia-skills.svc.cluster.local:8000/mcp,http://sophia-image.sophia-skills.svc.cluster.local:8000/mcp,http://mcp-fichiers.sophia-skills.svc.cluster.local:8000/mcp"
+            # Seuls serveurs MCP qui reçoivent le jeton d'accès de la personne (outils à méta sophia/jeton)
+            - name: SOPHIA_MCP_JETON_URLS
+              value: "http://mcp-fichiers.sophia-skills.svc.cluster.local:8000/mcp"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
@@ -191,39 +213,22 @@ apiVersion: v1
 kind: Service
 metadata:
   name: sophia-interface
-  namespace: sophia-apps
+  namespace: sophia-interface
   labels: { app: sophia-interface }
 spec:
   selector: { app: sophia-interface }
   ports:
     - { name: http, port: 8080, targetPort: http }
 ---
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: sophia-interface
-  namespace: sophia-apps
-  labels: { app: sophia-interface }
-  annotations:
-    # Réponses longues en streaming (gros modèles).
-    haproxy.router.openshift.io/timeout: 900s
-spec:
-  host: chat.example.org
-  to: { kind: Service, name: sophia-interface }
-  port: { targetPort: http }
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
----
 # Entrée : seul le routeur OpenShift, vers oauth2-proxy (nginx :8080 n'est joignable
-# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak, PostgreSQL, Forgejo, le sas web, les serveurs
-# MCP de sophia-skills (et des modules) et le DNS du cluster.
-# Ne vise que les pods de l'interface : sophia-notebook, dans le même namespace, n'est pas concerné.
+# que depuis le pod lui-même). Sortie : LiteLLM, Keycloak, PostgreSQL, Forgejo, le sas web,
+# les serveurs MCP de sophia-skills et des modules, l'école (index des contenus) et le DNS du cluster.
+# Ne vise que les pods de l'interface (les pods de build ont leurs propres règles de namespace).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: sophia-interface
-  namespace: sophia-apps
+  namespace: sophia-interface
   labels: { app: sophia-interface }
 spec:
   podSelector:
@@ -253,6 +258,11 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: sophia-core }
           podSelector:
             matchLabels: { app: postgres-sophia }
+        # PostgreSQL 18 : l'ancienne instance reste ouverte pendant la garde qui suit la migration, pour un retour arrière
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: postgres-sophia-18 }
       ports:
         - { protocol: TCP, port: 5432 }
     - to:
@@ -275,9 +285,17 @@ spec:
             matchLabels: { sophia-mcp: "true" }
       ports:
         - { protocol: TCP, port: 8000 }
-    # Un module qui expose un serveur MCP (même namespace) : un bloc par module
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-apps }
+          podSelector:
+            matchLabels: { app: sophia-school }
+      ports:
+        - { protocol: TCP, port: 8080 }
+    # Un module qui expose un serveur MCP (namespace des applications) : un bloc par module
     # - to:
-    #     - podSelector: { matchLabels: { app: <module> } }
+    #     - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+    #       podSelector: { matchLabels: { app: <module> } }
     #   ports:
     #     - { protocol: TCP, port: 8081 }
     - to:
