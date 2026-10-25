@@ -48,6 +48,37 @@ data:
           supports_vision: true
           max_input_tokens: 61440
 
+      # Même serveur, pour les tâches de fond (agents, travaux non urgents des applications).
+      # max_parallel_requests 1 laisse à la discussion les autres emplacements du serveur. Limite :
+      # le verrou est relâché à la première réponse ; en flux, il ne couvre pas la génération. Il ne
+      # vaut donc que pour les appels sans flux ; les missions des agents sont bornées par le répartiteur.
+      - model_name: sophia-local-fond
+        litellm_params:
+          model: openai/sophia-local
+          api_base: http://llama-server.sophia-inference.svc.cluster.local:8080/v1
+          api_key: "aucune"
+          timeout: 600
+          max_parallel_requests: 1
+          input_cost_per_token: 0
+          output_cost_per_token: 0
+        model_info:
+          supports_function_calling: true
+          supports_vision: true
+          max_input_tokens: 61440
+
+      # Mémoire (RAG) : bge-m3, 1 024 dimensions, service d'embedding de sophia-memory (CPU),
+      # route compatible OpenAI /v1/embeddings. Nom attendu par l'ingestion.
+      - model_name: sophia-embedder
+        litellm_params:
+          model: openai/bge-m3
+          api_base: http://sophia-embedding-svc.sophia-memory.svc.cluster.local:8080/v1
+          api_key: "aucune"
+          timeout: 120
+          input_cost_per_token: 0
+        model_info:
+          mode: embedding
+          output_vector_size: 1024
+
       # Voix (PVoix) : sophia-voice sur CPU, dans sophia-inference. Gratuit, rien ne sort du cluster.
       - model_name: sophia-stt
         litellm_params:
