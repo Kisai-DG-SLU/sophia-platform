@@ -35,11 +35,11 @@ In progress. Work follows this order:
 
 | # | Work | Status |
 |---|---|---|
-| 0 | **Event bus and durable workflows**: RabbitMQ (topology, rights, dead letters), Temporal; the delegation **dispatcher**, only client of Temporal and only publisher of events ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | in service ([`deploy/okd/core/repartiteur/`](../deploy/okd/core/repartiteur/)); event consumers to do |
-| 1 | **Minimal observability** and **CPU priorities**: service metrics, alert rules, priority classes, per-namespace quotas ([observability](concepts/10-observabilite.en.md), [inference and hardware](concepts/11-inference-materiel.en.md)) | to do |
-| 2 | **Agents on the local model**, with a "background" alias that leaves priority to chat | to do |
-| 3 | **Memory (RAG)**: collection and schema with tags, **memory API** (per-tag rights, long-term writes by the memory service), graph and ingestion, object storage for files | to do, partly ready |
-| 4 | **The interface as a requester** of the dispatcher, with a return channel for approvals and notifications | being designed |
+| 0 | **Event bus and durable workflows**: RabbitMQ (topology, rights, dead letters), Temporal; the delegation **dispatcher**, only client of Temporal and only publisher of events ([`deploy/okd/core/rabbitmq/`](../deploy/okd/core/rabbitmq/), [`deploy/okd/core/temporal/`](../deploy/okd/core/temporal/)) | in service ([`deploy/okd/core/repartiteur/`](../deploy/okd/core/repartiteur/)); agents' queues and accounts removed from the bus; event consumers to do |
+| 1 | **Minimal observability** and **CPU priorities**: service metrics, alert rules, priority classes, per-namespace quotas ([observability](concepts/10-observabilite.en.md), [inference and hardware](concepts/11-inference-materiel.en.md)) | in service ([`deploy/okd/monitoring/`](../deploy/okd/monitoring/), [`deploy/okd/cluster/`](../deploy/okd/cluster/)); alert routing to the dispatcher and the agents namespace quota to do |
+| 2 | **Agents on the local model**, with a "background" alias that leaves priority to chat, one router key per agent and card slots by time of day | in service ([`deploy/okd/hermes-system/`](../deploy/okd/hermes-system/)); mission cap at the dispatcher's next build |
+| 3 | **Memory (RAG)**: collection and schema with tags, **memory API** (per-tag rights, long-term writes by the memory service), graph and ingestion, object storage for files | in progress: schema, embedding alias ([`deploy/okd/memory/`](../deploy/okd/memory/)) and object storage ([`deploy/okd/storage/`](../deploy/okd/storage/)) in service; memory API designed; graph and ingestion to rebuild |
+| 4 | **The interface as a requester** of the dispatcher, with a return channel for approvals and notifications; a dedicated namespace for the interface | designed; first step in service: models per role, opening an application ([`deploy/okd/apps/chat-interface/`](../deploy/okd/apps/chat-interface/)) |
 | 5 | Delegations to **supervision** (read), **deployment** and **maintenance** (two-level approvals); mutual TLS | to do |
 | 6 | **Planner** for open goals: workflow prototype, compared with a planner agent on real goals | to do |
 | 7 | **n8n** (with the first tool that needs it), **leak filter**, **Semantic Tribunal** | to do |
