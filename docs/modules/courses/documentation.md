@@ -10,13 +10,15 @@
 - **Modèle par usage** : l'achat express, que la discussion attend, reste sur l'alias principal ; les listes non urgentes passent par l'alias de fond, avec repli sur l'alias principal si le routeur le refuse (alias inconnu ou non permis à la clé).
 - **Prix de référence** pour la table des ingrédients du module Cuisine : outil MCP **en lecture** `prix_reference` (voir ci-dessous).
 
+- **Avis de nouvelle version** (en service) : la page de secours affiche un bandeau « Recharger » quand l'image a changé, jamais pendant une saisie non envoyée, et garde les champs modifiés au rechargement ; jamais dans un cadre : dans l'onglet des courses du module Cuisine, seul le bandeau de Cuisine s'affiche.
+
 Prévu : plusieurs drives, comparaison entre enseignes, signal quand un site devient illisible.
 
 ## Architecture
 
 ```
 module Cuisine ─MCP─┐
-discussion ─────MCP─┼→ service (namespace des applications)   ──→ PostgreSQL partagé (schéma propre)
+discussion ─────MCP─┼→ service (namespace des applications)   ──→ PostgreSQL 18 partagé (schéma propre)
 page de secours ────┘    │ LiteLLM (sophia-local, JSON strict)
                          └←── relevés ── extension du navigateur distant (sas, sortie Internet filtrée)
                                               └──→ site du drive (session ouverte par l'humain)

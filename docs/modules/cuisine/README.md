@@ -7,7 +7,7 @@ Module privé construit sur SophIA : il tient le **planning des repas** d'un foy
 | État | en service dans l'installation de référence |
 | Utilisateurs | les adultes du foyer (accès complet), les enfants (comptes protégés, lecture seule) |
 | Modèle | `sophia-local` (inférence locale) par défaut, par le routeur de modèles |
-| Briques de la plateforme | SSO, routeur de modèles, PostgreSQL partagé, outil MCP `image`, sas web, interface de discussion, module Courses |
+| Briques de la plateforme | SSO, routeur de modèles, PostgreSQL 18 partagé, outil MCP `image`, sas web, interface de discussion, module Courses |
 | Code | privé ; cette page décrit l'architecture et les règles pour en construire un équivalent |
 
 Documentation détaillée : [documentation.md](documentation.md). Autres modules : [modules privés](../README.md).
