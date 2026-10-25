@@ -15,12 +15,13 @@ State verified on 2026-09-27, by reading the cluster.
 | PostgreSQL | `${NS_CORE}` | yes | 10Gi | bound | 4 users, logs, permissions. Not expandable, starting minimum |
 | Forgejo | `${NS_GIT}` | yes | 50Gi | bound | repositories and local SQLite database, 6 MB today |
 | Qdrant | `${NS_MEMORY}` | yes | 20Gi | bound | points x dimensions x 4 bytes, to be computed once ingestion produces |
-| Neo4j | `${NS_MEMORY}` | yes | 10Gi | bound, not mounted | graph to be built, no data |
+| Neo4j | `${NS_MEMORY}` | yes | 10Gi | bound, 0 replicas | graph to be built, no data; image pinned, on hold |
 | Embedding service | `${NS_MEMORY}` | yes | 5Gi | bound | cache and model, no corpus |
 | Workspace | `${NS_APPS}` | yes | 20Gi | bound, consumer down | preproduction, notebooks, webapps, APIs |
 | LiteLLM | `${NS_CORE}` | no | `emptyDir` | no storage | configuration and logs, nothing to keep |
 | Coding assistant (Dionysos) | `${NS_AGENTS}` | no | `emptyDir` + private Git repository | restored at every pod creation | configuration and history pushed regularly to a dedicated repository (see `okd/hermes-system/`) |
-| RabbitMQ | `${NS_CORE}` | yes | 5Gi | bound by name (`claimRef` + `volumeName`) | inter-agent queues; dedicated volume, see `okd/core/rabbitmq/` |
+| RabbitMQ | `${NS_CORE}` | yes | 5Gi | bound by name (`claimRef` + `volumeName`) | delegation events and dead letters (the agents' queues are removed); dedicated volume, see `okd/core/rabbitmq/` |
+| S3 object storage (SeaweedFS) | `sophia-storage` | yes | 200Gi | bound | dedicated XFS logical volume, growable online; PV and PVC bound by name, `Retain`; see `okd/storage/` |
 | Control agent | `${NS_AGENTS}` | planned | 2Gi requested | pending | control rules, to be created |
 
 Namespaces are variables so the example stays reusable:
