@@ -30,7 +30,7 @@ navigateur ─VPN─→ routeur ─→ [ oauth2-proxy │ application + collecte
                                                 └─ forge (miroirs, jeton en lecture)
 ```
 
-- Un seul conteneur sert la page et l'API (Starlette et uvicorn), derrière oauth2-proxy et le SSO, groupe d'administration ; la confiance d'oauth2-proxy dans les en-têtes `X-Forwarded-*`, limitée au routeur, est en cours de généralisation.
+- Un seul conteneur sert la page et l'API (Starlette et uvicorn), derrière oauth2-proxy et le SSO, groupe d'administration ; la confiance d'oauth2-proxy dans les en-têtes `X-Forwarded-*`, est limitée au routeur.
 - Namespace avec quota, valeurs par défaut et entrée fermée ; sortie limitée aux sources lues.
 - Build depuis la forge interne par une **clé de déploiement en lecture seule** sur le seul dépôt, jamais par le jeton d'un administrateur de la forge.
 - Métriques du contrôle des miroirs exposées pour la métrologie, avec une règle d'alerte du namespace.

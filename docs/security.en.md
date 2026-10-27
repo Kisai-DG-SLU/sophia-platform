@@ -99,7 +99,7 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 - secrets managed through Kubernetes: manifests contain none; a Secret is created from standard input, never as a command argument (visible in the process list), and no value is printed; a value found in a repository's history is changed, without rewriting history;
 - repositories read through a read-only deploy key, specific to each repository, never through a forge administrator's token: **in place** for the school's content sync and for the builds of the interface and of the visualisation tool. **Remaining**: the forge administrator's token is still used for pushing and for other builds; inventory of its uses, then tokens limited per use;
 - relational database: **one role per database, no superuser**; the superuser only connects locally;
-- trust of the authentication relays: the interface's oauth2-proxy only believes the forwarded client address when it comes from the ingress router; extension to the other modules in progress;
+- trust of the authentication relays: the interface's oauth2-proxy only believes the forwarded client address when it comes from the ingress router; likewise for every other oauth2-proxy (modules, visualisation, workflow interface);
 - interface and household devices without external dependencies: browser fonts and libraries served by the image, no CDN in the content security policy;
 - permanent chat and video calls without end-to-end encryption, a deliberate choice: a platform administrator can read the rooms; chat media have no backup;
 - tokens masked in the relays' access logs; model-router logs at `INFO`, never `DEBUG` (which would write every full request);
