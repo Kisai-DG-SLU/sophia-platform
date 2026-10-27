@@ -118,12 +118,14 @@ Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 | Namespace | Rôle |
 |---|---|
 | namespace des agents | pods du panthéon, un compte de service et un UID par pod |
-| sophia-sandbox | environnements de développement, clusters enfants par projet |
+| sophia-sandbox | environnements de développement, sans privilège sur le nœud ; prévu : un cluster virtuel éphémère par projet |
 | sophia-test | validation CI/CD |
 | sophia-apps | modules |
 | sophia-interface | l'interface de discussion, hors de la portée de l'agent de déploiement |
 | sophia-workflow | l'outil de visualisation, même raison |
 | sophia-workspace | la bureautique : fichiers et édition en ligne |
+| sophia-messagerie | chat permanent du foyer (Matrix), installé, en recette |
+| sophia-visio | visioconférence (Jitsi Meet), installée, en recette |
 | namespaces de build | construction d'outils sensibles, sans compte d'agent |
 | prod-* | charges de travail des locataires |
 
@@ -159,4 +161,4 @@ Ces mécanismes fonctionnent avec n'importe quel modèle, du plus petit (quelque
 
 ## Statut
 
-L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale (agents compris), l'identité, le répartiteur et ses workflows, la métrologie et les alertes, les priorités CPU et le stockage objet sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).
+L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale (agents compris), l'identité, le répartiteur et ses workflows, la métrologie et les alertes (filtrées, envoyées à l'administrateur hors de la plateforme), les priorités CPU et le stockage objet sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).

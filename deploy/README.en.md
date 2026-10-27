@@ -93,6 +93,8 @@ Typical namespaces include:
 | sophia-interface | chat interface |
 | sophia-workflow | visualisation tool |
 | sophia-workspace | office suite |
+| sophia-messagerie | permanent chat (Matrix), in acceptance testing |
+| sophia-visio | video calls (Jitsi Meet), in acceptance testing |
 | sophia-skills-build | MCP tool builds, no agent account |
 | agents namespace | pantheon and coding assistant |
 | sophia-identity | identity and SSO (Keycloak) |

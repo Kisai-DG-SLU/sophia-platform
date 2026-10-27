@@ -83,6 +83,8 @@ Le deploiement exemple utilise une architecture de namespaces segmentee. Les nam
 | sophia-interface | interface de discussion                   |
 | sophia-workflow  | outil de visualisation                    |
 | sophia-workspace | bureautique                               |
+| sophia-messagerie | chat permanent (Matrix), en recette      |
+| sophia-visio     | visioconference (Jitsi Meet), en recette  |
 | sophia-skills-build | builds des outils MCP, sans compte d'agent |
 | namespace des agents | panthéon et assistant de code         |
 | sophia-identity  | identité et SSO (Keycloak)                |

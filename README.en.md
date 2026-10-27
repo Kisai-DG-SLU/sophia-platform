@@ -114,7 +114,7 @@ SOPHIA is currently an **experimental architecture project**.
 
 Current stage:
 
-- core platform in service in the reference installation (local inference, model router, SSO, chat, office suite, bus and workflows, agents on the local model, observability); agents and memory in progress — see [Where the project stands](docs/pitch.en.md) and the [roadmap](docs/roadmap.en.md)
+- core platform in service in the reference installation (local inference, model router, SSO, chat, office suite, bus and workflows, agents on the local model, observability and alerts); the household's permanent chat and video calls installed, in acceptance testing; agents and memory in progress — see [Where the project stands](docs/pitch.en.md) and the [roadmap](docs/roadmap.en.md)
 - architectural documentation in progress
 - whitepaper under preparation
 - public repository structure being established

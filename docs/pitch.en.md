@@ -71,19 +71,24 @@ SophIA is an experimental architecture under construction. We separate what work
 - Single-node Kubernetes (OKD) cluster on a physical server, VPN-only access, single sign-on (SSO) for every interface.
 - Local inference on the server's GPU (text and vision), voice and images on CPU, without network access; local model by default for the interface and modules.
 - Unified model router: local and remote behind the same aliases.
-- Chat interface in its own namespace, connected to the router and to local tools (geography, images, the person's files), with no key in the browser; model enforced by the server per role, one router key per use.
+- Chat interface in its own namespace, connected to the router and to local tools (geography, images, the person's files), with no key in the browser and no external dependency (fonts and libraries embedded); model enforced by the server per role, one router key per use; visual themes to choose.
 - Office suite (files and online editing); the chat finds, opens and reads the person's documents under their identity, the content going to the local model only.
 - Shared relational database on PostgreSQL 18, on a dedicated volume.
 - Isolated web acquisition through the airlock, first brick of the Paranoid Airlock.
 - Delegation dispatcher, durable workflows and event bus; first executor agent (development) in acceptance testing.
-- Self-hosted Git forge, source of truth for code and project memory; isolated development environments.
+- Self-hosted Git forge, source of truth for code and project memory; isolated development environments, without privilege on the node.
 - Vector database with its schema on its dedicated volume, embedding service, S3 object storage with a trash.
 - Pantheon agents on the local model, with priority to chat on the graphics card; one router key per agent, master key confined to the router.
-- Minimal observability: service metrics, alert rules, graphics card, VPN filter safeguard; CPU priorities without preemption and per-namespace quotas; measured state of each component and repository mirror check.
+- Minimal observability: service metrics, alert rules, graphics card, VPN filter safeguard; CPU priorities without preemption and per-namespace quotas; measured state of each component and hourly repository mirror check; filtered alerts sent to the administrator outside the platform.
+
+**Installed, in acceptance testing**
+
+- The household's permanent chat (Matrix) and video calls (Jitsi Meet), each in its own namespace, restricted to household accounts, video media reachable through the VPN only.
 
 **In progress**
 
 - The interface as a requester of the dispatcher.
+- Development clusters: one ephemeral virtual cluster per project (decided, to be built).
 - Memory service (designed), ingestion pipeline and graph dimension.
 - Scheduled backups, vulnerability watch, compliance (GDPR, AI Act, ISO 27001).
 
