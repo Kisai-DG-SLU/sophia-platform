@@ -18,6 +18,14 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: "${AGENT_NAMESPACE}" }
       ports:
         - { protocol: TCP, port: 8443 }
+    # Webhook /v1/alertes depuis l'Alertmanager des charges utilisateur (jeton exigé).
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-user-workload-monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: alertmanager }
+      ports:
+        - { protocol: TCP, port: 8443 }
 ---
 # RabbitMQ : le répartiteur publie sur sophia.events
 apiVersion: networking.k8s.io/v1

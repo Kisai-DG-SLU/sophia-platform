@@ -1,7 +1,7 @@
 # Réglages de la surveillance des charges utilisateur. À appliquer APRÈS 00-cluster-monitoring-config.yaml,
 # une fois le namespace openshift-user-workload-monitoring créé par l'opérateur.
 # - Alertmanager propre aux charges utilisateur, avec AlertmanagerConfig par namespace
-#   (30-alertmanager-config.yaml : prêt, non activé) ;
+#   (30- et 31-alertmanager-config…yaml : webhook vers le répartiteur) et le jeton du bot des alertes ;
 # - rétention de 15 jours ; ressources bornées (le CPU est la ressource rare du nœud, pas la mémoire).
 apiVersion: v1
 kind: ConfigMap
@@ -22,6 +22,10 @@ data:
     alertmanager:
       enabled: true
       enableAlertmanagerConfig: true
+      # Jeton du bot des alertes (/etc/alertmanager/secrets/alertes-telegram/) ; le Secret doit exister
+      # AVANT l'apply.
+      secrets:
+        - alertes-telegram
       resources:
         requests: { cpu: 10m, memory: 64Mi }
         limits: { cpu: 200m, memory: 256Mi }

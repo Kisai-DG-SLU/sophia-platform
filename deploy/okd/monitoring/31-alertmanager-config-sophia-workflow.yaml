@@ -1,0 +1,32 @@
+# Alertes « audience: admin » de sophia-workflow (contrôle des miroirs des dépôts, module Visualisation)
+# vers le récepteur du répartiteur, sur le modèle de 30-alertmanager-config.yaml. Secret repartiteur-alertes
+# copié par un tube depuis celui de sophia-core. La notification de l'administrateur part de la route
+# générale (alertes-telegram-ajout.py).
+apiVersion: monitoring.coreos.com/v1beta1
+kind: AlertmanagerConfig
+metadata:
+  name: admin-vers-repartiteur
+  namespace: sophia-workflow
+spec:
+  route:
+    receiver: repartiteur
+    matchers:
+      - { name: audience, value: admin, matchType: "=" }
+    groupBy: [alertname]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+  receivers:
+    - name: repartiteur
+      webhookConfigs:
+        - url: https://repartiteur.sophia-core.svc:8443/v1/alertes
+          sendResolved: true
+          maxAlerts: 64
+          httpConfig:
+            authorization:
+              type: Bearer
+              credentials: { name: repartiteur-alertes, key: jeton }
+            tlsConfig:
+              ca:
+                configMap: { name: openshift-service-ca.crt, key: service-ca.crt }
+              serverName: repartiteur.sophia-core.svc

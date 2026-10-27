@@ -52,6 +52,10 @@ spec:
             # Exemple, avec le premier exécutant :
             # - name: CLE_HEPHAISTOS
             #   valueFrom: { secretKeyRef: { name: repartiteur-cle-hephaistos, key: cle } }
+            # Jeton partagé avec l'Alertmanager des charges utilisateur ; sans lui, /v1/alertes répond 404
+            # (Secret créé avant l'apply : ../../monitoring/README.md).
+            - name: ALERTES_JETON
+              valueFrom: { secretKeyRef: { name: repartiteur-alertes, key: jeton } }
           resources:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { cpu: 500m, memory: 512Mi }
