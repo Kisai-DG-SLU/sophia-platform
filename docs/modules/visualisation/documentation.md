@@ -17,8 +17,8 @@ Prévu : un volet **conformité** (RGPD, AI Act, ISO 27001 visée « certifiable
 | **Rien n'est supposé déployé sans avoir été mesuré** | l'état d'un composant vient de ses sondes : pods prêts, raison d'attente (`CrashLoopBackOff`, `ImagePullBackOff`), réplicas, `EndpointSlice` non vides, alertes en cours ; une source muette ou un refus donne « non mesuré », **jamais** « ok » ; un composant sans sonde reste « théorique » |
 | **Lecture seule** | un compte de service qui lit les pods et la métrologie, **pas les Secrets** ; un compte du bus en lecture, qui refuse tout message dont l'émetteur n'est pas le répartiteur ; un jeton de la forge de portée « lecture des dépôts » seulement |
 | **Une page ouverte ne coûte rien** | la collecte tourne en fond toutes les 30 secondes ; la page ne lit que le dernier résultat |
-| **Une alerte n'est pas un bruit** | l'alerte des miroirs part après **deux** contrôles en échec de suite (deux poussées simultanées se gênent puis se résorbent), et **tout de suite** pour un miroir sur un dépôt interdit ; elle ne va qu'à l'administrateur |
-| **Isolé des agents** | un namespace propre, sans aucune liaison de rôle vers un agent : un agent administrateur du namespace des applications aurait pu forger une session ou se servir du compte de lecture |
+| **Une alerte n'est pas un bruit** | l'alerte des miroirs part après **deux** contrôles en échec de suite (deux poussées simultanées se gênent puis se résorbent), et **tout de suite** pour un miroir sur un dépôt interdit ; elle ne va qu'à l'administrateur, par la route Telegram générale de la métrologie (avertissements et alertes critiques, un message à l'ouverture, un autre à la résolution) |
+| **Isolé des agents** | un namespace propre, sans aucune liaison de rôle vers un agent : un agent administrateur du namespace des applications aurait pu forger une session ou se servir du compte de lecture ; la dernière liaison de lecture dans ce namespace est supprimée, et la sonde de l'interface de discussion lit son namespace propre |
 
 ## Architecture
 
@@ -30,7 +30,7 @@ navigateur ─VPN─→ routeur ─→ [ oauth2-proxy │ application + collecte
                                                 └─ forge (miroirs, jeton en lecture)
 ```
 
-- Un seul conteneur sert la page et l'API (Starlette et uvicorn), derrière oauth2-proxy et le SSO, groupe d'administration.
+- Un seul conteneur sert la page et l'API (Starlette et uvicorn), derrière oauth2-proxy et le SSO, groupe d'administration ; la confiance d'oauth2-proxy dans les en-têtes `X-Forwarded-*`, limitée au routeur, est en cours de généralisation.
 - Namespace avec quota, valeurs par défaut et entrée fermée ; sortie limitée aux sources lues.
 - Build depuis la forge interne par une **clé de déploiement en lecture seule** sur le seul dépôt, jamais par le jeton d'un administrateur de la forge.
 - Métriques du contrôle des miroirs exposées pour la métrologie, avec une règle d'alerte du namespace.
@@ -40,3 +40,4 @@ navigateur ─VPN─→ routeur ─→ [ oauth2-proxy │ application + collecte
 - **RabbitMQ 4.4** nomme les files créées par le serveur `amq_<32 hexadécimaux>`, et non plus `amq.gen-*` : les droits du compte de lecture doivent suivre, sinon sa file d'écoute est refusée.
 - **Forgejo** ne liste les miroirs d'un dépôt qu'à un administrateur, et ne montre que les dépôts visibles du compte : le compte du contrôle est administrateur du site, mais sa puissance est bornée par son jeton (« lecture des dépôts » seulement), sans mot de passe connu ni clé SSH.
 - Plusieurs miroirs vers la même adresse (créations répétées) se gênent et poussent chaque commit plusieurs fois : la règle « un seul miroir » en est née.
+- **Un miroir en poussée écrase l'hébergeur externe** : une branche modifiée directement chez l'hébergeur a été remplacée par celle de la forge à la synchronisation suivante (tout a été récupéré). Règles retenues : on ne travaille que dans la forge ; chez l'hébergeur, la branche par défaut des dépôts publics est protégée contre la poussée forcée et la suppression (celle des dépôts privés ne peut pas l'être sans offre payante). Un contrôle de divergence entre la forge et l'hébergeur est proposé, pas construit.

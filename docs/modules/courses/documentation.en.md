@@ -26,7 +26,7 @@ fallback page ──────┘    │ LiteLLM (sophia-local, strict JSON)
 
 | Item | Choice |
 |---|---|
-| Service | Python application and **oauth2-proxy** (SSO, group for adults); internal MCP server; a port reserved for readings, open to the browser pod only; a 13-table schema (products, mappings, lists, lines, price readings…) |
+| Service | Python application and **oauth2-proxy** (SSO, group for adults); internal MCP server, reached only by the Cooking module and by the interface from its own namespace; a port reserved for readings, open to the browser pod only; a 13-table schema (products, mappings, lists, lines, price readings…) |
 | Remote browser | in the **airlock** (`sophia-dmz`): Chromium + Xvfb + noVNC, non-root, no service account token, behind SSO and VPN |
 | Browser policies | domain allow-list (the store, its anti-bot service, the service); password, card and address managers **disabled** |
 | Extension | Manifest V3, **no stealth**: it reads data the page has already received, keeping a closed list of fields only, and fills the basket through the site's normal call |

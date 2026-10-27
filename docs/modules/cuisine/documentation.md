@@ -11,6 +11,7 @@
 - **Courses** agrégées par rayon, coches partagées entre les membres du foyer, historique annulable ; un onglet transmet la liste validée au [module Courses](../courses/README.md), qui remplit le panier d'un drive.
 - **Import** d'une recette depuis un lien ou un texte collé : le modèle la met en fiche, des règles la contrôlent, le foyer relit un aperçu avant l'enregistrement.
 - **Photo du plat** générée localement par l'outil MCP `image` de la plateforme.
+- **Recettes favorites** du foyer (en service, en recette) : une étoile sur la fiche, une recherche dans les seules favorites (titre et ingrédients) et leur ajout direct au planning. La recherche du catalogue ignore les accents, la casse et le pluriel, et porte sur le début des mots.
 - **Dans la discussion** : « on mange quoi ce soir ? » est répondu par l'assistant, à partir du planning. Le service annonce toujours le créneau retenu (`_trace`) ; si tous les repas demandés sont vides, c'est lui qui écrit la réponse (`_fin` : « Rien de prévu… Tu veux que je te propose un plat ? »), affichée telle quelle : le modèle ne peut plus inventer un repas « prévu ». Une fête secrète cachée à un enfant donne la réponse du créneau vide, sans un mot sur la fête. Depuis la discussion, les adultes ouvrent aussi l'application sur le planning de la semaine ou sur l'onglet des courses.
 
 - **Table des ingrédients** (en recette) : calories, saison et prix de chaque ingrédient, pour **calculer** le coût, les calories et les mois de saison des recettes au lieu de les estimer (voir ci-dessous).
@@ -40,7 +41,7 @@ module Courses ─────────MCP (écriture limitée)─→ applica
 | Variabilité | calculée sur des champs d'identité de la recette (cuisson, ingrédient principal, accompagnements), sans base vectorielle |
 | Accès | deux groupes du realm : accès complet, comptes protégés (lecture seule, jamais de génération de photo) |
 | Délais | 300 s au proxy et à la Route : le modèle local met plusieurs dizaines de secondes |
-| Réseau | liste fermée : entrée du routeur vers le proxy, de l'interface vers le MCP de lecture, du module Courses vers le MCP d'écriture ; sortie vers le routeur de modèles, le fournisseur d'identité, PostgreSQL, l'outil `image`, le sas web, le module Courses, le DNS |
+| Réseau | liste fermée : entrée du routeur vers le proxy, de l'interface (depuis son seul namespace) vers le MCP de lecture, du module Courses vers le MCP d'écriture ; sortie vers le routeur de modèles, le fournisseur d'identité, PostgreSQL, l'outil `image`, le sas web, le module Courses, le DNS |
 | Build | BuildConfig Docker depuis la forge interne, déclencheur d'image sur le Deployment ; un CronJob à droits minimaux lance un build par nouveau commit |
 
 ### Serveurs MCP exposés

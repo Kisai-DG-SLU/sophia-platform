@@ -91,6 +91,11 @@ spec:
             - --http-address=0.0.0.0:4180
             - --upstream=http://127.0.0.1:8080/
             - --reverse-proxy=true
+            # Seul appelant admis à fournir X-Forwarded-* : le routeur d'OKD, en hostNetwork, qui joint le pod
+            # depuis l'interface de gestion du réseau des pods du nœud (adresse relevée dans le journal
+            # d'oauth2-proxy). Limite : tout processus en hostNetwork du nœud partage cette adresse.
+            # /ping n'en dépend pas.
+            - --trusted-proxy-ip=ROUTER_POD_SIDE_IP/32
             - --provider=keycloak-oidc
             - --client-id=sophia-interface
             - --client-secret-file=/etc/oauth2/client-secret
@@ -222,7 +227,7 @@ spec:
 ---
 # Entrée : seul le routeur OpenShift, vers oauth2-proxy (nginx :8080 n'est joignable
 # que depuis le pod lui-même). Sortie : LiteLLM, Keycloak, PostgreSQL, Forgejo, le sas web,
-# les serveurs MCP de sophia-skills et des modules, l'école (index des contenus) et le DNS du cluster.
+# les serveurs MCP de sophia-skills et des modules, l'école (index des contenus et catalogue des avatars, lus par l'API) et le DNS du cluster.
 # Ne vise que les pods de l'interface (les pods de build ont leurs propres règles de namespace).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
