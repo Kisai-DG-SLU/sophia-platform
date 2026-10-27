@@ -76,7 +76,7 @@ Five confidentiality levels, from most open to most restricted: `public` > `fami
 
 | Block | What it does | Status |
 |---|---|---|
-| **Conversation** | multi-model web interface, with displayed cost and history; no key in the browser; mandatory sign-in, profile and context adapted to each person (current date and time included) | operational, in its own namespace; new-version notice; visual themes to choose (light and dark) and calendar themes offered on the day, fonts and libraries embedded, no CDN; the person's files found, opened and read (local model only) from the chat |
+| **Conversation** | multi-model web interface, with displayed cost and history; no key in the browser; mandatory sign-in, profile and context adapted to each person (current date and time included) | operational, in its own namespace; new-version notice; visual themes to choose (light and dark) and calendar themes (holidays on the day, seasons, birthday), fonts and libraries embedded, no CDN; the person's files found, opened and read (local model only) from the chat |
 | **Search** | memory first; the web through the airlock when information is missing, sources ranked by reliability and cited; forecast data for weather; consent before storing | in progress: web search operational, memory to be built |
 | **Arbiter** | a high-end external model, queried by the agents through the message queue, **after anonymization** by the leak filter | planned |
 | **On-demand tool development** | a need expressed in conversation becomes a project; one agent codes and tests it in the sandbox; another deploys it after human approval | in progress: development environments driven by agents |

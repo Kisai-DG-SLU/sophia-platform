@@ -30,7 +30,7 @@ browser ─VPN─→ router ─→ [ oauth2-proxy │ application + collector ] 
                                           └─ forge (mirrors, read token)
 ```
 
-- A single container serves the page and the API (Starlette and uvicorn), behind oauth2-proxy and SSO, administration group; oauth2-proxy's trust in `X-Forwarded-*` headers, limited to the router, is being extended.
+- A single container serves the page and the API (Starlette and uvicorn), behind oauth2-proxy and SSO, administration group; oauth2-proxy's trust in `X-Forwarded-*` headers, is limited to the router.
 - Namespace with quota, defaults and closed ingress; egress limited to the sources it reads.
 - Built from the internal forge with a **read-only deploy key** on that repository alone, never with a forge administrator's token.
 - Mirror-check metrics exposed to monitoring, with an alert rule in the namespace.
