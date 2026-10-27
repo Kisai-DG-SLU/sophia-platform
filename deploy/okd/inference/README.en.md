@@ -64,7 +64,7 @@ The code is not provided; its contract (OpenAI API, routed by the model router):
 | `POST /v1/audio/speech` | text → WAV; voices on an allow-list, unknown → default voice |
 | `GET /v1/voices`, `GET /health` | available voices, status |
 
-Rules: **numbers, times, dates and operations written out in words before synthesis** (the model cannot read digits); Markdown, links, emojis and tool notices removed; audio ≤ 10 MB and ≤ 120 s, text ≤ 2,000 characters; one job at a time per model. In the interface, the dictated sentence is sent, and the reply is read aloud sentence by sentence.
+Rules: **numbers, times, dates and operations written out in words before synthesis** (the model cannot read digits; in French, "+" is written "plusse" so that the final "s" is pronounced); Markdown, links, emojis and tool notices removed; audio ≤ 10 MB and ≤ 120 s, text ≤ 2,000 characters; one job at a time per model. In the interface, the dictated sentence is sent, and the reply is read aloud sentence by sentence.
 
 Voices: the model's catalogue, or a voice converted from a freely licensed recording (`export-voices.sh`, on the node, with the model's "cloning" variant). Never a person's voice without their consent.
 
