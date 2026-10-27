@@ -105,7 +105,7 @@ SophIA est actuellement un projet d'architecture experimentale.
 
 Etape actuelle :
 
-- plateforme centrale en service dans l'installation de reference (inference locale, routeur de modeles, SSO, discussion, bureautique, bus et workflows, agents sur le modele local, observabilite) ; agents et memoire en cours — voir [Où en est le projet](docs/pitch.md) et la [feuille de route](docs/roadmap.md)
+- plateforme centrale en service dans l'installation de reference (inference locale, routeur de modeles, SSO, discussion, bureautique, bus et workflows, agents sur le modele local, observabilite et alertes) ; chat permanent et visio du foyer installes, en recette ; agents et memoire en cours — voir [Où en est le projet](docs/pitch.md) et la [feuille de route](docs/roadmap.md)
 - documentation architecturale en cours
 - livre blanc en preparation
 - structure du depot public en cours d'etablissement

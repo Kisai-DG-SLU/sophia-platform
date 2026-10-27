@@ -118,12 +118,14 @@ Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 | Namespace | Role |
 |---|---|
 | agents namespace | pantheon pods, one service account and one UID per pod |
-| sophia-sandbox | development environments, child clusters per project |
+| sophia-sandbox | development environments, without privilege on the node; planned: one ephemeral virtual cluster per project |
 | sophia-test | CI/CD validation |
 | sophia-apps | modules |
 | sophia-interface | the chat interface, out of the deployment agent's reach |
 | sophia-workflow | the visualisation tool, same reason |
 | sophia-workspace | the office suite: files and online editing |
+| sophia-messagerie | the household's permanent chat (Matrix), installed, in acceptance testing |
+| sophia-visio | video conferencing (Jitsi Meet), installed, in acceptance testing |
 | build namespaces | building sensitive tools, with no agent account |
 | prod-* | tenant workloads |
 
@@ -159,4 +161,4 @@ These mechanisms work with any model, from the smallest (a few billion parameter
 
 # Status
 
-The architecture is experimental. Infrastructure, model routing, local inference (agents included), identity, the dispatcher and its workflows, metrics and alerts, CPU priorities and object storage are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).
+The architecture is experimental. Infrastructure, model routing, local inference (agents included), identity, the dispatcher and its workflows, metrics and alerts (filtered, sent to the administrator outside the platform), CPU priorities and object storage are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).
