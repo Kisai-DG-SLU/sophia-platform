@@ -64,7 +64,7 @@ Le code n'est pas fourni ; son contrat (API OpenAI, routée par le routeur de mo
 | `POST /v1/audio/speech` | texte → WAV ; voix sur liste blanche, inconnue → voix par défaut |
 | `GET /v1/voices`, `GET /health` | voix disponibles, état |
 
-Règles : **nombres, heures, dates et opérations écrits en lettres avant la synthèse** (le modèle ne lit pas les chiffres) ; Markdown, liens, emojis et annonces d'outils retirés ; audio ≤ 10 Mo et ≤ 120 s, texte ≤ 2 000 caractères ; un traitement à la fois par modèle. Côté interface : la phrase dictée est envoyée, et la réponse est lue à voix haute, phrase par phrase.
+Règles : **nombres, heures, dates et opérations écrits en lettres avant la synthèse** (le modèle ne lit pas les chiffres ; « + » s'écrit « plusse », pour que le « s » final soit prononcé) ; Markdown, liens, emojis et annonces d'outils retirés ; audio ≤ 10 Mo et ≤ 120 s, texte ≤ 2 000 caractères ; un traitement à la fois par modèle. Côté interface : la phrase dictée est envoyée, et la réponse est lue à voix haute, phrase par phrase.
 
 Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistrement sous licence libre (`export-voices.sh`, sur le nœud, avec la version « clonage » du modèle). Jamais la voix d'une personne sans son accord.
 
