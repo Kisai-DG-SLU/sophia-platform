@@ -41,4 +41,14 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 - **A list provided in the import replaces the realm defaults.** Declaring `clientScopes` to add one scope removes `profile`, `email`, `basic`… and sign-in fails with `invalid_scope`. Add, do not redefine: the group mapper is carried by the client.
 - **The import only applies when the realm is created.** To replay a fixed import: delete the realm, delete the `KeycloakRealmImport` resource, apply again. On an existing realm, a client added to the file is imported on its own from the console (*Clients → Import client*); the file remains the reference for a fresh install.
 
-Client applications: [chat interface](../apps/chat-interface/README.en.md), [RabbitMQ](../core/rabbitmq/README.en.md), [Temporal](../core/temporal/README.en.md). Keycloak accepts Temporal's pods from `sophia-core` (signing keys, service account tokens): `02-network.yaml`.
+## Reserving an application to some groups: persistent chat and video calls
+
+The `matrix` (Matrix authentication service) and `jitsi` (video adapter) clients of the [Communication module](../../../docs/modules/communication/documentation.en.md), installed and in acceptance testing, are **confidential**, using the standard flow with **PKCE S256**, with the `groups` mapper. Neither MAS nor Jitsi can filter by group: refusal happens in Keycloak, before the application sees the person.
+
+1. **Client role** `acces` on each client, given to the admitted groups (the household, without guests).
+2. **Client-specific access flow** (`acces-matrix`, `acces-jitsi`): a **copy of the realm's actual browser flow**, with all its steps (including Keycloak's conditional second factor), to which a conditional sub-step "Condition - user role" on that role is added, **negated**, followed by "Deny access". The flow is bound to the client (*Authentication flow overrides*); the realm's browser flow stays unchanged.
+3. **Test** with an admitted account **and** a guest account: the second must be refused by Keycloak.
+
+Pitfall: the condition's negation is set through its `negate` configuration key; a wrongly negated condition refuses everyone, or no one. Only the test with both accounts shows it.
+
+Client applications: [chat interface](../apps/chat-interface/README.en.md), [RabbitMQ](../core/rabbitmq/README.en.md), [Temporal](../core/temporal/README.en.md), [office suite, persistent chat and video calls](../office/README.en.md). Keycloak accepts Temporal's pods from `sophia-core` (signing keys, service account tokens): `02-network.yaml`.

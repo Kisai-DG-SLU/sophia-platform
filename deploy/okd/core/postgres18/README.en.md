@@ -1,6 +1,6 @@
 # PostgreSQL 18 — shared instance (`sophia-core`)
 
-Every database of the platform lives in **one PostgreSQL 18 instance**: model router, workflow engine, identity provider, chat interface, modules, the office suite's file management, the memory schema. It replaced a PostgreSQL 15 instance, migrated database by database.
+Every database of the platform lives in **one PostgreSQL 18 instance**: model router, workflow engine, identity provider, chat interface, modules, the office suite's file management, the persistent chat, the memory schema. It replaced a PostgreSQL 15 instance, migrated database by database.
 
 **Why 18**: the office suite's file management stores its items in an `ltree` path whose labels contain hyphens, which PostgreSQL only accepts from version 16; on 15, creating a folder failed (error 500), although the migrations passed. Rather than keep a version debt, every database moved to the latest stable version.
 
@@ -71,6 +71,17 @@ For each database, one at a time:
 
 - The old instance goes to **0 replicas**, with a full final backup; it stays in place for **7 days** as a fallback.
 - Then the administrator deletes: the old instance's Deployment, Service, PVC, PV, Secret and network rules, the node directory, the applications' egress rules to the old instance, intermediate backups. The final backup is kept 30 more days.
+
+### Adding a database: persistent chat (Matrix)
+
+The [Communication module](../../../../docs/modules/communication/documentation.en.md) (installed, in acceptance testing) has two databases, each with its owner role and its Secret, created following the rule above (Secret first, then role):
+
+| Database | Specifics |
+|---|---|
+| `synapse` | **`C` collation** required by the Matrix server: `CREATE DATABASE synapse OWNER synapse TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' LOCALE_PROVIDER libc`; the instance's default template database is not in `C` |
+| `mas` | Matrix authentication service; no collation requirement |
+
+For each: `REVOKE CONNECT ON DATABASE … FROM PUBLIC`, so a role only connects to its own database; port 5432 ingress opened to the chat namespace only, following `03-network.yaml`. Check: each role connects to its database, and is refused the other one.
 
 ## Lessons
 

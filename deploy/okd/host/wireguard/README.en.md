@@ -15,6 +15,7 @@ No value from the reference installation is given here: pick your own.
 | `${VPN_PORT}` | UDP listening port, forwarded by the upstream router or firewall | — |
 | `${LAN_NETWORK}` | the node's local network, never routed into the VPN | — |
 | `${GIT_SSH_PORT}`, `${GIT_HTTP_PORT}` | Forgejo ports exposed on the externalIP | — |
+| `${JVB_UDP_PORT}` | UDP port of video call media, exposed on the same externalIP (section 6) | — |
 
 Any address outside `${VPN_ADMIN_RANGE}` is a **user** device: HTTP/HTTPS only.
 
@@ -141,7 +142,25 @@ This is the only administration path: a change to the safeguard is installed wit
 2. **Installation**, outside usage hours, with the administration session kept open: `bash -n`, old script set aside on the node, installation, then **one run identical to the timer's**, without reloading the filter or restarting `sophia-wg-filter.service`. Expected: `garde-fou=0`, `sophia_wg_filter_code 0` and a timestamp in the file, table present; on the timer's next run, the timestamp moves forward.
 3. **Rollback in one command**: reinstall the old script set aside and run it once.
 
+## 6. Video call media
+
+The video service of the [Communication module](../../../../docs/modules/communication/documentation.en.md) (installed, in acceptance testing) carries its media over **a single UDP port**, exposed like Forgejo through an externalIP on `${VPN_SERVER_IP}`, not through a NodePort: a NodePort would be reachable from the local network, and the bridge would only see OVN-Kubernetes' join address there. The service's recipe is in [`../../office/`](../../office/README.en.md#persistent-chat-and-video-calls).
+
+OVN-Kubernetes' DNAT happens before the filter: this traffic goes through the **`forward`** chain, not `input`. A single rule, open to **every** VPN device (users included), to place before the `counter drop` of `forward`:
+
+```
+ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept comment "video: media"
+```
+
+Add `$JVB_UDP_PORT` to `envsubst`'s explicit list, then load the filter as in section 3: `nft -c` check, **3-minute automatic switch**, which reloads the previous filter (or removes the table), safeguard at 0, new administration session, then stop the switch. The bridge's replies to devices go through `ct state established,related`.
+
+**Check**: during a call between two VPN devices, the rule's counter increases:
+
+```bash
+sudo nft list chain inet sophia_wg forward | grep video
+```
+
 ## Open points
 
 - Cleaner later: ship these files through a `MachineConfig`, like the rest of the node configuration. On a single node, applying a MachineConfig **reboots the node**: to be planned.
-- The safeguard alerts in the node journal and as a metric (section 5); relaying alerts to the dispatcher, then to the administrator, is planned with the "incident" workflow.
+- The safeguard alerts in the node journal and as a metric (section 5); its `warning` and `critical` alerts go to the administrator outside the platform, through the Alertmanager's general route ([`../../monitoring/`](../../monitoring/)); the "incident" workflow remains planned.

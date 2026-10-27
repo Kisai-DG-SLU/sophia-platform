@@ -8,6 +8,7 @@ Un **module** est une application du foyer ou de l'organisation, construite sur 
 | [Courses](courses/README.md) | choix des produits d'un drive selon les règles du foyer, remplissage du vrai panier, panier express depuis la discussion | SSO, modèle local, PostgreSQL, navigateur distant dans le sas, MCP |
 | [École](ecole/README.md) | école ludique du primaire au collège, indices sans la réponse, carnet de notes, lecture des devoirs photographiés | SSO et rôles, modèle local avec vision, interface de discussion, contenus par Git |
 | [Bureautique](bureautique/README.md) | fichiers de chacun, privés par défaut, édition des documents dans le navigateur, recherche et lecture depuis la discussion | SSO, PostgreSQL 18, S3 commun, outil MCP « fichiers » sous l'identité de la personne |
+| [Communication](communication/README.md) | chat permanent entre les membres du foyer et visio, à la maison seulement ; installé, en recette | SSO, PostgreSQL 18, volume local dédié, VPN pour le média de la visio |
 | [Visualisation](visualisation/README.md) | état mesuré de chaque composant et chemin d'une demande, contrôle horaire des miroirs des dépôts ; conformité prévue | SSO, API du cluster et métrologie en lecture, bus d'événements en lecture, forge |
 
 ## Le patron commun
@@ -19,7 +20,7 @@ Un **module** est une application du foyer ou de l'organisation, construite sur 
 | **L'identité vient de la plateforme, jamais du modèle** | en-tête posé par oauth2-proxy sur les pages ; paramètre injecté par l'interface (`sophia/injecte`) dans les outils MCP ; liste des membres autorisés vérifiée par le serveur |
 | **Comptes protégés** | les enfants lisent, ne déclenchent ni achat ni génération coûteuse ; leurs données ne partent jamais vers un modèle distant |
 | **Réseau en liste fermée** | chaque module n'ouvre que les flux dont il a besoin (entrée par le routeur et par l'interface, sortie vers le routeur de modèles, le fournisseur d'identité, sa base, les outils utilisés) ; l'accès à Internet passe par le sas |
-| **Un module = un pod, une base, un groupe** | pod avec son oauth2-proxy (ou servi derrière celui de l'interface, comme l'École), base et rôle propres dans le PostgreSQL partagé, groupe du realm ; build depuis la forge interne |
+| **Un module = un pod, une base, un groupe** | pod avec son oauth2-proxy sur sa propre adresse (une application servie sous l'origine de l'interface aurait tous les droits de la personne sur la discussion), base et rôle propres dans le PostgreSQL partagé, groupe du realm ; build depuis la forge interne |
 | **L'humain garde la main sur l'irréversible** | validation d'une liste, paiement, correction d'une dictée |
 
 Pour intégrer un module à la discussion : exposer un serveur MCP (voir le [contrat des outils](../../deploy/okd/skills/README.md)), l'ajouter à `SOPHIA_MCP_URLS` de l'[interface](../../deploy/okd/apps/chat-interface/README.md) et ouvrir le flux dans sa NetworkPolicy ; pour lui donner une base : un bloc dans [`allow-apps-to-postgres.yaml`](../../deploy/okd/core/postgres/allow-apps-to-postgres.yaml).

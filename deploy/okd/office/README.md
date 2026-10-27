@@ -1,8 +1,10 @@
-# Bureautique — Fichiers et Collabora (`sophia-workspace`)
+# Bureautique — Fichiers et Collabora (`sophia-workspace`) ; chat permanent et visio
 
 Recette de l'installation de référence pour le module [Bureautique](../../../docs/modules/bureautique/documentation.md) : La Suite Drive (« Fichiers », 0.25.3) et Collabora Online (CODE 26.04), dans un namespace dédié. Les choix et leurs raisons sont dans la documentation du module ; ici, les composants, les prérequis, les Secrets et la procédure. Les manifestes de l'installation de référence ne sont pas publiés : ils suivent les manifestes amont de Drive, avec les réglages ci-dessous, rendus par Kustomize.
 
 État : en service ; cette recette est une procédure, sans les manifestes de l'installation de référence ; essais détaillés (second compte, partages, lecture depuis la discussion) à faire.
+
+Le chat permanent et la visio du [module Communication](../../../docs/modules/communication/documentation.md), installés par le même projet dans deux autres namespaces, ont leur recette en fin de page : [Chat permanent et visio](#chat-permanent-et-visio).
 
 ## Composants
 
@@ -78,3 +80,75 @@ Côté outil et fournisseur d'identité : [`../skills/`](../skills/README.md) et
 ## Retour arrière
 
 `oc delete -k` et suppression des Jobs : les données restent (fichiers dans le seau versionné, schéma dans la base), les Secrets aussi. Un seul composant : `oc scale … --replicas=0`. Base, rôle et client OIDC : suppressions par l'administrateur, selon leurs recettes.
+
+## Chat permanent et visio
+
+Recette du [module Communication](../../../docs/modules/communication/documentation.md) : Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) dans `sophia-messagerie`, Jitsi Meet (`stable-11248-2` : web, Prosody, Jicofo, JVB) et un adaptateur OIDC → jeton dans `sophia-visio`. Comme pour la bureautique, c'est une procédure, sans les manifestes de l'installation de référence ; les choix et leurs raisons sont dans la documentation du module.
+
+État : **installé, en recette** ; essais avec les appareils du foyer à faire.
+
+### Composants
+
+| Namespace | Objet | Rôle |
+|---|---|---|
+| `sophia-messagerie` | `synapse` | serveur Matrix, fédération coupée, chiffrement de bout en bout coupé par défaut (`extra_well_known_client_content` → `io.element.e2ee: {default: false}`), médias de 50 Mo au plus sur le volume dédié |
+| | `mas` | service d'authentification Matrix, client OIDC du fournisseur d'identité ; les chemins de connexion, de déconnexion et de rafraîchissement de l'API Matrix lui sont routés sur le nom du serveur |
+| | `element` | client web, sans adresse externe dans sa configuration |
+| | `ntfy` | notifications UnifiedPush, sans texte ni expéditeur |
+| `sophia-visio` | `web`, `prosody`, `jicofo`, `jvb` | Jitsi Meet en authentification par jeton ; Jicofo sondé en `exec` (son API de santé n'écoute que sur `127.0.0.1`) |
+| | `adaptateur` | connexion OIDC, puis jeton signé de 600 s pour une seule salle ; image construite dans le cluster depuis la forge, figée par empreinte |
+| | `jvb-media` | Service `ClusterIP` avec `externalIPs: [${VPN_IP}]`, port `${JVB_UDP_PORT}/UDP` ; **pas de NodePort** |
+
+Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, pair-à-pair coupé, `JVB_ADVERTISE_PRIVATE_CANDIDATES=false`, `ENABLE_COLIBRI_WEBSOCKET=0` (canal de pont par SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` pour l'UID arbitraire, sans privilège ni `anyuid`.
+
+### Prérequis
+
+| # | Objet | Recette |
+|---|---|---|
+| 0 | **Socle** de chaque namespace, appliqué en premier : Namespace, `ResourceQuota`, `LimitRange`, EgressFirewall, `default-deny`, `allow-dns` ; aucune RoleBinding d'agent | ci-dessous |
+| 1 | Classe de la bureautique pour tous les pods, classe de la voix pour JVB | [`../cluster/`](../cluster/README.md) |
+| 2 | Bases `synapse` (collation `C`, depuis `template0`) et `mas`, un rôle propriétaire chacune ; entrée de PostgreSQL depuis `sophia-messagerie` | [`../core/postgres18/`](../core/postgres18/README.md) |
+| 3 | Clients OIDC `matrix` et `jitsi`, rôle de client d'accès, flux qui refuse le groupe des invités | [`../identity/`](../identity/README.md) |
+| 4 | Volume logique dédié aux médias de Synapse (10 Gio), PV `Retain` | [`../../stockage-persistant.md`](../../stockage-persistant.md) |
+| 5 | Règle UDP du pont média dans la table nftables du VPN | [`../host/wireguard/`](../host/wireguard/README.md#6-média-de-la-visio) |
+
+### Réseau
+
+- **Entrée** : depuis le routeur pour les pages et les API ; JVB depuis `${VPN_NETWORK}` seulement, en UDP sur `${JVB_UDP_PORT}`.
+- **Sortie** : Synapse vers MAS et ntfy ; MAS et l'adaptateur vers le nom public du fournisseur d'identité, en 443, par le routeur ; JVB en UDP vers `${VPN_NETWORK}` seulement (réponses aux appareils), dans sa NetworkPolicy **et** dans l'EgressFirewall du socle, avant la règle de refus.
+- Le pont média n'utilise pas de NodePort : un NodePort serait joignable depuis le réseau local, et le pod n'y verrait que l'adresse de jonction d'OVN-Kubernetes. L'`externalIP` sur l'adresse VPN, comme la forge, n'est joignable que par le VPN et garde l'adresse réelle du client.
+
+### Variables
+
+| Variable | Rôle | Exemple |
+|---|---|---|
+| `${MATRIX_HOST}` | nom du serveur Matrix (API et `.well-known`) | `matrix.apps.example.org` |
+| `${MAS_HOST}` | nom du service d'authentification | `account.apps.example.org` |
+| `${ELEMENT_HOST}` | nom du client web | `chat.apps.example.org` |
+| `${NTFY_HOST}` | nom du relais de notifications | `ntfy.apps.example.org` |
+| `${VISIO_HOST}` | nom de la visio (pages et adaptateur) | `meet.apps.example.org` |
+| `${VPN_IP}`, `${VPN_NETWORK}` | adresse du nœud sur le VPN, réseau du VPN ([`../host/wireguard/`](../host/wireguard/README.md)) | `192.0.2.1`, `192.0.2.0/24` |
+| `${JVB_UDP_PORT}` | port UDP du média | un port libre du nœud |
+
+### Secrets (contenu, jamais de valeur)
+
+| Secret | Contenu |
+|---|---|
+| `sophia-messagerie/synapse` | mot de passe de la base, secret partagé avec MAS, secrets internes de Synapse |
+| `sophia-messagerie/mas` | mot de passe de la base, secret du client OIDC, clés de chiffrement et de signature (une RSA, une EC), secret partagé avec Synapse |
+| `sophia-visio/adaptateur-visio` | secret du client OIDC, secret de signature des jetons de salle |
+| `sophia-visio/jitsi` | mots de passe internes des composants de Jitsi, secret de signature des jetons de salle (le même que l'adaptateur) |
+
+Chaque valeur est générée sur place et écrite par un tube, sans saut de ligne final ; le secret partagé entre Synapse et MAS est recopié de Secret à Secret. Contrôles : noms des clés, longueurs, et **égalité des deux copies par empreintes**, jamais par affichage. Synapse lit ses secrets par des chemins de fichiers et le mot de passe de sa base par `PGPASSWORD` (libpq ignore un fichier de mots de passe lisible par le groupe, ce que sont les Secrets montés) ; MAS lit chaque secret dans un fichier.
+
+### Procédure
+
+1. **Socles** (étape 0) : `oc diff`, `--dry-run=server`, `oc apply` ; contrôle champ à champ ; aucune RoleBinding hors de celles créées par OKD.
+2. **Prérequis 1 à 5** en place ; un point manque : s'arrêter.
+3. **Secrets**, dans un seul terminal (ci-dessus).
+4. **Chat** : `oc diff -k`, dry-run serveur, `oc apply -k`, attente des déploiements. Contrôles par le vrai chemin : `.well-known` avec `io.element.e2ee` à `false`, `versions` de l'API, flux de connexion servis par MAS, découverte OIDC de MAS, ntfy, Element. Connexion d'un compte admis (deux pages de MAS à la première fois), refus d'un invité, salon créé sans cadenas.
+5. **Visio** : build de l'adaptateur, puis `oc apply -k`. Contrôles : pods prêts ; JVB annonce l'adresse VPN et est joint par Jicofo ; `config.js` sans requête tierce, pair-à-pair coupé ; adaptateur en bonne santé ; essai à deux appareils au moins, invité refusé, **compteur de la règle nftables qui augmente**.
+
+### Retour arrière
+
+`oc delete -k` sur le chat ou la visio : la base, le volume des médias et les Secrets restent. Socles, bases, clients OIDC et règle nftables : suppressions par l'administrateur, selon leurs recettes.

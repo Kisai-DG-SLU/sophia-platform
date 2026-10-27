@@ -1,8 +1,10 @@
-# Office suite — Files and Collabora (`sophia-workspace`)
+# Office suite — Files and Collabora (`sophia-workspace`); persistent chat and video calls
 
 The reference installation's recipe for the [Office](../../../docs/modules/bureautique/documentation.en.md) module: La Suite Drive ("Files", 0.25.3) and Collabora Online (CODE 26.04), in a dedicated namespace. The choices and their reasons are in the module documentation; here, the components, prerequisites, Secrets and procedure. The reference installation's manifests are not published: they follow Drive's upstream manifests, with the settings below, rendered by Kustomize.
 
 Status: in service; this recipe is a procedure, without the reference installation's manifests; detailed acceptance testing (second account, shares, reading from the chat) still to do.
+
+The persistent chat and video calls of the [Communication module](../../../docs/modules/communication/documentation.en.md), installed by the same project in two other namespaces, have their recipe at the end of this page: [Persistent chat and video calls](#persistent-chat-and-video-calls).
 
 ## Components
 
@@ -78,3 +80,75 @@ Tool and identity-provider side: [`../skills/`](../skills/README.en.md) and [Ide
 ## Rollback
 
 `oc delete -k` and deleting the Jobs: the data stays (files in the versioned bucket, schema in the database), so do the Secrets. A single component: `oc scale … --replicas=0`. Database, role and OIDC client: deletions by the administrator, following their recipes.
+
+## Persistent chat and video calls
+
+Recipe of the [Communication module](../../../docs/modules/communication/documentation.en.md): Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) in `sophia-messagerie`, Jitsi Meet (`stable-11248-2`: web, Prosody, Jicofo, JVB) and an OIDC → token adapter in `sophia-visio`. As for the office suite, this is a procedure, without the reference installation's manifests; the choices and their reasons are in the module documentation.
+
+Status: **installed, in acceptance testing**; tests with the household's devices still to do.
+
+### Components
+
+| Namespace | Object | Role |
+|---|---|---|
+| `sophia-messagerie` | `synapse` | Matrix server, federation off, end-to-end encryption off by default (`extra_well_known_client_content` → `io.element.e2ee: {default: false}`), media of 50 MB at most on the dedicated volume |
+| | `mas` | Matrix authentication service, OIDC client of the identity provider; the Matrix API's login, logout and refresh paths are routed to it on the server's name |
+| | `element` | web client, with no external address in its configuration |
+| | `ntfy` | UnifiedPush notifications, without text or sender |
+| `sophia-visio` | `web`, `prosody`, `jicofo`, `jvb` | Jitsi Meet with token authentication; Jicofo probed through `exec` (its health API only listens on `127.0.0.1`) |
+| | `adaptateur` | OIDC sign-in, then a signed 600 s token for a single room; image built in the cluster from the forge, pinned by digest |
+| | `jvb-media` | `ClusterIP` Service with `externalIPs: [${VPN_IP}]`, port `${JVB_UDP_PORT}/UDP`; **no NodePort** |
+
+Jitsi settings to remember: `ENABLE_THIRD_PARTY_REQUESTS=false`, peer-to-peer off, `JVB_ADVERTISE_PRIVATE_CANDIDATES=false`, `ENABLE_COLIBRI_WEBSOCKET=0` (bridge channel over SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` for the arbitrary UID, with neither privilege nor `anyuid`.
+
+### Prerequisites
+
+| # | Object | Recipe |
+|---|---|---|
+| 0 | **Base** of each namespace, applied first: Namespace, `ResourceQuota`, `LimitRange`, EgressFirewall, `default-deny`, `allow-dns`; no agent RoleBinding | below |
+| 1 | The office suite's class for every pod, the voice class for JVB | [`../cluster/`](../cluster/README.en.md) |
+| 2 | `synapse` (`C` collation, from `template0`) and `mas` databases, one owner role each; PostgreSQL ingress from `sophia-messagerie` | [`../core/postgres18/`](../core/postgres18/README.en.md) |
+| 3 | `matrix` and `jitsi` OIDC clients, access client role, flow refusing the guests group | [`../identity/`](../identity/README.en.md) |
+| 4 | Dedicated logical volume for Synapse media (10 GiB), `Retain` PV | [`../../stockage-persistant.en.md`](../../stockage-persistant.en.md) |
+| 5 | UDP rule for the media bridge in the VPN's nftables table | [`../host/wireguard/`](../host/wireguard/README.en.md#6-video-call-media) |
+
+### Network
+
+- **Ingress**: from the router for pages and APIs; JVB from `${VPN_NETWORK}` only, over UDP on `${JVB_UDP_PORT}`.
+- **Egress**: Synapse to MAS and ntfy; MAS and the adapter to the identity provider's public name, on 443, through the router; JVB over UDP to `${VPN_NETWORK}` only (replies to devices), in its NetworkPolicy **and** in the base's EgressFirewall, before the deny rule.
+- The media bridge uses no NodePort: a NodePort would be reachable from the local network, and the pod would only see OVN-Kubernetes' join address there. The `externalIP` on the VPN address, like the forge, is reachable through the VPN only and keeps the client's real address.
+
+### Variables
+
+| Variable | Role | Example |
+|---|---|---|
+| `${MATRIX_HOST}` | Matrix server name (API and `.well-known`) | `matrix.apps.example.org` |
+| `${MAS_HOST}` | authentication service name | `account.apps.example.org` |
+| `${ELEMENT_HOST}` | web client name | `chat.apps.example.org` |
+| `${NTFY_HOST}` | notification relay name | `ntfy.apps.example.org` |
+| `${VISIO_HOST}` | video service name (pages and adapter) | `meet.apps.example.org` |
+| `${VPN_IP}`, `${VPN_NETWORK}` | the node's VPN address, VPN network ([`../host/wireguard/`](../host/wireguard/README.en.md)) | `192.0.2.1`, `192.0.2.0/24` |
+| `${JVB_UDP_PORT}` | media UDP port | a free port of the node |
+
+### Secrets (content, never a value)
+
+| Secret | Content |
+|---|---|
+| `sophia-messagerie/synapse` | database password, secret shared with MAS, Synapse's internal secrets |
+| `sophia-messagerie/mas` | database password, OIDC client secret, encryption and signing keys (one RSA, one EC), secret shared with Synapse |
+| `sophia-visio/adaptateur-visio` | OIDC client secret, room token signing secret |
+| `sophia-visio/jitsi` | internal passwords of Jitsi's components, room token signing secret (the same as the adapter's) |
+
+Each value is generated on the spot and written through a pipe, without a trailing newline; the secret shared between Synapse and MAS is copied from Secret to Secret. Checks: key names, lengths, and **equality of both copies by digest**, never by display. Synapse reads its secrets through file paths and its database password through `PGPASSWORD` (libpq ignores a password file readable by the group, which mounted Secrets are); MAS reads each secret from a file.
+
+### Procedure
+
+1. **Bases** (step 0): `oc diff`, `--dry-run=server`, `oc apply`; field-by-field check; no RoleBinding beyond those created by OKD.
+2. **Prerequisites 1 to 5** in place; if one is missing: stop.
+3. **Secrets**, in a single terminal (above).
+4. **Chat**: `oc diff -k`, server dry-run, `oc apply -k`, wait for the rollouts. Checks through the real path: `.well-known` with `io.element.e2ee` set to `false`, the API's `versions`, sign-in flows served by MAS, MAS OIDC discovery, ntfy, Element. Sign-in of an admitted account (two MAS pages the first time), refusal of a guest, room created without a padlock.
+5. **Video**: build the adapter, then `oc apply -k`. Checks: pods ready; JVB advertises the VPN address and is joined by Jicofo; `config.js` without third-party requests, peer-to-peer off; adapter healthy; a test with at least two devices, guest refused, **the nftables rule's counter increasing**.
+
+### Rollback
+
+`oc delete -k` on the chat or the video service: the database, the media volume and the Secrets remain. Bases, databases, OIDC clients and the nftables rule: removed by the administrator, according to their recipes.

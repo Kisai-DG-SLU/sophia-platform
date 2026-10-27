@@ -15,6 +15,7 @@ Aucune valeur de l'installation de référence n'est donnée ici : choisissez le
 | `${VPN_PORT}` | port UDP d'écoute, redirigé par la box ou le pare-feu en amont | — |
 | `${LAN_NETWORK}` | réseau local du nœud, à ne jamais router dans le VPN | — |
 | `${GIT_SSH_PORT}`, `${GIT_HTTP_PORT}` | ports de Forgejo exposés sur l'externalIP | — |
+| `${JVB_UDP_PORT}` | port UDP du média de la visio, exposé sur la même externalIP (section 6) | — |
 
 Toute adresse hors de `${VPN_ADMIN_RANGE}` est un appareil **utilisateur** : HTTP/HTTPS seulement.
 
@@ -141,7 +142,25 @@ C'est le seul chemin d'administration : un changement du garde-fou s'installe av
 2. **Installation**, hors de l'heure d'usage, la session d'administration restant ouverte : `bash -n`, ancien script mis de côté sur le nœud, installation, puis **un passage identique à celui de la minuterie**, sans recharger le filtre ni redémarrer `sophia-wg-filter.service`. Attendu : `garde-fou=0`, `sophia_wg_filter_code 0` et un horodatage dans le fichier, table présente ; au passage suivant de la minuterie, l'horodatage avance.
 3. **Retour arrière en une commande** : réinstaller l'ancien script mis de côté et le lancer une fois.
 
+## 6. Média de la visio
+
+La visio du [module Communication](../../../../docs/modules/communication/documentation.md) (installée, en recette) fait passer son média par **un seul port UDP**, exposé comme Forgejo par une externalIP sur `${VPN_SERVER_IP}`, et non par un NodePort : un NodePort serait joignable depuis le réseau local, et le pont n'y verrait que l'adresse de jonction d'OVN-Kubernetes. La recette du service est dans [`../../office/`](../../office/README.md#chat-permanent-et-visio).
+
+Le DNAT d'OVN-Kubernetes a lieu avant le filtre : ce trafic passe par la chaîne **`forward`**, pas `input`. Une seule règle, ouverte à **tous** les appareils du VPN (utilisateurs compris), à placer avant le `counter drop` de `forward` :
+
+```
+ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept comment "visio : média"
+```
+
+Ajouter `$JVB_UDP_PORT` à la liste explicite d'`envsubst`, puis charger le filtre comme à la section 3 : contrôle `nft -c`, **interrupteur automatique de 3 minutes**, qui recharge l'ancien filtre (ou retire la table), garde-fou à 0, nouvelle session d'administration, puis arrêt de l'interrupteur. Les réponses du pont vers les appareils passent par `ct state established,related`.
+
+**Vérification** : pendant une visio entre deux appareils du VPN, le compteur de la règle augmente :
+
+```bash
+sudo nft list chain inet sophia_wg forward | grep visio
+```
+
 ## Points ouverts
 
 - Plus propre à terme : livrer ces fichiers par une `MachineConfig`, comme le reste de la configuration du nœud. Sur un nœud unique, appliquer une MachineConfig **redémarre le nœud** : à planifier.
-- Le garde-fou alerte dans le journal du nœud et en métrique (section 5) ; le relais des alertes vers le répartiteur, puis vers l'administrateur, est prévu avec le workflow « incident ».
+- Le garde-fou alerte dans le journal du nœud et en métrique (section 5) ; ses alertes `warning` et `critical` partent vers l'administrateur hors de la plateforme, par la route générale de l'Alertmanager ([`../../monitoring/`](../../monitoring/)) ; le workflow « incident » reste prévu.
