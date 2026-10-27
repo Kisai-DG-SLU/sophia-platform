@@ -1,0 +1,69 @@
+# SCC propre a la passerelle SSH, a la place de privileged. Copie d'anyuid (meme UID libre, meme SELinux
+# MustRunAs, memes volumes), avec la seule capacite SYS_CHROOT en plus : sshd en a besoin pour la
+# separation de privileges, et anyuid n'admet aucune capacite ajoutee. Liee au seul compte de la
+# passerelle ; le Deployment la demande par l'annotation openshift.io/required-scc.
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: dev-gateway
+  annotations:
+    kubernetes.io/description: "Passerelle SSH du namespace de developpement : anyuid plus SYS_CHROOT, rien d'autre."
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: false
+allowedCapabilities:
+  - SYS_CHROOT
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+groups: []
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+  - MKNOD
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+userNamespaceLevel: AllowHostLevel
+users: []
+volumes:
+  - configMap
+  - csi
+  - downwardAPI
+  - emptyDir
+  - ephemeral
+  - image
+  - persistentVolumeClaim
+  - projected
+  - secret
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:openshift:scc:dev-gateway
+rules:
+  - apiGroups: [security.openshift.io]
+    resources: [securitycontextconstraints]
+    resourceNames: [dev-gateway]
+    verbs: [use]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: system:openshift:scc:dev-gateway
+  namespace: ${SANDBOX_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:dev-gateway
+subjects:
+  - kind: ServiceAccount
+    name: ${GATEWAY_SERVICE_ACCOUNT:-dev-gateway-sa}
+    namespace: ${SANDBOX_NAMESPACE}

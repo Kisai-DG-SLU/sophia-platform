@@ -41,7 +41,7 @@ Le routeur de modèles délivre des **clés virtuelles** : chacune a une **liste
 | chat | les modèles du chat | débit et budget du chat |
 | voix du chat | reconnaissance et synthèse vocales seulement | débit propre (300 requêtes par minute), sans budget : modèles locaux |
 | chaque agent (`agent-<nom>`) | l'alias de fond du modèle local et l'embedding | 120 requêtes par minute, sans budget : la liste fermée empêche tout appel payant |
-| chaque pod de développement | les modèles du chat, **sans** la voix | débit et budget bornés |
+| chaque projet de développement (prévu) | le modèle local seul : l'alias de fond et l'embedding, comme les agents | débit borné, sans budget : la liste fermée empêche tout appel payant |
 | chaque application (cuisine, courses…) | ses seuls modèles | les siennes |
 
 ### La voix : la clé posée par nginx
@@ -88,7 +88,7 @@ Essayé contre un faux routeur : à blanc, modèle inconnu, limite absente, opti
 | Clé de la voix posée par nginx | en service |
 | Une clé par agent ; clé maître retirée des appelants et renouvelée | en service |
 | Sondes et RollingUpdate du routeur ([`deployment.yaml`](../../deploy/okd/core/litellm/deployment.yaml)) | en service |
-| Clé d'un pod de développement par projet, créée par le script de préparation | prêt (à la prochaine création de pod) |
+| Clé d'un projet de développement, limitée au modèle local : créée une fois par le workflow qui crée le cluster du projet, au moyen d'un compte de gestion qui ne peut appeler aucun modèle, dans une équipe du routeur limitée au modèle local ; aucun script lancé à la main | prévu (éprouvé avec le premier cluster de projet) |
 
 ---
 

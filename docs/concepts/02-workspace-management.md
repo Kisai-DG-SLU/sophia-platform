@@ -45,6 +45,8 @@ Le repository contient le travail réel : code, notebooks, ressources.
 
 Le workspace est un environnement d'exécution temporaire, éphémère, isolé et reproductible. Il peut être local, dans un pod Kubernetes ou dans un environnement sandbox.
 
+Dans l'installation de référence, les environnements de développement tournent dans un namespace dédié, sans privilège sur le nœud. **Prévu** pour l'agent de développement : un cluster virtuel par projet, dont l'état est éphémère et recréé depuis la forge par un workflow ; pods sans privilège sous un compte propre au projet, images du registre interne seulement, paquets par des relais en lecture seule dans le sas, aucune sortie directe vers Internet.
+
 ---
 
 ## Règle fondamentale

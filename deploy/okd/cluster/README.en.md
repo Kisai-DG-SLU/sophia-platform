@@ -9,11 +9,11 @@ A single node carries chat, the language model, voice, agents, office suite, ima
 | `sophia-socle` | 2,000,000 | no | cluster read pod (coding assistant), Git forge |
 | `sophia-inference-high` | 1,000,000 | **yes** | language model server ([`../inference/00-namespace-guardrails.yaml`](../inference/00-namespace-guardrails.yaml)) |
 | `sophia-chat` | 100,000 | no | interface, household applications, model router, relational database, identity |
-| `sophia-voix` | 90,000 | no | speech recognition and synthesis |
+| `sophia-voix` | 90,000 | no | real-time voice and video: speech recognition and synthesis, video-call media bridge |
 | `sophia-agents` | 80,000 | no | dispatcher, workflows, bus, agents, embedding, web airlock |
 | `sophia-workspace-low` | 50,000 | no | office suite |
 | `sophia-images` | 30,000 | no | image generation, capped at 8 CPU |
-| `sophia-dev` | 10,000 | no | development pods, dev gateway, child clusters |
+| `sophia-dev` | 10,000 | no | development pods, dev gateway; virtual clusters per project (planned) |
 
 ## Design
 
@@ -39,6 +39,8 @@ A single node carries chat, the language model, voice, agents, office suite, ima
 | chat interface (dedicated namespace) | 4 | 3 Gi | 6 | |
 | workflow dashboard (dedicated namespace) | 3 | 3 Gi | 5 | |
 | object storage | 3 | 3 Gi | 4 | |
+| persistent chat (dedicated namespace) | 3 | 3 Gi | 8 | installed, in acceptance testing |
+| video calls (dedicated namespace) | 5 | 3 Gi | 8 | installed, in acceptance testing |
 | MCP tool builds | one build at a time | | | no agent account in the namespace |
 
 Template: `01-namespace-quota.yaml` (one copy per namespace).
@@ -66,6 +68,15 @@ One step at a time, from a clean, up-to-date clone of the internal repository, f
 
    For each: `oc diff -f <file>`, `oc apply -f <file>`, `oc rollout status`, then `oc get pod -o jsonpath='{.items[0].spec.priorityClassName} {.items[0].status.containerStatuses[0].ready}'`, expected `<class> true`. Rollback: `oc rollout undo`.
 4. **Base, in its slot**: the cluster read pod gets its class and explicit resources; recreating it cuts the sessions it carries. **Only then**, its namespace's quota.
+
+## Security constraints (SCC)
+
+| Namespace | Rule | Status |
+|---|---|---|
+| applications | `privileged` SCC removed from the `default` account: no workload needed it | in service |
+| development | `privileged` SCC removed from every account, including the development agent's, administrator of the namespace: a privileged pod is refused there; the SSH gateway has its own SCC ([`../pod-bases/dev-bastion/`](../pod-bases/dev-bastion/)) | in service |
+| development | AdminNetworkPolicy on the whole namespace; admission of internal-registry images only | planned |
+| persistent chat, video calls | neither `privileged` nor `anyuid`: images run under OKD's arbitrary UID; no binding to an agent | in service, in acceptance testing |
 
 ## Status
 

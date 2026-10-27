@@ -34,7 +34,7 @@ metadata:
 value: 90000
 preemptionPolicy: Never
 globalDefault: false
-description: "Voix (reconnaissance, synthèse)"
+description: "Voix et vidéo en temps réel : reconnaissance, synthèse, pont média de la visio"
 ---
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass

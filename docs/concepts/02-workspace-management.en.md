@@ -41,6 +41,8 @@ The repository contains the actual work: code, notebooks, resources.
 
 The workspace is a temporary execution environment: ephemeral, isolated, and reproducible. It can be local, in a Kubernetes pod, or in a sandbox environment.
 
+In the reference installation, development environments run in a dedicated namespace, without privilege on the node. **Planned** for the development agent: one virtual cluster per project, whose state is ephemeral and recreated from the forge by a workflow; unprivileged pods under a project-specific account, images from the internal registry only, packages through read-only relays in the airlock, no direct egress to the Internet.
+
 ---
 
 ## Fundamental rule
