@@ -23,7 +23,7 @@ média (UDP, VPN seulement) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 
 | Élément | Choix | Raison |
 |---|---|---|
-| Namespaces | deux namespaces dédiés, `sophia-messagerie` (chat) et `sophia-visio` (visio), chacun avec quota, LimitRange, EgressFirewall, refus par défaut en entrée, DNS ; **aucune liaison de rôle vers un agent** | la bureautique n'avait plus la place dans son quota ; isoler le chat et la visio de tout le reste |
+| Namespaces | deux namespaces dédiés, `sophia-messagerie` (chat) et `sophia-visio` (visio), chacun avec quota, LimitRange, EgressFirewall, refus par défaut en entrée et en sortie, DNS ; **aucune liaison de rôle vers un agent** | la bureautique n'avait plus la place dans son quota ; isoler le chat et la visio de tout le reste |
 | Priorité | classe de la bureautique pour tous les pods, **sauf le pont média de la visio**, dans la classe de la voix ([priorités](../../../deploy/okd/cluster/README.md)) | le média d'une visio en cours ne doit pas attendre derrière un travail de fond |
 | Images | figées par empreinte ; Synapse 1.163.2, Jitsi `stable-11248-2` | une mise à jour est une décision |
 
@@ -35,7 +35,7 @@ média (UDP, VPN seulement) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 | Connexion | **MAS** (Matrix Authentication Service) délègue l'authentification au fournisseur d'identité de la plateforme (OIDC, PKCE) ; base `mas` propre | connexion unique, aucun mot de passe Matrix ; MAS est le chemin d'authentification actuel de Matrix |
 | Accès | réservé aux groupes du foyer : un rôle de client dans le fournisseur d'identité, et un flux de connexion qui **refuse le groupe des invités** | MAS ne filtre pas par groupe : le refus se fait avant, chez le fournisseur d'identité |
 | Fédération | **coupée** | le serveur ne parle à aucun autre serveur Matrix ; rien ne sort |
-| Chiffrement de bout en bout | **coupé par défaut** pour les nouveaux salons (réglage servi aux clients par le serveur) | choix voulu, pour garder l'historique lisible sur tous les appareils, anciens compris. **Conséquence assumée** : l'administrateur du serveur peut lire les salons |
+| Chiffrement de bout en bout | **coupé par défaut** pour les nouveaux salons (réglage servi aux clients par le serveur) | choix du foyer. **Conséquence assumée** : l'administrateur du serveur peut lire les salons |
 | Médias | 50 Mo au plus par fichier ; volume logique dédié de 10 Gio, PV `Retain` ; **sans sauvegarde** | une perte des médias est acceptée ; les messages sont dans la base |
 | Notifications | **ntfy** dans le même namespace, en UnifiedPush : la notification ne porte ni le texte ni l'expéditeur ; Synapse ne sort que vers MAS et ntfy | aucune passerelle de notification d'un tiers |
 | Client web | Element Web, configuration sans adresse externe | servi par la plateforme |
@@ -62,7 +62,7 @@ Jitsi Meet a remplacé la visio de La Suite numérique, d'abord prévue : son in
 | Android | Element X, notifications par ntfy | application Jitsi Meet |
 | Tablette ancienne (iOS 15) | Element classique | application Jitsi Meet |
 
-La **première connexion** au chat passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. L'application mobile de Jitsi se règle sur chaque appareil : adresse du serveur de la maison, rapports de plantage coupés.
+La **première connexion** au chat passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. L'application mobile de Jitsi se règle sur chaque appareil : adresse du serveur de la maison, rapports de plantage coupés, pair-à-pair coupé.
 
 ## Confidentialité et limites
 

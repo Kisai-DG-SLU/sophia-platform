@@ -136,8 +136,8 @@ Jitsi settings to remember: `ENABLE_THIRD_PARTY_REQUESTS=false`, peer-to-peer of
 |---|---|
 | `sophia-messagerie/synapse` | database password, secret shared with MAS, Synapse's internal secrets |
 | `sophia-messagerie/mas` | database password, OIDC client secret, encryption and signing keys (one RSA, one EC), secret shared with Synapse |
-| `sophia-visio/adaptateur-visio` | OIDC client secret, room token signing secret |
-| `sophia-visio/jitsi` | internal passwords of Jitsi's components, room token signing secret (the same as the adapter's) |
+| `sophia-visio/adaptateur-visio` | OIDC client secret (`client-secret` key) |
+| `sophia-visio/jitsi` | internal passwords of Jitsi's components, room token signing secret (`jwt-secret` key) |
 
 Each value is generated on the spot and written through a pipe, without a trailing newline; the secret shared between Synapse and MAS is copied from Secret to Secret. Checks: key names, lengths, and **equality of both copies by digest**, never by display. Synapse reads its secrets through file paths and its database password through `PGPASSWORD` (libpq ignores a password file readable by the group, which mounted Secrets are); MAS reads each secret from a file.
 
@@ -145,7 +145,7 @@ Each value is generated on the spot and written through a pipe, without a traili
 
 1. **Bases** (step 0): `oc diff`, `--dry-run=server`, `oc apply`; field-by-field check; no RoleBinding beyond those created by OKD.
 2. **Prerequisites 1 to 5** in place; if one is missing: stop.
-3. **Secrets**, in a single terminal (above).
+3. **Secrets**, written through a pipe, with no variable and nothing displayed (above).
 4. **Chat**: `oc diff -k`, server dry-run, `oc apply -k`, wait for the rollouts. Checks through the real path: `.well-known` with `io.element.e2ee` set to `false`, the API's `versions`, sign-in flows served by MAS, MAS OIDC discovery, ntfy, Element. Sign-in of an admitted account (two MAS pages the first time), refusal of a guest, room created without a padlock.
 5. **Video**: build the adapter, then `oc apply -k`. Checks: pods ready; JVB advertises the VPN address and is joined by Jicofo; `config.js` without third-party requests, peer-to-peer off; adapter healthy; a test with at least two devices, guest refused, **the nftables rule's counter increasing**.
 
