@@ -18,7 +18,7 @@ Une plateforme qui sert un foyer ou une organisation doit savoir quand elle va m
 |---|---|---|
 | Métrologie de la plateforme (Prometheus, Alertmanager fournis par OKD) | état du nœud et des composants du cluster | en service |
 | Accès en lecture à la métrologie pour la supervision | requêtes, pointes sur plusieurs jours | en service |
-| Surveillance des charges applicatives | métriques des services de SophIA : bus de messages, moteur de workflows, serveur d'inférence ; 15 jours de rétention | en service |
+| Surveillance des charges applicatives | métriques des services de SophIA : bus de messages, moteur de workflows, serveur d'inférence ; 15 jours de rétention, sans volume persistant | en service |
 | Règles d'alerte | 29 règles : mémoire épuisée et redémarrages en boucle (répétées dans chaque namespace, une règle ne voyant que le sien), répartiteur indisponible, lettres mortes et alarmes du bus, workflows en échec, modèle local indisponible ou saturé, volumes presque pleins ou pleins | en service : chargées, aucune en erreur |
 | Exporteur du nœud | la carte graphique (mémoire, utilisation, température, puissance), l'occupation des volumes du nœud et les fichiers de métriques que déposent les scripts du nœud | en service |
 | État mesuré des composants, contrôle des miroirs | chaque composant vu par ses sondes, jamais supposé ; miroirs des dépôts contrôlés toutes les heures ([module Visualisation](../modules/visualisation/README.md)) | en service |
@@ -28,9 +28,15 @@ Coût mesuré : environ 0,2 cœur et un à deux gigaoctets de mémoire, sans tou
 
 Traçabilité, déjà en place : l'historique de chaque workflow de délégation (30 jours), les événements datés publiés sur le bus par le répartiteur, le journal des requêtes du routeur de modèles.
 
-### 2. Recevoir : l'alarme devient une demande
+### 2. Recevoir : l'administrateur prévenu, l'alarme devient une demande
 
-L'alerte part d'Alertmanager vers un **demandeur « alertes »** du répartiteur, comme n'importe quelle demande : identité prouvée, règles, quotas. Le répartiteur lance un **workflow « incident »**, un par groupe d'alertes. Les alertes de la plateforme OKD passent par le même circuit, par une route ajoutée en tête de son Alertmanager, qui laisse chaque alerte suivre ensuite son chemin d'avant. **Prévu** : la route est prête et non activée, le récepteur du répartiteur écrit et désactivé ; il ne fera d'abord que valider et journaliser.
+**L'administrateur est prévenu par Telegram** (en service), pour toutes les alertes actionnables des namespaces SophIA et de la plateforme OKD :
+- une route placée en tête de la configuration générale de chacun des deux Alertmanager, qui laisse ensuite chaque alerte suivre son chemin d'avant ;
+- un bot dédié aux alertes, qui n'écrit qu'à l'administrateur ; son jeton n'est que dans les deux namespaces de supervision ;
+- avertissements et alertes critiques seulement, bruit permanent exclu par son nom ; un message par problème (groupement par namespace et nom, l'alerte critique masque l'avertissement de même nom), rappel toutes les 24 h, puis « Résolue » avec la durée ;
+- seuls partent le nom, la gravité, le namespace, le résumé et l'heure de début ; la plateforme n'envoie plus de courriel.
+
+**L'alerte part aussi vers un demandeur « alertes »** du répartiteur, comme n'importe quelle demande : identité prouvée, règles, quotas. **En service** pour le cœur et l'outil de visualisation : le récepteur valide et **journalise** chaque alerte, dans la vie de son pod. **Prévu** : les alertes de la plateforme OKD par le même circuit, puis un **workflow « incident »** par groupe d'alertes, et un registre durable des incidents tenu par le répartiteur. Les deux envois sont indépendants : un répartiteur arrêté n'empêche pas le message.
 
 ### 3. Réagir : le workflow « incident »
 
@@ -38,7 +44,7 @@ L'alerte part d'Alertmanager vers un **demandeur « alertes »** du répartiteur
 2. **Diagnostic** par le modèle local, en sortie contrainte. S'il manque une information, le modèle demande une autre lecture (un outil typé « lire X ») ; les règles la valident, la supervision la fait. **Deux tours au plus**, bornés par le code ; un plafond à revoir à l'usage.
 3. **Plan**, proposé par le modèle : le pourquoi, les actions, les manifestes.
 4. **Règles de gravité**, tirées de l'étiquette de l'alerte, jamais du modèle : elles fixent le destinataire et les actions automatiques permises. **Aucune au départ.**
-5. **Notification de l'administrateur**, puis approbation du plan.
+5. **Notification de l'administrateur** (le canal Telegram ci-dessus), puis approbation du plan.
 6. **Exécution** par l'agent de maintenance, **chaque commande approuvée**.
 
 Toutes les étapes, de l'alarme à la dernière commande, sont dans l'historique du workflow, avec l'auteur authentifié de chaque approbation.

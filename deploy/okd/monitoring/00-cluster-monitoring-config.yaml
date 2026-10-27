@@ -10,3 +10,9 @@ metadata:
 data:
   config.yaml: |
     enableUserWorkload: true
+    # Jeton du bot des alertes (Secret alertes-telegram, clé « jeton »), monté sous
+    # /etc/alertmanager/secrets/alertes-telegram/. Le Secret doit exister AVANT l'apply :
+    # sans lui, alertmanager-main ne redémarre pas.
+    alertmanagerMain:
+      secrets:
+        - alertes-telegram

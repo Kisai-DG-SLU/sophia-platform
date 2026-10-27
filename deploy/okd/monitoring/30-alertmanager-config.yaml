@@ -1,10 +1,13 @@
-# Routage des alertes SophIA vers le récepteur /v1/alertes du répartiteur (demandeur « alertes »).
-# PRÊT, NON ACTIVÉ : ne pas appliquer avant l'étape 6 du README, qui suppose
+# Alertes SophIA de sophia-core vers le récepteur /v1/alertes du répartiteur (demandeur « alertes »), qui
+# les journalise ; le workflow « incident » les prendra en charge. Prérequis (étape 6 du README) :
 #   (1) une image du répartiteur qui contient le récepteur /v1/alertes,
 #   (2) le Secret repartiteur-alertes (clé « jeton ») dans sophia-core, lu par le répartiteur,
 #   (3) une règle d'entrée du répartiteur depuis l'Alertmanager des charges utilisateur (port 8443).
+# La notification de l'administrateur ne passe pas ici : elle part de la route générale de
+# l'Alertmanager (alertes-telegram-ajout.py). L'opérateur force continue: true sur cette route ; un
+# Telegram ici enverrait chaque alerte deux fois.
 # Une AlertmanagerConfig ne reçoit que les alertes de SON namespace : une par namespace à alerter
-# (ici sophia-core ; les autres sur le même modèle).
+# (ici sophia-core ; 31-… pour sophia-workflow).
 apiVersion: monitoring.coreos.com/v1beta1
 kind: AlertmanagerConfig
 metadata:
@@ -31,5 +34,5 @@ spec:
               credentials: { name: repartiteur-alertes, key: jeton }
             tlsConfig:
               ca:
-                configMap: { name: temporal-service-ca, key: service-ca.crt }
+                configMap: { name: openshift-service-ca.crt, key: service-ca.crt }
               serverName: repartiteur.sophia-core.svc
