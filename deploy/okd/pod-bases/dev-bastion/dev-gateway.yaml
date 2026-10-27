@@ -12,7 +12,10 @@ spec:
     metadata:
       labels:
         app: dev-gateway
+      annotations:
+        openshift.io/required-scc: dev-gateway
     spec:
+      priorityClassName: sophia-dev
       serviceAccountName: ${GATEWAY_SERVICE_ACCOUNT:-dev-gateway-sa}
       containers:
         - name: gateway

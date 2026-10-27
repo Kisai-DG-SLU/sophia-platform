@@ -41,7 +41,7 @@ The model router issues **virtual keys**: each has a **closed list of models** a
 | chat | the chat's models | the chat's rate and budget |
 | chat voice | speech recognition and synthesis only | its own rate (300 requests per minute), no budget: local models |
 | each agent (`agent-<name>`) | the local model's background alias and embedding | 120 requests per minute, no budget: the closed list prevents any paid call |
-| each development pod | the chat's models, **without** voice | bounded rate and budget |
+| each development project (planned) | the local model only: the background alias and embedding, like the agents | bounded rate, no budget: the closed list prevents any paid call |
 | each application (cooking, shopping…) | its own models only | its own |
 
 ### Voice: the key set by nginx
@@ -88,7 +88,7 @@ Tested against a fake router: dry run, unknown model, missing limit, incompatibl
 | Voice key set by nginx | in service |
 | One key per agent; master key removed from callers and rotated | in service |
 | Router probes and RollingUpdate ([`deployment.yaml`](../../deploy/okd/core/litellm/deployment.yaml)) | in service |
-| A development pod key per project, created by the setup script | ready (at the next pod creation) |
+| A development project key, limited to the local model: created once by the workflow that creates the project's cluster, through a management account that cannot call any model, in a router team limited to the local model; no script run by hand | planned (proven with the first project cluster) |
 
 ---
 

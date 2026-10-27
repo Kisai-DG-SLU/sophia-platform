@@ -9,11 +9,11 @@ Un seul nœud porte la discussion, le modèle de langage, la voix, les agents, l
 | `sophia-socle` | 2 000 000 | non | pod de lecture du cluster (assistant de code), forge Git |
 | `sophia-inference-high` | 1 000 000 | **oui** | serveur du modèle de langage ([`../inference/00-namespace-guardrails.yaml`](../inference/00-namespace-guardrails.yaml)) |
 | `sophia-chat` | 100 000 | non | interface, applications du foyer, routeur de modèles, base relationnelle, identité |
-| `sophia-voix` | 90 000 | non | reconnaissance et synthèse vocales |
+| `sophia-voix` | 90 000 | non | voix et vidéo en temps réel : reconnaissance et synthèse vocales, pont média de la visio |
 | `sophia-agents` | 80 000 | non | répartiteur, workflows, bus, agents, embedding, sas web |
 | `sophia-workspace-low` | 50 000 | non | bureautique |
 | `sophia-images` | 30 000 | non | génération d'images, plafonnée à 8 CPU |
-| `sophia-dev` | 10 000 | non | pods de développement, passerelle de dev, clusters enfants |
+| `sophia-dev` | 10 000 | non | pods de développement, passerelle de dev ; clusters virtuels par projet (prévus) |
 
 ## Choix
 
@@ -39,6 +39,8 @@ Un seul nœud porte la discussion, le modèle de langage, la voix, les agents, l
 | interface de discussion (namespace dédié) | 4 | 3 Gi | 6 | |
 | tableau de bord des workflows (namespace dédié) | 3 | 3 Gi | 5 | |
 | stockage objet | 3 | 3 Gi | 4 | |
+| chat permanent (namespace dédié) | 3 | 3 Gi | 8 | installé, en recette |
+| visio (namespace dédié) | 5 | 3 Gi | 8 | installé, en recette |
 | builds des outils MCP | un build à la fois | | | aucun compte d'agent dans le namespace |
 
 Gabarit : `01-namespace-quota.yaml` (une copie par namespace).
@@ -66,6 +68,15 @@ Une étape à la fois, depuis un clone propre et à jour du dépôt interne, com
 
    Pour chacune : `oc diff -f <fichier>`, `oc apply -f <fichier>`, `oc rollout status`, puis `oc get pod -o jsonpath='{.items[0].spec.priorityClassName} {.items[0].status.containerStatuses[0].ready}'`, attendu `<classe> true`. Retour arrière : `oc rollout undo`.
 4. **Socle, dans son créneau** : le pod de lecture du cluster reçoit sa classe et ses ressources explicites ; le recréer coupe les sessions qu'il porte. **Ensuite seulement**, le quota de son namespace.
+
+## Contraintes de sécurité (SCC)
+
+| Namespace | Règle | État |
+|---|---|---|
+| applications | SCC `privileged` retirée du compte `default` : aucune charge n'en avait besoin | en service |
+| développement | SCC `privileged` retirée de tous les comptes, y compris celui de l'agent de développement, administrateur du namespace : un pod privilégié y est refusé ; la passerelle SSH a sa SCC propre ([`../pod-bases/dev-bastion/`](../pod-bases/dev-bastion/)) | en service |
+| développement | AdminNetworkPolicy sur tout le namespace ; admission des seules images du registre interne | prévu |
+| chat permanent, visio | ni `privileged` ni `anyuid` : les images tournent sous l'UID arbitraire d'OKD ; aucune liaison vers un agent | en service, en recette |
 
 ## État
 

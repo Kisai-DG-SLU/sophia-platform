@@ -39,7 +39,7 @@ The architecture defines four fundamental roles, plus a planner. The list can be
 
 | Agent | Domain | Rights | Engine | Status |
 |---|---|---|---|---|
-| **Hephaistos** | development | full powers in its development environment, one child cluster per project; everything it produces is versioned in the Git forge | autonomous agent | in acceptance testing, first executor behind the dispatcher |
+| **Hephaistos** | development | full powers in its development environment, without privilege on the node; planned: one virtual cluster per project; everything it produces is versioned in the Git forge | autonomous agent | in acceptance testing, first executor behind the dispatcher |
 | **Ouranos** | application deployment | limited to the applications namespace | agent, closed tool list, every command approved | planned |
 | **Athena** | platform maintenance | cluster administrator, **every command approved** by a human after the plan is approved | agent, closed tool list (the terminal under approval) | planned |
 | **Dionysos** | supervision | read-only on the whole cluster and on metrics; can alert, never act | deterministic read functions exposed to the dispatcher, in a separate pod, without node network access or secrets, with a read-only account; interpretation is left to the model, inside a workflow | planned: designed and tested, not deployed |
@@ -62,7 +62,7 @@ The dispatcher is a service without a model, in `sophia-core`. It is the **only 
 
 **Human approvals.** Two levels: approving the plan before departure, then approving each command. Today they go through a single path, the workflow engine's interface, restricted to the administration group; they will move into the chat interface, with the person's token relayed and verified, the workflow engine's interface staying the fallback: the authenticated author of each signal is recorded in the history, and only an approver from the list is accepted. A signal carries only a decision and a hash, never a command. An approval is valid once: nothing is written into a permanent allow list.
 
-Status: **in service** for rules, workflow, events and the mission to development (in acceptance testing); the first real requester, the Sophia agent, completed the full round trip entirely on the local model. **Ready** (written and tested, at the next build): one mission at a time per executor, and local-model slots by time of day. **Planned**: the interface as requester, reads to supervision, deployment and maintenance missions, consulting an external model (after the leak filter and the tribunal), mutual TLS.
+Status: **in service** for rules, workflow, events and the mission to development (in acceptance testing); the first real requester, the Sophia agent, completed the full round trip entirely on the local model. **In service** since the last build: one mission at a time per executor, and local-model slots by time of day. **Planned**: the interface as requester, reads to supervision, deployment and maintenance missions, consulting an external model (after the leak filter and the tribunal), mutual TLS.
 
 ---
 
