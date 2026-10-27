@@ -70,7 +70,7 @@ Drive and Collabora use ES2022 `static {}` blocks: at least **Safari 16.4** (or 
 ## Planned
 
 - **Unified mail** (decided): a local aggregator that gathers a person's existing mailboxes over IMAP (two-way sync), with sorting, anti-spam and a webmail behind SSO; no server exposed to the Internet. An **MCP tool** will let the model or a workflow search, read, file and draft, never send or delete permanently: sending stays validated by the person.
-- **Persistent chat and video** (decided): Matrix for persistent chat, La Suite's Visio for video calls, screen sharing and meeting chat; starting a call from the chat.
+- **Persistent chat and video**: installed, in acceptance testing, in a separate module ([Communication](../communication/README.en.md)); Jitsi Meet replaced La Suite's Visio. Starting a call from the chat remains planned.
 
 ## Lessons
 

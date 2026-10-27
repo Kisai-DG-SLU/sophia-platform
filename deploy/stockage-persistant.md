@@ -25,6 +25,7 @@ Deux questions distinctes, et la seconde est celle qu'on oublie : le composant a
 | Stockage objet S3 (SeaweedFS) | `sophia-storage` | oui | 200Gi | **volume logique dédié** | documents de la bureautique et leurs versions (corbeille de 30 jours) ; voir `okd/storage/` |
 | RabbitMQ | `${NS_CORE}` | oui | 5Gi | répertoire du nœud, lié nommément (`claimRef` + `volumeName`) | événements des délégations et lettres mortes ; voir `okd/core/rabbitmq/` |
 | Forgejo | `${NS_GIT}` | oui | 50Gi | **volume logique dédié** | dépôts et base SQLite locale |
+| Médias du chat permanent (Synapse) | `sophia-messagerie` | oui | 10Gi | **volume logique dédié**, PV `Retain` | fichiers de 50 Mo au plus ; **sans sauvegarde**, choix accepté (les messages sont dans PostgreSQL) ; installé, en recette ; voir `okd/office/` |
 | Neo4j | `${NS_MEMORY}` | oui | 10Gi | répertoire du nœud, 0 réplique | graphe à construire, aucune donnée ; image figée, en attente |
 | Service d'embedding | `${NS_MEMORY}` | oui | 5Gi | répertoire du nœud | cache et modèle, pas de corpus |
 | Espace de travail | `${NS_APPS}` | oui | 20Gi | répertoire du nœud, consommateur arrêté | préproduction, notebooks, webapps, API |

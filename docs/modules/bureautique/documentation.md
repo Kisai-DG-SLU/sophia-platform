@@ -70,7 +70,7 @@ Drive et Collabora utilisent des blocs `static {}` d'ES2022 : il faut au moins *
 ## Prévu
 
 - **Courrier unifié** (décidé) : un agrégateur local qui rassemble les boîtes existantes d'une personne par IMAP (synchronisation bidirectionnelle), avec tri, anti-spam et webmail derrière le SSO ; aucun serveur exposé à Internet. Un **outil MCP** permettra au modèle ou à un workflow de chercher, lire, classer et préparer un brouillon, jamais d'envoyer ni de supprimer définitivement : l'envoi reste validé par la personne.
-- **Discussion permanente et visio** (décidé) : Matrix pour la discussion permanente, Visio de La Suite pour la visio, le partage d'écran et le chat de réunion ; lancer une visio depuis la discussion.
+- **Discussion permanente et visio** : installées, en recette, dans un module à part ([Communication](../communication/README.md)) ; Jitsi Meet a remplacé la Visio de La Suite. Lancer une visio depuis la discussion reste prévu.
 
 ## Leçons
 

@@ -1,6 +1,6 @@
 # PostgreSQL 18 — instance commune (`sophia-core`)
 
-Toutes les bases de la plateforme vivent dans **une instance PostgreSQL 18** : routeur de modèles, moteur de workflows, fournisseur d'identité, interface de discussion, modules, gestion de fichiers de la bureautique, schéma de la mémoire. Elle a remplacé une instance PostgreSQL 15, migrée base par base.
+Toutes les bases de la plateforme vivent dans **une instance PostgreSQL 18** : routeur de modèles, moteur de workflows, fournisseur d'identité, interface de discussion, modules, gestion de fichiers de la bureautique, chat permanent, schéma de la mémoire. Elle a remplacé une instance PostgreSQL 15, migrée base par base.
 
 **Pourquoi la 18** : la gestion de fichiers de la bureautique range ses éléments dans un chemin `ltree` dont les étiquettes contiennent des tirets, que PostgreSQL n'accepte qu'à partir de la version 16 ; sur la 15, la création d'un dossier échouait (erreur 500), alors que les migrations passaient. Plutôt que garder une dette de version, toutes les bases sont passées à la dernière version stable.
 
@@ -71,6 +71,17 @@ Pour chaque base, une à la fois :
 
 - L'ancienne instance passe à **0 réplique**, avec une sauvegarde finale complète ; elle reste en place **7 jours** comme retour arrière.
 - Ensuite, suppression par l'administrateur : Deployment, Service, PVC, PV, Secret et règles réseau de l'ancienne instance, répertoire du nœud, règles de sortie des applications vers l'ancienne instance, sauvegardes intermédiaires. La sauvegarde finale est gardée 30 jours de plus.
+
+### Ajouter une base : chat permanent (Matrix)
+
+Le [module Communication](../../../../docs/modules/communication/documentation.md) (installé, en recette) a deux bases, chacune avec son rôle propriétaire et son Secret, créés selon la règle ci-dessus (Secret d'abord, puis rôle) :
+
+| Base | Particularité |
+|---|---|
+| `synapse` | **collation `C`** exigée par le serveur Matrix : `CREATE DATABASE synapse OWNER synapse TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' LOCALE_PROVIDER libc` ; la base modèle par défaut de l'instance n'est pas en `C` |
+| `mas` | service d'authentification de Matrix ; aucune exigence de collation |
+
+Pour chacune : `REVOKE CONNECT ON DATABASE … FROM PUBLIC`, si bien qu'un rôle ne se connecte qu'à sa propre base ; entrée de 5432 ouverte au seul namespace du chat, sur le modèle de `03-network.yaml`. Contrôle : chaque rôle se connecte à sa base, et se voit refuser l'autre.
 
 ## Leçons
 
