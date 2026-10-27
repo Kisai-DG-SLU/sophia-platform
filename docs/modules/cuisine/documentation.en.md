@@ -11,6 +11,7 @@
 - **Shopping** aggregated by aisle, ticks shared between household members, undoable history; a tab sends the validated list to the [Shopping module](../courses/README.en.md), which fills a drive-through grocery basket.
 - **Import** of a recipe from a link or pasted text: the model turns it into a card, rules check it, the household reviews a preview before saving.
 - **Dish photo** generated locally by the platform's `image` MCP tool.
+- **Favourite recipes** of the household (in service, under acceptance testing): a star on the recipe card, a search within favourites only (title and ingredients) and adding them straight to the meal plan. Catalogue search ignores accents, case and plurals, and matches the start of words.
 - **In the chat**: "what's for dinner tonight?" is answered by the assistant, from the meal plan. The service always announces the chosen slot (`_trace`); if every requested meal is empty, the service writes the answer itself (`_fin`: "Nothing planned… Shall I suggest a dish?"), shown as is: the model can no longer invent a "planned" meal. A secret party hidden from a child gives the empty-slot answer, without a word about the party. From the chat, adults can also open the application on the week's plan or on the shopping tab.
 
 - **Ingredient table** (under acceptance testing): calories, season and price of each ingredient, to **compute** the cost, calories and season months of recipes instead of estimating them (see below).
@@ -40,7 +41,7 @@ Shopping module ─MCP (limited write)─→ application
 | Variety | computed on the recipe's identity fields (cooking method, main ingredient, sides), without a vector database |
 | Access | two realm groups: full access, protected accounts (read-only, never photo generation) |
 | Timeouts | 300 s at the proxy and the Route: the local model takes several tens of seconds |
-| Network | closed list: ingress from the router to the proxy, from the interface to the read MCP, from the Shopping module to the write MCP; egress to the model router, the identity provider, PostgreSQL, the `image` tool, the web airlock, the Shopping module, DNS |
+| Network | closed list: ingress from the router to the proxy, from the interface (from its own namespace only) to the read MCP, from the Shopping module to the write MCP; egress to the model router, the identity provider, PostgreSQL, the `image` tool, the web airlock, the Shopping module, DNS |
 | Build | Docker BuildConfig from the internal forge, image trigger on the Deployment; a least-privilege CronJob starts one build per new commit |
 
 ### Exposed MCP servers

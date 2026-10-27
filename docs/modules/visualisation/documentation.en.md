@@ -17,8 +17,8 @@ Planned: a **compliance** section (GDPR, AI Act, ISO 27001 aimed at "certifiable
 | **Nothing is assumed deployed without being measured** | a component's state comes from its probes: ready pods, waiting reason (`CrashLoopBackOff`, `ImagePullBackOff`), replicas, non-empty `EndpointSlice`s, firing alerts; a silent source or a refusal gives "not measured", **never** "ok"; a component without a probe stays "theoretical" |
 | **Read only** | a service account that reads pods and metrics, **not Secrets**; a read-only bus account that rejects any message whose sender is not the dispatcher; a forge token scoped to "read repositories" only |
 | **An open page costs nothing** | collection runs in the background every 30 seconds; the page only reads the latest result |
-| **An alert is not noise** | the mirror alert fires after **two** failed checks in a row (two simultaneous pushes clash then resolve), and **immediately** for a mirror on a forbidden repository; it goes to the administrator only |
-| **Isolated from agents** | its own namespace, with no role binding to any agent: an agent administering the applications namespace could have forged a session or used the read account |
+| **An alert is not noise** | the mirror alert fires after **two** failed checks in a row (two simultaneous pushes clash then resolve), and **immediately** for a mirror on a forbidden repository; it goes to the administrator only, through the monitoring's general Telegram route (warnings and critical alerts, one message when it opens, another when it resolves) |
+| **Isolated from agents** | its own namespace, with no role binding to any agent: an agent administering the applications namespace could have forged a session or used the read account; the last read binding in that namespace is deleted, and the chat interface probe reads its own namespace |
 
 ## Architecture
 
@@ -30,7 +30,7 @@ browser ─VPN─→ router ─→ [ oauth2-proxy │ application + collector ] 
                                           └─ forge (mirrors, read token)
 ```
 
-- A single container serves the page and the API (Starlette and uvicorn), behind oauth2-proxy and SSO, administration group.
+- A single container serves the page and the API (Starlette and uvicorn), behind oauth2-proxy and SSO, administration group; oauth2-proxy's trust in `X-Forwarded-*` headers, limited to the router, is being extended.
 - Namespace with quota, defaults and closed ingress; egress limited to the sources it reads.
 - Built from the internal forge with a **read-only deploy key** on that repository alone, never with a forge administrator's token.
 - Mirror-check metrics exposed to monitoring, with an alert rule in the namespace.
@@ -40,3 +40,4 @@ browser ─VPN─→ router ─→ [ oauth2-proxy │ application + collector ] 
 - **RabbitMQ 4.4** names server-created queues `amq_<32 hex digits>`, no longer `amq.gen-*`: the read account's permissions must follow, otherwise its listening queue is refused.
 - **Forgejo** lists a repository's mirrors only to an administrator, and shows only the repositories the account can see: the check account is a site administrator, but its power is bounded by its token ("read repositories" only), with no known password or SSH key.
 - Several mirrors to the same address (repeated creations) clash and push every commit several times: the "single mirror" rule came from that.
+- **A push mirror overwrites the external host**: a branch changed directly on the host was replaced by the forge's at the next sync (everything was recovered). Rules adopted: work happens in the forge only; on the host, the default branch of public repositories is protected against force-push and deletion (private ones cannot be without a paid plan). A divergence check between the forge and the host is proposed, not built.

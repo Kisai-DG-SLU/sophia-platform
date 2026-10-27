@@ -117,38 +117,24 @@ http {
         location ^~ /css/ { add_header Cache-Control "no-cache"; }
         location ^~ /js/ { add_header Cache-Control "no-cache"; }
         location ^~ /images/ { add_header Cache-Control "max-age=86400"; }
+        # Polices des thèmes, embarquées : jamais changées sous le même nom.
+        location ^~ /fonts/ { add_header Cache-Control "max-age=2592000"; }
+        # Bibliothèques embarquées (vendor/README.md) : la version est dans le chemin, le fichier ne change jamais.
+        location ^~ /vendor/ { add_header Cache-Control "max-age=2592000"; }
 
         location / {
             return 404;
         }
 
-        # Sophia School : pod voisin du namespace, mêmes connexion et identité que le chat.
-        # Le nom est résolu à chaque requête (variable + resolver) et non au démarrage : si l'école
-        # est absente, le chat démarre quand même et seul /ecole/ répond 502.
-        # Ni cookie ni en-tête d'identité ne partent vers l'école : elle ne sert que des fichiers,
-        # et passe par /api/store/school/ pour la progression.
+        # Sophia School a sa propre adresse : /ecole/ n'est plus relayée. Une redirection 302 (et non
+        # 301, mise en cache pour toujours) sert les marque-pages et les boutons des anciennes réponses ; le
+        # navigateur garde le fragment (#/salle/…). Les avatars ne passent plus par ici : l'API lit le catalogue
+        # au Service de l'école. À retirer à un nettoyage suivant.
         location = /ecole {
-            return 301 /ecole/;
+            return 302 https://ecole.example.org/;
         }
         location ^~ /ecole/ {
-            resolver dns-default.openshift-dns.svc.cluster.local valid=30s ipv6=off;
-            set $sophia_school http://sophia-school.sophia-apps.svc.cluster.local:8080;
-            rewrite ^/ecole/(.*)$ /$1 break;
-            proxy_pass $sophia_school;
-            proxy_http_version 1.1;
-            proxy_set_header Host sophia-school;
-            proxy_set_header Connection "";
-            proxy_set_header X-Sophia-Jeton "";
-            proxy_set_header Cookie "";
-            proxy_set_header Authorization "";
-            proxy_set_header X-Forwarded-User "";
-            proxy_set_header X-Forwarded-Email "";
-            proxy_set_header X-Forwarded-Preferred-Username "";
-            proxy_set_header X-Forwarded-Groups "";
-            proxy_set_header X-Forwarded-Access-Token "";
-            proxy_connect_timeout 5s;
-            proxy_read_timeout 30s;
-            limit_except GET HEAD { deny all; }
+            return 302 https://ecole.example.org/;
         }
 
         # Routes LiteLLM réellement appelées par le front (js/api.js).

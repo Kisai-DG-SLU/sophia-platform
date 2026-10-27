@@ -26,7 +26,7 @@ page de secours ────┘    │ LiteLLM (sophia-local, JSON strict)
 
 | Élément | Choix |
 |---|---|
-| Service | application Python et **oauth2-proxy** (SSO, groupe dédié aux adultes) ; serveur MCP interne ; un port réservé aux relevés, ouvert au seul pod du navigateur ; un schéma de 13 tables (produits, correspondances, listes, lignes, relevés de prix…) |
+| Service | application Python et **oauth2-proxy** (SSO, groupe dédié aux adultes) ; serveur MCP interne, joint par le seul module Cuisine et par l'interface depuis son namespace ; un port réservé aux relevés, ouvert au seul pod du navigateur ; un schéma de 13 tables (produits, correspondances, listes, lignes, relevés de prix…) |
 | Navigateur distant | dans le **sas** (`sophia-dmz`) : Chromium + Xvfb + noVNC, non root, sans jeton de compte de service, derrière le SSO et le VPN |
 | Politiques du navigateur | liste blanche de domaines (le drive, son service anti-robot, le service) ; gestionnaire de mots de passe, de cartes et d'adresses **désactivés** |
 | Extension | Manifest V3, **sans furtivité** : elle lit les données que la page a déjà reçues en ne gardant qu'une liste fermée de champs, et remplit le panier par l'appel normal du site |
