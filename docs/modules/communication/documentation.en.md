@@ -23,7 +23,7 @@ media (UDP, VPN only) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 
 | Element | Choice | Reason |
 |---|---|---|
-| Namespaces | two dedicated namespaces, `sophia-messagerie` (chat) and `sophia-visio` (video), each with quota, LimitRange, EgressFirewall, default ingress deny, DNS; **no role binding to any agent** | the office suite had no room left in its quota; isolate chat and video from everything else |
+| Namespaces | two dedicated namespaces, `sophia-messagerie` (chat) and `sophia-visio` (video), each with quota, LimitRange, EgressFirewall, default ingress and egress deny, DNS; **no role binding to any agent** | the office suite had no room left in its quota; isolate chat and video from everything else |
 | Priority | the office suite's class for every pod, **except the video media bridge**, in the voice class ([priorities](../../../deploy/okd/cluster/README.en.md)) | the media of an ongoing call must not wait behind background work |
 | Images | pinned by digest; Synapse 1.163.2, Jitsi `stable-11248-2` | an update is a decision |
 
@@ -35,7 +35,7 @@ media (UDP, VPN only) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 | Sign-in | **MAS** (Matrix Authentication Service) delegates authentication to the platform's identity provider (OIDC, PKCE); its own `mas` database | single sign-on, no Matrix password; MAS is Matrix's current authentication path |
 | Access | reserved to the household's groups: a client role in the identity provider, and a sign-in flow that **refuses the guests group** | MAS does not filter by group: refusal happens earlier, at the identity provider |
 | Federation | **off** | the server talks to no other Matrix server; nothing goes out |
-| End-to-end encryption | **off by default** for new rooms (setting served to clients by the server) | deliberate choice, to keep history readable on every device, old ones included. **Accepted consequence**: the server administrator can read the rooms |
+| End-to-end encryption | **off by default** for new rooms (setting served to clients by the server) | the household's choice. **Accepted consequence**: the server administrator can read the rooms |
 | Media | 50 MB at most per file; dedicated 10 GiB logical volume, `Retain` PV; **no backup** | losing media is accepted; messages are in the database |
 | Notifications | **ntfy** in the same namespace, through UnifiedPush: the notification carries neither the text nor the sender; Synapse only goes out to MAS and ntfy | no third-party push gateway |
 | Web client | Element Web, configuration without any external address | served by the platform |
@@ -62,7 +62,7 @@ Jitsi Meet replaced La Suite numérique's video service, planned first: its inte
 | Android | Element X, notifications through ntfy | Jitsi Meet app |
 | Older tablet (iOS 15) | Element Classic | Jitsi Meet app |
 
-The **first sign-in** to the chat goes through two MAS pages: account linking, then application authorisation. Jitsi's mobile app is set up on each device: the home server's address, crash reports off.
+The **first sign-in** to the chat goes through two MAS pages: account linking, then application authorisation. Jitsi's mobile app is set up on each device: the home server's address, crash reports off, peer-to-peer off.
 
 ## Privacy and limits
 

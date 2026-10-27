@@ -136,8 +136,8 @@ Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, pair-à-pai
 |---|---|
 | `sophia-messagerie/synapse` | mot de passe de la base, secret partagé avec MAS, secrets internes de Synapse |
 | `sophia-messagerie/mas` | mot de passe de la base, secret du client OIDC, clés de chiffrement et de signature (une RSA, une EC), secret partagé avec Synapse |
-| `sophia-visio/adaptateur-visio` | secret du client OIDC, secret de signature des jetons de salle |
-| `sophia-visio/jitsi` | mots de passe internes des composants de Jitsi, secret de signature des jetons de salle (le même que l'adaptateur) |
+| `sophia-visio/adaptateur-visio` | secret du client OIDC (clé `client-secret`) |
+| `sophia-visio/jitsi` | mots de passe internes des composants de Jitsi, secret de signature des jetons de salle (clé `jwt-secret`) |
 
 Chaque valeur est générée sur place et écrite par un tube, sans saut de ligne final ; le secret partagé entre Synapse et MAS est recopié de Secret à Secret. Contrôles : noms des clés, longueurs, et **égalité des deux copies par empreintes**, jamais par affichage. Synapse lit ses secrets par des chemins de fichiers et le mot de passe de sa base par `PGPASSWORD` (libpq ignore un fichier de mots de passe lisible par le groupe, ce que sont les Secrets montés) ; MAS lit chaque secret dans un fichier.
 
@@ -145,7 +145,7 @@ Chaque valeur est générée sur place et écrite par un tube, sans saut de lign
 
 1. **Socles** (étape 0) : `oc diff`, `--dry-run=server`, `oc apply` ; contrôle champ à champ ; aucune RoleBinding hors de celles créées par OKD.
 2. **Prérequis 1 à 5** en place ; un point manque : s'arrêter.
-3. **Secrets**, dans un seul terminal (ci-dessus).
+3. **Secrets**, écrits par tube, sans variable ni affichage (ci-dessus).
 4. **Chat** : `oc diff -k`, dry-run serveur, `oc apply -k`, attente des déploiements. Contrôles par le vrai chemin : `.well-known` avec `io.element.e2ee` à `false`, `versions` de l'API, flux de connexion servis par MAS, découverte OIDC de MAS, ntfy, Element. Connexion d'un compte admis (deux pages de MAS à la première fois), refus d'un invité, salon créé sans cadenas.
 5. **Visio** : build de l'adaptateur, puis `oc apply -k`. Contrôles : pods prêts ; JVB annonce l'adresse VPN et est joint par Jicofo ; `config.js` sans requête tierce, pair-à-pair coupé ; adaptateur en bonne santé ; essai à deux appareils au moins, invité refusé, **compteur de la règle nftables qui augmente**.
 
