@@ -71,7 +71,8 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Cluster Kubernetes (OKD) mono-nœud sur serveur physique, accès par VPN seulement, identité unique (SSO) pour toutes les interfaces.
 - Inférence locale sur le GPU du serveur (texte et vision), voix et images sur CPU, sans accès réseau ; modèle local par défaut de l'interface et des modules.
 - Routeur de modèles unifié : local et distant derrière les mêmes alias.
-- Interface de discussion dans son namespace, connectée au routeur et à des outils locaux (géographie, images, fichiers de la personne), sans aucune clé dans le navigateur ni dépendance externe (polices et bibliothèques embarquées) ; modèle imposé par le serveur selon le rôle, une clé du routeur par usage ; thèmes visuels au choix.
+- Interface de discussion dans son namespace, connectée au routeur et à des outils locaux (géographie, images, fichiers de la personne), sans aucune clé dans le navigateur ni dépendance externe (polices et bibliothèques embarquées) ; modèle imposé par le serveur selon le rôle, une clé du routeur par usage ; thèmes visuels au choix ; réponse lue à voix haute pendant qu'elle s'écrit.
+- Cockpit : la discussion devient la coquille de toutes les interactions, avec un accueil pour parler à Sophia (avatar en hologramme qui montre la réflexion, l'outil appelé et la parole) et les applications de cuisine, d'école et de visualisation affichées au centre, chacune sous sa propre connexion ; un lieu tiré par le modèle n'est retenu que s'il a été dit.
 - Bureautique (fichiers et édition en ligne) ; la discussion retrouve, ouvre et lit les documents de la personne sous son identité, le contenu ne partant qu'au modèle local.
 - Base relationnelle commune en PostgreSQL 18, sur un volume dédié.
 - Acquisition web isolée par le sas, première brique du Sas Paranoïaque.
@@ -81,13 +82,15 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Agents du panthéon sur le modèle local, avec priorité à la discussion sur la carte graphique ; une clé du routeur par agent, clé maître confinée au routeur.
 - Observabilité minimale : métriques des services, règles d'alerte, carte graphique, garde-fou du filtre VPN ; priorités CPU sans préemption et quotas par namespace ; état mesuré de chaque composant et contrôle horaire des miroirs des dépôts ; alertes filtrées envoyées à l'administrateur hors de la plateforme.
 
-**Installé, en recette**
+**En service, en recette**
 
-- Chat permanent du foyer (Matrix) et visio (Jitsi Meet), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement.
+- Chat permanent du foyer (Matrix) et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre.
+- « Quoi de neuf ? » dans le cockpit, première version calculée par le serveur.
 
 **En cours**
 
 - L'interface comme demandeur du répartiteur.
+- Cockpit : ouverture par Sophia du bon module sans clic (prête), résumés déterministes de chaque application, documents ouverts et complétés par Sophia, lieux enregistrés dans le profil avec un géocodage local, accès par le cockpit seul.
 - Clusters de développement : un cluster virtuel éphémère par projet (décidé, à construire).
 - Service mémoire (conçu), pipeline d'ingestion et dimension graphe.
 - Sauvegardes planifiées, veille des failles, conformité (RGPD, AI Act, ISO 27001).

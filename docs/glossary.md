@@ -88,6 +88,12 @@ Dans SophIA, tout est modelise comme un projet. Un projet represente une unite d
 
 ---
 
+## Cockpit
+
+L'interface de discussion devenue la coquille de toutes les interactions : un accueil pour parler a Sophia, un volet des modules permis par le role, chaque application affichee au centre dans un cadre, sous sa propre connexion, et un volet « Quoi de neuf ? » fait de resumes deterministes fournis par les applications. Une application signale au cockpit qu'elle est prete par un message `sophia.pret`. Voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md).
+
+---
+
 # Concepts de securite
 
 ## Sas Paranoiaque
