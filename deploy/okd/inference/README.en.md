@@ -14,7 +14,7 @@ A language model that also reads images, served by the server's GPU, a voice (re
 | Image | built in the cluster, CUDA compatible with the node's driver | the official image targeted a newer CUDA than the driver |
 | GPU access | privileged container, driver library (`libcuda.so.1`) mounted from the host, **without** a `nvidia.com/gpu` resource | on this node the NVIDIA operator's container-toolkit hook fails; the device plugin is disabled |
 | Speech recognition | **Parakeet TDT 0.6B v3** (ONNX int8), CPU | ≈ 5 % French error rate, 0.4 to 0.6 s per sentence |
-| Speech synthesis | **Pocket TTS** (French model, int8), CPU | first sound in 75 ms, 4.6× faster than real time; the GPU stays with text |
+| Speech synthesis | **Pocket TTS** (French model, int8), CPU, 2 threads | first sound in 75 ms, 4.6× faster than real time; the GPU stays with text. Under the 4-CPU limit, 120 characters in 1.4 to 1.5 s with 2 threads, against 1.7 to 1.8 s with 4 |
 | Image generation | **stable-diffusion.cpp**, 1-step SDXL-Turbo + TAESDXL decoder, CPU, 512 × 512 | about ten seconds per image without a GPU; the card stays with text. **SDXL-Turbo licence: non-commercial use** — replace it with an openly licensed model for commercial use |
 | Image check | image classifier (Apache 2.0) after each generation | a deterministic check around the model's output, on top of the rules applied before |
 
@@ -61,10 +61,19 @@ The code is not provided; its contract (OpenAI API, routed by the model router):
 | Route | Role |
 |---|---|
 | `POST /v1/audio/transcriptions` | browser audio (webm/opus, mp4/aac, wav) → text |
-| `POST /v1/audio/speech` | text → WAV; voices on an allow-list, unknown → default voice |
+| `POST /v1/audio/speech` | text → WAV or PCM; voices on an allow-list, unknown → default voice. With `"stream_format": "audio"` and `"response_format": "pcm"`, 16-bit PCM arrives **as it is decoded**, with an `X-Sample-Rate` header; a WAV stream is refused (400), since its size is only known at the end; without `stream_format`, nothing changes |
 | `GET /v1/voices`, `GET /health` | available voices, status |
 
-Rules: **numbers, times, dates and operations written out in words before synthesis** (the model cannot read digits; in French, "+" is written "plusse" so that the final "s" is pronounced); Markdown, links, emojis and tool notices removed; audio ≤ 10 MB and ≤ 120 s, text ≤ 2,000 characters; one job at a time per model. In the interface, the dictated sentence is sent, and the reply is read aloud sentence by sentence.
+Rules: **numbers, times, dates and operations written out in words before synthesis** (the model cannot read digits; in French, "+" is written "plusse" so that the final "s" is pronounced); Markdown, links, emojis and tool notices removed; audio ≤ 10 MB and ≤ 120 s, text ≤ 2,000 characters.
+
+Synthesis (in service):
+
+- **a single engine, served in order of arrival**: at most 8 syntheses waiting (`TTS_MAX_WAITING`), beyond that a 503; the engine is not thread-safe, and a second one would add no compute within the pod's CPU limit;
+- **relayed stop**: if the client drops the connection (playback stopped), generation stops and the slot is released (about 20 ms measured);
+- **duration guard**: beyond max(1.8 s; 0.135 s × characters), or if the model does not signal the end of its generation, synthesis is stopped: 502 without streaming, early end with streaming;
+- **two compute threads** (`TTS_THREADS=2`): generation and decoding each get that many, i.e. the pod's 4-CPU limit; with 4, they competed for 8 threads.
+
+In the interface, the reply is read **while it is being written**: in groups of sentences (the first from about forty characters, then 80 to 150), chained without gaps, with a timeout that accounts for the queue; a late group is retried or merged into the next one, and is only skipped on a service error, never silently. In service, verified on a long reply (the voice starts before the text ends). Not done yet: the chat requests each group in one block and does not consume streamed PCM yet; relaying the stream through the model router remains to be proven on the real path (without relaying, the PCM arrives whole, as before).
 
 Voices: the model's catalogue, or a voice converted from a freely licensed recording (`export-voices.sh`, on the node, with the model's "cloning" variant). Never a person's voice without their consent.
 

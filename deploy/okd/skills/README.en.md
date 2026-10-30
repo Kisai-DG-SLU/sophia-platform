@@ -49,6 +49,10 @@ The servers' code is not provided; their contract:
 
 Open data: French municipalities (official municipalities API), GeoNames (towns over 1,000 inhabitants, French names), Natural Earth country borders. ≈ 230 MB downloaded, ≈ 8 MB kept. Update: rerun `fetch-geo-data.sh`, then restart `sophia-geo`.
 
+Places the tool receives first go through the interface's guards: a place extracted by the model is only kept if it appears in the person's message or is the name of a saved place (see [the interface](../apps/chat-interface/README.en.md)).
+
+**Planned: local address geocoding**, for the places saved in profiles (home, personal places). A route or tool over the French national address base (open data, prepared on the node like the rest), called **once, when the place is saved**; no address in any log; `lieu`, `distance`, `carte` and the weather then work on the municipality and its coordinates, never on the address. Outside the covered country, a *plus code* (Open Location Code) is decoded locally by the interface, sending nothing out. Other place requests are still geocoded as today.
+
 ## Images — `sophia-image`
 
 `image` tool: the person's request (in French, verbatim) and the English prompt written by the model, a style (`illustration`, `coloriage` (colouring page), `aquarelle` (watercolour), `bd` (comic), `photo`); 512 × 512, one generation at a time on CPU (about ten seconds, a second request waits).
@@ -71,10 +75,13 @@ Status: in service (search) and deployed (content reading, acceptance test pendi
 | `details_fichier` | one item and its readable path |
 | `lire_fichier` | a document's text, extracted without execution (bounded XML archives, text-only PDF), truncated, flagged `contenu_sensible` |
 
+HTTP route next to the MCP: `GET /api/resume`, the Files summary for the interface's "What's new?" panel (files shared with the person, modified in the last 14 days, 20 at most; Files does not expose the sharing date). Same relayed token and same audience as the tools; 401 without a valid token. In service, checked without a token; the call from the interface is planned.
+
 - **Read-only, under the person's identity**: token relayed by the interface, verified (signature, issuer, expiry, audience, originating client, groups), then **exchanged** for a token issued to the tool; Files introspects it and applies its own permissions. No service account that reads everything. One MCP session per call; no token logged (the HTTP client's log brought down to WARNING, so that the person's search does not appear in it).
 - **Network**: ingress from the interface only; egress to DNS, the identity provider (public keys and exchange) and the reserved internal port of Files (GET only), **nothing else**.
 - **Build in a separate namespace** (`sophia-skills-build`): the tool receives the family's tokens, so no agent may change its BuildConfig or its image. That namespace has **no RoleBinding to an agent account**; quota of one build at a time; no ingress.
 - **Build EgressFirewall with a final deny**: cluster Services and pods, **the cluster API** (control-plane nodes, on the API port; without this rule the build hangs at clone, unable to update its status), PyPI; nothing else.
+- **Lesson: start inside the base image itself.** A minimal image may lack the time-zone database: a named time zone then raises an exception at import, and the pod crash-loops (`Recreate` strategy: the tool is cut off). Remedies: the time-zone database as a pinned dependency, an import that does not break the server (the route concerned answers 503, the rest carries on), an import check in the Containerfile that fails the **build** rather than the pod, and tests without a system database.
 - **Base image** that already contains Python, **imported through the internal registry** (ImageStream with `referencePolicy: Local`, pinned by digest): the build pod pulls nothing from the vendor and installs no system package. **Python dependencies pinned by hash** (`--require-hashes`, binary wheels only). Binary source (`git archive` of the commit), no trigger: a new image replaces the pod only after a new digest has been committed and applied.
 
 ## Variables

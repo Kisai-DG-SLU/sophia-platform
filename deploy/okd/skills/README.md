@@ -49,6 +49,10 @@ Le code des serveurs n'est pas fourni ; leur contrat :
 
 Données ouvertes : communes françaises (API officielle des communes), GeoNames (villes de plus de 1 000 habitants, noms français), contours des pays Natural Earth. ≈ 230 Mo téléchargés, ≈ 8 Mo gardés. Mise à jour : relancer `fetch-geo-data.sh`, puis redémarrer `sophia-geo`.
 
+Les lieux que l'outil reçoit passent d'abord par les gardes de l'interface : un lieu tiré par le modèle n'est retenu que s'il figure dans le message de la personne ou s'il est le nom d'un lieu enregistré (voir [l'interface](../apps/chat-interface/README.md)).
+
+**Prévu : géocodage d'adresse en local**, pour les lieux enregistrés dans les profils (domicile, lieux personnels). Une route ou un outil sur la Base Adresse Nationale (données ouvertes, préparées sur le nœud comme les autres), appelée **une fois, à l'enregistrement** ; aucune adresse dans un journal ; les outils `lieu`, `distance`, `carte` et la météo travaillent ensuite sur la commune et ses coordonnées, jamais sur l'adresse. Hors du pays couvert, un *plus code* (Open Location Code) est décodé en local par l'interface, sans rien envoyer dehors. Les autres demandes de lieu restent géocodées comme aujourd'hui.
+
 ## Images — `sophia-image`
 
 Outil `image` : la demande de la personne (en français, telle quelle) et la consigne anglaise écrite par le modèle, un style (`illustration`, `coloriage`, `aquarelle`, `bd`, `photo`) ; 512 × 512, une génération à la fois sur CPU (une dizaine de secondes, une seconde demande attend).
@@ -71,10 +75,13 @@ Le nom et la licence du modèle accompagnent chaque image. Licence de SDXL-Turbo
 | `details_fichier` | un élément et son chemin lisible |
 | `lire_fichier` | texte d'un document, extrait sans exécution (archives XML bornées, PDF en texte seul), tronqué, marqué `contenu_sensible` |
 
+Route HTTP à côté du MCP : `GET /api/resume`, le résumé de Fichiers pour le volet « Quoi de neuf ? » de l'interface (fichiers partagés avec la personne, modifiés depuis 14 jours, 20 au plus ; Fichiers n'expose pas la date du partage). Même jeton relayé et même audience que les outils ; 401 sans jeton valide. En service, contrôlée sans jeton ; l'appel par l'interface est prévu.
+
 - **Lecture seule, sous l'identité de la personne** : jeton relayé par l'interface, vérifié (signature, émetteur, expiration, audience, client d'origine, groupes), puis **échangé** contre un jeton émis pour l'outil ; Fichiers l'introspecte et applique ses propres droits. Aucun compte de service qui lit tout. Une session MCP par appel ; aucun jeton journalisé (journal du client HTTP ramené à WARNING, pour que la recherche de la personne n'y figure pas).
 - **Réseau** : entrée depuis l'interface seulement ; sortie vers le DNS, le fournisseur d'identité (clés publiques et échange) et le port interne réservé de Fichiers (GET seulement), **rien d'autre**.
 - **Build dans un namespace à part** (`sophia-skills-build`) : l'outil reçoit les jetons de la famille, donc aucun agent ne doit pouvoir changer sa BuildConfig ou son image. Ce namespace n'a **aucun RoleBinding vers un compte d'agent** ; quota d'un build à la fois ; aucune entrée.
 - **EgressFirewall du build en refus final** : Services et pods du cluster, **l'API du cluster** (nœuds du plan de contrôle, sur le port de l'API ; sans cette règle, le build reste bloqué au clonage, faute de pouvoir mettre à jour son état), PyPI ; rien d'autre.
+- **Leçon : démarrer dans l'image de base même.** Une image minimale peut manquer de la base des fuseaux horaires : un fuseau nommé lève alors une exception à l'import, et le pod boucle au démarrage (stratégie `Recreate` : l'outil est coupé). Remèdes : la base des fuseaux comme dépendance figée, un import qui ne casse pas le serveur (la route concernée répond 503, le reste continue), un contrôle d'import dans le Containerfile qui fait échouer le **build** plutôt que le pod, et des tests sans base système.
 - **Image de base** déjà munie de Python, **importée par le registre interne** (ImageStream en `referencePolicy: Local`, figée par empreinte) : le pod de build ne tire rien chez l'éditeur et n'installe aucun paquet système. **Dépendances Python figées par empreinte** (`--require-hashes`, roues binaires seules). Source binaire (`git archive` du commit), aucun déclencheur : une nouvelle image ne remplace le pod qu'après une nouvelle empreinte commitée et appliquée.
 
 ## Variables

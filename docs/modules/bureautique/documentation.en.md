@@ -3,7 +3,7 @@
 ## What the module does
 
 - **Store and share**: each person has their own file space, with folders, previews and version history. Everything is **private by default**; a share (viewer or editor) takes an explicit action, and a link stays "restricted" until it is opened up.
-- **Edit**: office documents (text, spreadsheet, presentation, OpenDocument and Microsoft formats) open in Collabora, inside the Files page, with several people at once.
+- **Edit**: office documents (text, spreadsheet, presentation, OpenDocument and Microsoft formats) open in Collabora, with several people at once. Files opens the editor in **a new tab**; in the interface's cockpit, the document opens in its own frame (below).
 - **From the chat**: Sophia finds one of the person's files by its name, then offers to open it (in Collabora for an editable document, in Files otherwise) and to view the folder that contains it. She can also read and summarize a document's content, with a local model only.
 
 ## Architecture
@@ -42,6 +42,33 @@ Collabora ──► Files WOPI API (internal TLS), DNS; nothing else
 
 Lesson: a relay is tested with real requests against fake services, headers included, not only with `nginx -t`.
 
+## In the cockpit
+
+The [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md) displays Files in the centre, under the name "Desk". Status: in service, in acceptance testing on each device.
+
+- **Displayable by the chat only**: `frame-ancestors 'self'` plus the chat's origin on Files pages; the API, administration and media keep refusing to be framed. Collabora adds the chat's origin to its own list: `frame-ancestors` checks the whole chain of frames, and the editor is nested. Settings: [`deploy/okd/office/`](../../../deploy/okd/office/README.en.md#display-in-the-cockpit).
+- **`sophia.pret` signal**: Files tells the cockpit it is ready when the person's session answers; without a signal after 8 s, the cockpit offers "Open separately" and "Sign in again".
+- **A document opens in the cockpit** (in service, in acceptance testing): the small script injected into Files replaces the single tab opening towards the editor (`/wopi/<uuid>`, same origin, no parameter) with a `sophia.ouvrir` message to the chat; the chat checks the source (the Desk frame), the origin and the closed form of the path, rebuilds the address on the module's origin, and opens the document in its own frame, with a "← Files" button. The document counts towards the limit of two live frames.
+- **Older tablet**: Files requires a recent engine; the cockpit shows an explanation instead of the frame.
+- **"What's new?" summary**: the MCP tool serves `GET /api/resume` (files shared with the person and modified in the last 14 days), with the same relayed token as its tools. In service, checked without a token; the call from the interface is planned.
+
+### Planned: "Sophia, open document X"
+
+- **Analysis by the model**: the "files" intent, with the "open" action and the search terms.
+- **Decision by rules**: the server calls `chercher_fichiers` with the person's token and chooses according to the number of results; **the document's identifier comes from the tool's result, never from the model**, and no search word enters an address.
+- **Execution**: an event from the server to the cockpit, with a closed-form path, checked on the server and in the browser.
+- One result: the document (on a phone, its **preview**); several: a clickable list in the cockpit, or the common folder; none: "My files". Drive has no search address and no "all files" view: the cockpit cannot make it display a result list.
+
+### Planned: Sophia writes into the open document
+
+Through Collabora's PostMessage API, relayed by the script injected into the editor page: plain-text insertion at the cursor, undoable with Ctrl+Z, refused if the document is read-only. Writing through Drive's API is ruled out: it would conflict with the editing session. Household decision: **Sophia inserts directly, without a click**; an "Insert" button remains to insert again. Deterministic checks, since the model's output leaves the conversation:
+
+- insertion only if the analysis asks for it **and** a document is open;
+- plain text, sanitised twice and bounded;
+- origins checked at every hop;
+- **a closed list of two relayed messages**, never a UNO command or a script;
+- acknowledgement or error shown to the person.
+
 ## Confidentiality
 
 - **Each person their own files**: an item created by one person is invisible to the others, including through its direct address, until it is shared.
@@ -57,6 +84,7 @@ A read-only MCP server ([`deploy/okd/skills/`](../../../deploy/okd/skills/README
 | `chercher_fichiers` | up to 10 items found **by name** (accent- and case-insensitive), with path, date, type, "editable"; no URL | in service |
 | `details_fichier` | one item and its readable path | in service |
 | `lire_fichier` | a document's text (odt, docx, ods, xlsx, pdf, txt, md, csv), bounded, flagged "sensitive content" | deployed, acceptance test pending |
+| `GET /api/resume` route | summary for "What's new?": files shared with the person, modified in the last 14 days, 20 at most; same token and same audience as the tools; Files does not expose the sharing date | in service, checked without a token; call from the interface planned |
 
 - **Dedicated API**: Files serves its API for relayed tokens on a **reserved internal port**, with no Route, **GET only**; the public port answers 404 on that path. Allowed actions are a read-only allow-list. Reading content goes through the same authorization as media, on that port.
 - **Links built by the chat**: the tool returns no address; the chat composes "Open in Collabora" for an item that is editable **and** an office type (by extension **or** MIME type), "Open in Files" (the preview) for the others, and "View in Files" to the folder that contains the item when the person can read it.
@@ -65,15 +93,17 @@ A read-only MCP server ([`deploy/okd/skills/`](../../../deploy/okd/skills/README
 
 ## Browsers
 
-Drive and Collabora use ES2022 `static {}` blocks: at least **Safari 16.4** (or an equivalent browser) is required. On an older device, Files does not start, and no server-side fix is reasonable. The chat detects the engine with a small ES2022 script (not the User-Agent): on an engine that is too old, the buttons to Files become inactive text that says so, and the result list stays visible.
+Drive and Collabora use ES2022 `static {}` blocks: at least **Safari 16.4** (or an equivalent browser) is required. On an older device, Files does not start, and no server-side fix is reasonable. The chat detects the engine with a small ES2022 script (not the User-Agent): on an engine that is too old, the buttons to Files become inactive text that says so, and the result list stays visible. In the cockpit, an explanation replaces the Desk frame.
 
 ## Planned
 
-- **Unified mail** (decided): a local aggregator that gathers a person's existing mailboxes over IMAP (two-way sync), with sorting, anti-spam and a webmail behind SSO; no server exposed to the Internet. An **MCP tool** will let the model or a workflow search, read, file and draft, never send or delete permanently: sending stays validated by the person.
-- **Persistent chat and video**: installed, in acceptance testing, in a separate module ([Communication](../communication/README.en.md)); Jitsi Meet replaced La Suite's Visio. Starting a call from the chat remains planned.
+- **Unified mail** (decided, **postponed** behind the other projects): a local aggregator that gathers a person's existing mailboxes over IMAP (two-way sync), with sorting, anti-spam and a webmail behind SSO; no server exposed to the Internet. An **MCP tool** will let the model or a workflow search, read, file and draft, never send or delete permanently: sending stays validated by the person.
+- **Persistent chat and video**: in service, in acceptance testing, in a separate module ([Communication](../communication/README.en.md)); Jitsi Meet replaced La Suite's Visio, and goes through the browser only. Starting a call from the chat remains planned.
 
 ## Lessons
 
 - A database "already tested" by migrations is not tested for writes: the first folder creation revealed the PostgreSQL 16 requirement.
 - Before switching a service to a new database, check its network **egress** as much as the database's ingress.
 - A token can end up in a log through an unexpected path (access log, error log, a tool's HTTP client): each path gets checked.
+- A minimal image may lack the time-zone database: check import and start-up **inside the base image itself**, and make the build fail rather than the pod ([`deploy/okd/skills/`](../../../deploy/okd/skills/README.en.md)).
+- For an nginx `sub_filter` to inject a script, the upstream response must not be compressed: clear `Accept-Encoding` towards the frontend.
