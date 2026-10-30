@@ -4,6 +4,8 @@ This card explains how the chat interface lets an MCP tool **act under the ident
 
 The example in service is searching the person's files (La Suite Drive) from the chat; the same path will serve any tool that must see "what this person is allowed to see".
 
+A second path, without token exchange, serves the **summary routes** of the applications shown in the cockpit ("What's new?"): see [To the summary routes](#to-the-summary-routes).
+
 ---
 
 ## Problem
@@ -66,6 +68,32 @@ Why exchange: the service then accepts only tokens **issued to the MCP**. The ch
 
 ---
 
+## To the summary routes
+
+The cockpit's "What's new?" panel is computed by the **chat server**, which queries each application's summary route (`GET /api/resume`, deterministic, no model) with the person's access token as `Authorization: Bearer`. Here there is **no exchange**: the token is checked by the receiver, which applies its own rights.
+
+```
+chat API ──Bearer──► application's oauth2-proxy ──► application (summary route)
+         └─Bearer──► summary module mounted in the messaging server
+```
+
+| Receiver | Check | What it refuses |
+|---|---|---|
+| **an application's oauth2-proxy** | `--skip-jwt-bearer-tokens=true`: the bearer token goes through the **main provider's verifier** (keys through the provider's internal Service, public issuer, the application's `client-id` required in `aud`), then groups and `--allowed-group` as for a session | `--bearer-token-login-fallback=false`: a refused token gets **403**, never a redirect to sign-in |
+| **a module that checks by itself** (application without oauth2-proxy) | signature with the realm keys, `iss`, `aud` = a **custom audience**, `azp` = the chat's client, `exp` and `iat`, allowed groups (guests excluded) | 401 for a refused token, 503 for any other error; it only returns counts, never a text or a sender |
+
+- Each receiver's audience is added to the chat token by an **audience mapper** on the chat's client; for a module without a Keycloak client, a custom audience is enough, no client is created ([`deploy/okd/identity/`](../../deploy/okd/identity/README.en.md#audiences-of-the-token-relayed-by-the-interface)).
+- Groups are in the access token, **without path**: `--allowed-group` compares the exact value.
+- **Never `--extra-jwt-issuers`**: that setting triggers an OIDC discovery on the provider's public address, which pods cannot reach. The main verifier already checks issuer, keys and audience.
+- The chat calls the **internal Service** of the application's oauth2-proxy; a separate NetworkPolicy opens that egress only ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/README.en.md#cockpit)), and the application opens the matching ingress.
+- An application with no data of its own (a static site) has no route: the chat computes its summary itself, without a token.
+- A module that finds the person's account by their identifier assumes that an identifier is **never reassigned** to another person.
+- A module's route that can also be reached through its application's public address stays guarded by the token.
+
+Why no exchange here: the route only returns a read-only summary, with the application's own rights, and the audience limits the token to that receiver.
+
+---
+
 ## Outputs without URLs, links built by the chat
 
 - The tool returns a **closed schema**: identifier (UUID), name, kind, type, readable path, date, "editable". **No URL**: a returned address would be ignored.
@@ -105,6 +133,8 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 | Token relay (oauth2-proxy, nginx, closed list) | in service |
 | "Files" MCP: verification, exchange, search by name, links built by the chat | in service |
 | Reading a document's content, reserved to local models ([Models by role](13-modeles-par-role.en.md)) | deployed, acceptance test pending |
+| Cockpit summary routes: audiences, network egress, applications that accept the bearer token (403 for an invalid token), messaging summary module (401 without a token) | in service, checked without a valid token |
+| The chat calling the summary routes with the person's token | planned |
 | Human approvals through the chat, with the same relayed token | planned (see [Observability](10-observabilite.en.md)) |
 
 ---

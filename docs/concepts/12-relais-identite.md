@@ -4,6 +4,8 @@ Cette fiche dit comment l'interface de discussion permet à un outil MCP d'**agi
 
 L'exemple en service est la recherche dans les fichiers de la personne (La Suite Drive) depuis le chat ; le même chemin servira à tout outil qui doit voir « ce que cette personne a le droit de voir ».
 
+Une seconde voie, sans échange de jeton, sert les **routes de résumé** des applications affichées dans le cockpit (« Quoi de neuf ? ») : voir [Vers les routes de résumé](#vers-les-routes-de-résumé).
+
 ---
 
 ## Problème
@@ -66,6 +68,32 @@ Pourquoi échanger : le service n'accepte alors que des jetons **émis pour le M
 
 ---
 
+## Vers les routes de résumé
+
+Le volet « Quoi de neuf ? » du cockpit est calculé par le **serveur du chat**, qui interroge la route de résumé de chaque application (`GET /api/resume`, déterministe, sans modèle) avec le jeton d'accès de la personne en `Authorization: Bearer`. Ici, **pas d'échange** : le jeton est vérifié par le destinataire, qui applique ses propres droits.
+
+```
+API du chat ──Bearer──► oauth2-proxy de l'application ──► application (route de résumé)
+            └─Bearer──► module de résumé monté dans le serveur de messagerie
+```
+
+| Destinataire | Vérification | Ce qu'il refuse |
+|---|---|---|
+| **oauth2-proxy d'une application** | `--skip-jwt-bearer-tokens=true` : le jeton porteur passe par le **vérificateur du fournisseur principal** (clés par le Service interne du fournisseur, émetteur public, `client-id` de l'application exigé dans `aud`), puis groupes et `--allowed-group` comme pour une session | `--bearer-token-login-fallback=false` : un jeton refusé reçoit **403**, jamais une redirection vers la connexion |
+| **module qui vérifie lui-même** (application sans oauth2-proxy) | signature par les clés du realm, `iss`, `aud` = une **audience personnalisée**, `azp` = le client du chat, `exp` et `iat`, groupes admis (invités exclus) | 401 pour un jeton refusé, 503 pour toute autre erreur ; il ne rend que des comptes, jamais un texte ni un expéditeur |
+
+- L'audience de chaque destinataire est ajoutée au jeton du chat par un **mappeur d'audience** sur le client du chat ; pour un module sans client Keycloak, une audience personnalisée suffit, aucun client n'est créé ([`deploy/okd/identity/`](../../deploy/okd/identity/README.md#audiences-du-jeton-relayé-par-linterface)).
+- Les groupes sont dans le jeton d'accès, **sans chemin** : `--allowed-group` compare la valeur exacte.
+- **Jamais `--extra-jwt-issuers`** : ce réglage lance une découverte OIDC sur l'adresse publique du fournisseur, que les pods ne joignent pas. Le vérificateur principal contrôle déjà émetteur, clés et audience.
+- Le chat appelle le **Service interne** de l'oauth2-proxy de l'application ; une NetworkPolicy à part ouvre cette seule sortie ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/README.md#cockpit)), et l'application ouvre l'entrée correspondante.
+- Une application sans données propres (site statique) n'a pas de route : le chat calcule son résumé lui-même, sans jeton.
+- Un module qui trouve le compte de la personne par son identifiant suppose qu'un identifiant n'est **jamais réattribué** à une autre personne.
+- La route d'un module joignable aussi par l'adresse publique de son application reste gardée par le jeton.
+
+Pourquoi pas d'échange ici : la route ne rend qu'un résumé en lecture, aux droits de l'application elle-même, et l'audience limite le jeton à ce destinataire.
+
+---
+
 ## Sorties sans URL, liens construits par le chat
 
 - L'outil rend un **schéma fermé** : identifiant (UUID), nom, genre, type, chemin lisible, date, « modifiable ». **Aucune URL** : une adresse renvoyée serait ignorée.
@@ -105,6 +133,8 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | Relais du jeton (oauth2-proxy, nginx, liste fermée) | en service |
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
 | Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
+| Routes de résumé du cockpit : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
+| Appel des routes de résumé par le chat, avec le jeton de la personne | prévu |
 | Validations humaines par le chat, avec le même jeton relayé | prévu (voir [Observabilité](10-observabilite.md)) |
 
 ---
