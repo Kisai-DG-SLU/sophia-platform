@@ -17,6 +17,7 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 | `02-network.yaml` | PostgreSQL accepte le namespace d'identité ; Keycloak n'accepte que le routeur, le namespace des applications et lui-même |
 | `03-keycloak.yaml` | instance Keycloak et Route |
 | `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, clients OIDC — interface de discussion (PKCE, secret par *placeholder*), administration de RabbitMQ (client public PKCE, audience `rabbitmq`), interface de Temporal (oauth2-proxy, secret par *placeholder*) |
+| `ajouter-mappeur-audience.py` | ajoute au client de l'interface un mappeur d'audience vers un service qui reçoit le jeton relayé (ci-dessous) ; lecture seule avec `--dry-run`, rejouable |
 
 ## Procédure
 
@@ -40,6 +41,31 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 
 - **Une liste fournie dans l'import remplace les valeurs par défaut du realm.** Déclarer `clientScopes` pour ajouter un scope supprime `profile`, `email`, `basic`… et la connexion échoue en `invalid_scope`. Ajouter, ne pas redéfinir : le mappeur des groupes est porté par le client.
 - **L'import ne s'applique qu'à la création du realm.** Pour rejouer un import corrigé : supprimer le realm, supprimer la ressource `KeycloakRealmImport`, réappliquer. Sur un realm existant, un client ajouté au fichier s'importe à part, depuis la console (*Clients → Import client*) ; le fichier reste la référence d'une installation neuve.
+
+## Audiences du jeton relayé par l'interface
+
+Quand l'interface de discussion relaie le jeton d'accès de la personne (voir [Relais de l'identité](../../../docs/concepts/12-relais-identite.md)), chaque service destinataire n'accepte que les jetons qui portent **son audience**. Elle est ajoutée au jeton du client de l'interface par un **mappeur d'audience**, un par service :
+
+| Service destinataire | Vérification | Mappeur |
+|---|---|---|
+| serveur MCP qui échange le jeton (fichiers) | signature, puis échange au nom de son client | audience de client (`included.client.audience`) |
+| oauth2-proxy d'une application, pour sa route de résumé du cockpit | `--skip-jwt-bearer-tokens` : vérificateur principal du fournisseur, `client-id` de l'application exigé dans `aud` | audience de client, égale au `client-id` de l'application |
+| module qui vérifie lui-même la signature, sans client propre (résumé de la messagerie) | signature par les clés du realm, émetteur, audience, client d'origine, groupes | **audience personnalisée** (`included.custom.audience`, option `--personnalisee`) : aucun client Keycloak n'est créé, puisqu'il ne servirait qu'à l'introspection ou à l'échange |
+
+```bash
+python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <client-de-l-application> --dry-run
+python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <client-de-l-application>
+python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <audience-libre> --personnalisee --dry-run
+```
+
+- Le script relève d'abord le **mappeur de groupes** du client : `--allowed-group` d'oauth2-proxy compare la valeur exacte, d'où des groupes **sans chemin** (`full.path false`) dans le **jeton d'accès**. Un mappeur non conforme arrête le script.
+- Il refuse les cas mal assortis : `--personnalisee` pour un nom qui est un client, ou l'inverse.
+- Une nouvelle audience n'arrive qu'au renouvellement du jeton : un 403 juste après, avec un jeton antérieur, est attendu.
+- **Jamais `--extra-jwt-issuers`** côté application : ce réglage lance une découverte OIDC sur l'adresse **publique** du fournisseur, que les pods ne joignent pas. Le vérificateur principal (clés par le Service interne, émetteur public) suffit.
+- Les en-têtes du realm ne changent pas : la page de connexion reste refusée dans un cadre (le cockpit propose « Se reconnecter »).
+- Ces mappeurs sont ajoutés à un realm existant ; `04-realm-sophia.yaml` ne porte que celui de RabbitMQ. Sur une installation neuve, rejouer le script après l'import.
+
+État : trois audiences (deux applications, la messagerie) en service, contrôlées par rejeu du script (« existe, non modifié ») et par un jeton invalide refusé en 403 par les deux applications.
 
 ## Réserver une application à certains groupes : chat permanent et visio
 

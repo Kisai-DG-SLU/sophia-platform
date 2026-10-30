@@ -2,6 +2,8 @@
 
 Deployment template for a web chat interface in front of the model router, with **no key in the browser** and **mandatory sign-in**. The front-end code is not provided: this directory describes the container, the proxy and the Kubernetes resources.
 
+The interface is also the **cockpit shell**: a single page that shows, next to the conversation with Sophia, the platform's applications (cooking, school, visualisation, messaging, video calls, office suite) in frames. See the [Cockpit](#cockpit) section.
+
 ```
 Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversation API :8000 ─→ model router (LiteLLM)
                           │ OIDC sign-in          │ static front         │ injected context (persona, profile, date)
@@ -21,6 +23,7 @@ Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversati
 | `render-pricing.py` | reads the router's prices server-side and writes `pricing.json` (atomic write) for cost display in the front |
 | `nginx.conf.in` | template: **allow-list** of served files and of routes relayed to the router, enforced identity headers, the person's token relayed on a single route, CORS for the school's origin only |
 | `sophia-interface.yaml` | dedicated `sophia-interface` namespace: ImageStream, BuildConfig (read-only deploy key), Deployment (oauth2-proxy + nginx + conversation API, `sophia-chat` class), Service, NetworkPolicy |
+| `sophia-interface-cockpit-egress.yaml` | cockpit-specific egress, in a separate policy added to the application's own: to the oauth2-proxy of the applications that provide a summary, and to the messaging summary route |
 | `sophia-interface-route.yaml` | production Route, applied at switchover |
 | `sophia-interface-essai.yaml` | trial Route before switchover, reachable through the VPN only, removed afterwards |
 
@@ -33,12 +36,21 @@ Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversati
 - **Enforced identity**: `x-litellm-end-user-id` comes from oauth2-proxy; headers sent by the client are overwritten. The router tracks spend per person.
 - **Server-side context**: in production, `v1/chat/completions` goes through the conversation API, which injects the persona, the person's profile and the date before the router; the browser cannot change them.
 - **Web search**: the tool loop (search, page reading, weather) runs in the API, against the `sophia-dmz` airlock. A page can only be read if its address comes from a search result or from the person's message: an address guessed by the model is refused by code.
+- **Places** (weather, place, distance, map): the model extracts the places from the request; deterministic guards check its output before any call:
+  - **a place must be said**: a place extracted by the model is kept only if it appears in the current message (compared without accents, case or article) or is the name of a saved place. The rule also applies to the model calling a tool freely, refused without any network call. It prevents a place taken from the history or invented (a misunderstood word geocoded to the other side of the world). In service, under acceptance testing;
+  - **a moment is never a place**: a closed list of moments ("tomorrow", weekdays…) is removed from places, as a second net;
+  - **without a place, the question is written by the server**, without calling the model again;
+  - **expected country**: a result outside the expected countries (`SOPHIA_PAYS_ATTENDUS`) and not named by the person must be confirmed instead of announced;
+  - **current place of the conversation**: the server stores in the database the last place **that came from the message** and passed the guards; "and tomorrow?" reuses it until another one is named. The model never rereads the history to find a place. No current place for a distance (two places), nor for a guest account, which always gets the question. In service, verified.
+  - **Profile places** (planned): two household places shared by everyone (a home, the default, and a second residence), set by an administrator, and a few personal places per person, freely named; a guardian sets a child's; another profile's places are never read; guests only have the places they name. The address stays in the chat database; the model only receives place **names**, and the announcement shows the name, not the town. A closed alias table ("at home" → the home) applies after the model's analysis. Resolution order: place said, else current place, else home (for a guest: the question). **Local geocoding** of the address, once when it is saved, by the national address base served in the namespace of tools without Internet; outside that base, an Open Location Code entered by the administrator and decoded locally, refused if it falls far from the chosen town. Other requests are still geocoded online through the web airlock.
 - **Tools over MCP**: the API is an MCP client; it reads the tool list of every server in `SOPHIA_MCP_URLS` (web airlock, [local tools](../../skills/README.en.md), modules), shows the announcement each tool declares (icon, label), fills reserved parameters itself (protected account) and inserts into the answer, after checking them, the images and maps the tool returns. Adding a tool requires no interface change.
 - **Models per role**: `SOPHIA_MODELS_BY_ROLE` (by default, children and guests on the local model only; an account with no known role is treated as a guest). A model sent by the browser outside the list gets an **explicit 403** and nothing goes to the router: no silent substitution. Internal calls (analysis, rephrasing, summary) reuse the already-checked model; the profile only exposes allowed models. Voice uses a separate virtual key (`LITELLM_AUDIO_API_KEY`, in service), limited to the two voice aliases and set by nginx on its routes only: the rule is held by the router, without parsing the form. See [Models by role](../../../../docs/concepts/13-modeles-par-role.en.md).
 - **Slots on the graphics card**: chats take at most 2 of the local server's slots during the day, 1 from 3 a.m. to 7 a.m. (`SOPHIA_LOCAL_CHAT_PLAGES`); school never waits; one more chat waits 60 s at most, then gets a "very busy" message. The browser's background tasks (title, requested summary) carry the `X-Sophia-Tache: fond` header and go to the background alias, as a simple relay, falling back to the main alias if the router or the key refuses it; the compaction summary stays on the main alias, since it is on the path of the person's message.
 - **Answer written by the service**: an MCP tool may return `_trace` (a line shown before the answer) and `_fin` (the final answer, shown as is, without calling the model again). The decision stays with the service that knows its data (for instance "nothing planned" for an empty slot): the model can no longer embellish it.
 - **Paths declared by tools**: an MCP server declares each tool's path in its metadata (`sophia/parcours`: `express`, `lecture`, `liste`). The chat server picks by rules the tools offered to the model, or calls an express-path tool itself and writes the answer from the service's messages; a server that declares no path keeps the old behavior.
-- **Opening an application**: an `application` intent in the analysis, with enumerations built by the server for the person's role; decision in the policy, from a closed, versioned list (`SOPHIA_APPLICATIONS`: identifier, name, base address, allowed pages, roles); the server writes the sentence and a **button**, and the browser only accepts an application button whose address starts with a base from the list. The click opens or reuses a **named tab** per application (a browser blocks opening a tab without a gesture from the person). Allowed roles come from the list (Files: the whole family, each for their own files; never guests); buttons are removed from the history sent to the model, which must never write an address.
+- **Opening an application**: an `application` intent in the analysis, with enumerations built by the server for the person's role; decision in the policy, from a closed, versioned list (`SOPHIA_APPLICATIONS`: identifier, name, base address, allowed pages, roles). Allowed roles come from the list (Files: the whole family, each for their own files; never guests); the model never writes an address.
+  - **In the cockpit**: no button any more. The server adds to the stream an event that switches the cockpit to the requested module and page, taken from the closed list; the browser re-checks the module, its mode and the path's shape. From the home page and the Sophia module the switch is direct; from "Ask Sophia" inside another application, the cockpit asks first. A "Sophia opened … for you" banner offers a way back. **Ready, being put into service.**
+  - **Chat opened alone** (outside the cockpit, or a device that cannot show the application): the server writes the sentence and a **button**, and the browser only accepts an application button whose address starts with a base from the list. The click opens or reuses a **named tab** per application (a browser blocks opening a tab without a gesture from the person). Buttons are removed from the history sent to the model. In service.
 - **Files in the chat** (in service): find one of the person's files in the office suite, then open it. oauth2-proxy relays the access token (`--pass-access-token`, `--cookie-refresh=4m`, below the token's 5-minute lifetime); nginx forwards it to the API on the chat route only (`X-Sophia-Jeton`) and clears it everywhere else, never towards the router; the API sends it only to the servers on the closed list `SOPHIA_MCP_JETON_URLS`, and never to the model. Search is by name; the answer is written by the server, with links it builds: "Open in Collabora" for an editable document, "Open in Files" (preview) for another file, and "View in Files", which opens the **folder** containing the file. **Reading a document's content** ("read me the second one") is deployed, acceptance test pending: reserved to local models (`SOPHIA_MODELES_CONTENU`), content removed from any call to another model, no tool offered after a reading. See [Identity relay](../../../../docs/concepts/12-relais-identite.en.md).
 - **School on its own address**: the school button opens the school's own address, with a deep link per level and subject built by the server; in the browser, any link to the school becomes that button (a known route is kept, an invented path leads to the home page, a look-alike address stays an ordinary link), and the model's instructions no longer contain the address. The old `/ecole/` path is no longer relayed: a 302 redirect (not a 301, which the browser keeps forever) leads to the school's address, for bookmarks and the buttons of older answers, fragment included.
 - **New-version notice** (in service): the API sets the `X-Sophia-Version` header (the image commit) on every response; the front compares it with the version it loaded, on every response and when the tab regains focus, and shows a "Reload" banner, never during typing or a response; never an automatic reload, the draft is kept.
@@ -49,7 +61,84 @@ Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversati
 - **Test accounts**: fictitious roles (`enfant-a`, `parent-b`), never the family's first names.
 - **Context window**: capped per model (`SOPHIA_CONTEXT_LIMITS`); beyond it, the oldest exchanges are summarised, and an oversized file is refused with a clear message.
 - **Conversation API**: listens on `127.0.0.1` only, behind nginx; identity comes from the headers set by nginx.
-- **Network**: ingress from the OpenShift router only, to oauth2-proxy; the services it reaches (database, web airlock, tools, modules) admit the interface from its namespace only; egress to the model router, Keycloak, PostgreSQL 18 (the old instance stays open during the hold period after the migration), Forgejo, the web airlock, the MCP servers of `sophia-skills` and of modules, the school and DNS.
+- **Network**: ingress from the OpenShift router only, to oauth2-proxy; the services it reaches (database, web airlock, tools, modules) admit the interface from its namespace only; egress to the model router, Keycloak, PostgreSQL 18 (the old instance stays open during the hold period after the migration), Forgejo, the web airlock, the MCP servers of `sophia-skills` and of modules, the school and DNS. The cockpit adds a **separate policy** (`sophia-interface-cockpit-egress.yaml`): egress to the oauth2-proxy port of the applications that provide a summary and to the messaging summary route; rules add up, the application's own policy is unchanged. No egress to the applications shown in frames: the browser loads them.
+
+## Cockpit
+
+The chat becomes the single shell for the platform's uses, rather than a chat that sends people to other tabs. Each application keeps its own look and its own sign-in; the frame (panels, header, home page) follows the theme chosen in the profile.
+
+### Shell
+
+- **Module panel** on the left, hidden by default, opened by a menu button. The list is **closed, built by the server and filtered by role** (identifier, name, mode `interne` / `a_part` / `iframe`, address, roles, read-only page, required engine); an address that is not `https://` or an unknown mode is dropped. Hiding a module is not a control: each application keeps its oauth2-proxy and its groups. Without a module list, the chat stays alone.
+- **One address per module** (`#/<module>`): the Back button and reloading work.
+- **Right-hand panels**, hidden by default, whose button disappears while the panel is open: "What's new?" on the home page, conversations and diary in the Sophia module, "Ask Sophia" in the other applications (planned). On a large screen they take their own space; on a phone they overlay. Their state is kept when switching module and on reload.
+- **Theme**: a header button opens the choice (light or dark, profile themes, calendar themes), saved in the profile as in the chat.
+- **"Zone Grise" development module**, for the administrator only: manage and supervise development assisted by the development agents, and talk with them; later, a "Pair Programming" button that opens a terminal in the coding tool. **Planned**: absent from the list until it exists.
+
+Status: in service; layout validated on a computer, tests on an old tablet and a phone under acceptance testing.
+
+### Home page
+
+- The cockpit's opening page. People **talk to Sophia** there: the home page uses the same sending path, microphone and voice as the chat, and shows only the person's last sentence and Sophia's last answer, with "See the whole conversation".
+- **Active session**, held by the server and shared across devices: the home conversation continues if it dates from today and is less than 3 hours old, otherwise a new one opens; its title and start time are shown, with "Change" and "New".
+- **Hologram** of Sophia's avatar: a point cloud taken from the avatar, drawn in 2D in the browser without a library, swaying ±30°, with expressions and blinking. **Adaptive**: three density levels, starting with the lightest on an unknown device, going up or down according to the measured time per frame, falling back to a still image; the chosen level expires after a week and with each new version. Stopped outside the home page and in a hidden tab; fixed head if the device asks for reduced motion.
+- **Home page per theme**: scene background, hologram tint and small discreet pictograms from a closed list, per theme; contrasts checked by a test.
+- **Sophia's states**: a golden cloud in the head while thinking, lit as soon as the question is sent; the icon of the called tool next to the head, kept for at least 2.5 s; the lips move while the visible text grows and while the voice speaks.
+
+Status: in service; home page text, cloud on sending, tool icon, order of states and home page theme verified by the administrator on the real path; tests on an old tablet and a phone under acceptance testing.
+
+### States in the stream
+
+- The server adds to the (OpenAI-compatible) response stream events **without `choices`**, so other clients ignore them: `sophia_etat` (`reflexion`, `outil` with an icon and a label, `fin`).
+- The icon is chosen **by the server** from a closed list (cooking, messages, weather, files, school, web, generic), from the tool's name or its server; never from a model text.
+- Tool announcements and traces carry `sophia_annonce` and never count as Sophia's text. The visible text is decided by the browser alone; the model's reasoning (tags or a dedicated field) keeps the "thinking" state.
+- **Background tasks** (title, summary) never act on the hologram, neither on the server nor in the browser.
+- **Observation mode**, enabled only by an address parameter: a local, timestamped overlay of the received states, with "Copy", to diagnose on a real question. Nothing is sent.
+
+### Voice along the stream
+
+The voice starts while the text is being written: by groups of sentences (the first one from about forty characters, then 80 to 150), chained without gaps with one synthesis ahead, without reading twice at the end, cut cleanly. A group's time limit accounts for the synthesis queue; when it expires, the group is retried then merged into the next one: **no text is lost**, a group is skipped only if the service fails. In service, verified (the voice starts well before the end of the text); sound on an old tablet under acceptance testing. Service side: [`deploy/okd/inference/`](../../inference/README.en.md).
+
+### Applications in frames
+
+| Setting | Role |
+|---|---|
+| `SOPHIA_MODULES_CADRE` | list of modules shown in the centre, read at startup: changing a mode takes an `oc apply`, not a build |
+| `frame-src` of the content policy | limited to the closed list's addresses, compared by a test |
+| live frames | **two at most**, loaded on first opening; the oldest is unloaded, never the one on screen |
+| `allow` | camera and microphone for video calls only; clipboard and full screen for a document |
+
+- **`sophia.pret` signal**: each application posts `{type: "sophia.pret", module: "<identifier>"}` to the chat's origin only when it is ready. The chat accepts a message only if its **origin** is the module's **and** its **source** is that module's frame; a fake signal posted by another page is ignored. The identifier must be exactly the module's in the list (a different identifier is ignored, and the fallback shows up wrongly).
+- **Fallback after 8 s** without a signal: "Open separately" (named tab) and "Sign in again" (sign-in in a tab, then the frame reloads on returning to the cockpit).
+- **Expired sign-in**: nothing changes in the identity provider's headers, whose sign-in page is still refused in a frame. An application with no session on the device shows the fallback; "Sign in again" once per application and per device is enough (already signed in to the provider, so nothing to type).
+- **Each application** sets `frame-ancestors 'self' <chat origin>`: only the chat can show it. `frame-ancestors` checks the whole chain of frames: an editor nested in an application (office suite) must also allow the chat.
+- Everything is under one parent domain: the frames' cookies are not third-party cookies.
+- An application that needs a more recent engine than the device's shows an explanation instead of the frame.
+
+Status: cooking, school and visualisation in frames, in service, verified; messaging, video calls and office suite in frames, in service, under acceptance testing. Each application's settings: [modules](../../../../docs/modules/README.en.md), [office suite, chat and video calls](../../office/README.en.md).
+
+### Document opened from the office suite
+
+The files application opens the editor in a new tab. In the cockpit, the small script it serves replaces that one gesture: it posts `{type: "sophia.ouvrir", module: "bureau", chemin: "/wopi/<id>"}` to the chat only, only if its direct parent is the chat and for an exact same-origin path. The chat refuses a path that is too long, contains `..`, `?`, `#` or `\`, or does not match the closed shape; it rebuilds the address on the module's origin and checks it again. The document opens in a frame laid over the list, with a "← Files" button, its own signal and its own fallback, and counts in the two-frame limit. In service, under acceptance testing.
+
+Planned:
+
+- **"Sophia, open document X"**: analysis by the model (intent and terms); decision by rules (search tool called with the person's token, choice by number of results); execution by a server event to the cockpit. **The identifier comes from the tool's result, never from the model**, and the path is checked on both sides. One result: the document (the preview on a phone); several: a clickable list, or their common folder; none: "My files".
+- **Sophia writes into the open document**: direct insertion of plain text at the cursor, through the editor's integration API relayed by the application's script, undone with Ctrl+Z, with an "Insert" button to insert again. Deterministic checks, since the model's output leaves the conversation: insertion only if the analysis asks for it **and** a document is open, sanitised and bounded text, origins checked at each hop, closed list of two relayed messages (never a command or a script), acknowledgement or error shown.
+
+### "What's new?"
+
+- Home page panel, in three groups: to do, notifications, news; each line carries its application's avatar and colour.
+- **Computed by the chat server**, so that the panel is complete on a new device: the browser queries no application.
+- **Contract**: each application exposes `GET /api/resume`, deterministic, with no language model, at most 20 items `{id, groupe, titre, detail, date, expire, relative link, priorite}`; `503` means "absent for now". The chat validates the schema, never renders a text as HTML and rebuilds each link on the closed list's base.
+- **Identity**: the chat server relays the person's access token (see [Identity relay](../../../../docs/concepts/12-relais-identite.en.md#to-the-summary-routes)).
+- An application with no data of its own (the school, a static site) has no route: its summary and the first-appearance date of its news are computed by the chat in its database.
+
+Status: first version in service, under acceptance testing (school summary and content news, computed by the chat; a failing source shows nothing). The access chain of the other applications is in place (audiences, network egress, applications that accept the token and answer 403 to an invalid token); **the chat's calls to the summary routes are planned**.
+
+### Access through the cockpit only (planned)
+
+Last step, after acceptance testing on all devices: an application page opened on its own is sent back to the cockpit, on the right module. Two layers: `frame-ancestors` (already set), then the redirect, on the server by the request's destination header, and in the page by a script for old browsers that do not send that header. An exception for the administrator, for troubleshooting. It is a usage rule, not a security barrier: each application keeps its sign-in. Not concerned: native applications, technical routes (summaries, tools), the sign-in page.
 
 ## Prerequisites (secrets)
 

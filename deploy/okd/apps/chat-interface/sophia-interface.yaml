@@ -203,6 +203,10 @@ spec:
             # Seuls serveurs MCP qui reçoivent le jeton d'accès de la personne (outils à méta sophia/jeton)
             - name: SOPHIA_MCP_JETON_URLS
               value: "http://mcp-fichiers.sophia-skills.svc.cluster.local:8000/mcp"
+            # Cockpit : modules affichés au centre, en cadre (les autres s'ouvrent à part). Chaque module listé
+            # doit poser frame-ancestors pour l'origine du chat et envoyer le signal sophia.pret avec cet
+            # identifiant exact. Changer la liste : oc apply, sans build. Voir README.md, section Cockpit.
+            - { name: SOPHIA_MODULES_CADRE, value: "cuisine,ecole,workflow,messages,visio,bureau" }
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }

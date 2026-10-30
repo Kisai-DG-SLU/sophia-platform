@@ -17,6 +17,7 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 | `02-network.yaml` | PostgreSQL accepts the identity namespace; Keycloak only accepts the router, the applications namespace and itself |
 | `03-keycloak.yaml` | Keycloak instance and Route |
 | `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*) |
+| `ajouter-mappeur-audience.py` | adds to the interface's client an audience mapper towards a service that receives the relayed token (below); read-only with `--dry-run`, replayable |
 
 ## Procedure
 
@@ -40,6 +41,31 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 
 - **A list provided in the import replaces the realm defaults.** Declaring `clientScopes` to add one scope removes `profile`, `email`, `basic`… and sign-in fails with `invalid_scope`. Add, do not redefine: the group mapper is carried by the client.
 - **The import only applies when the realm is created.** To replay a fixed import: delete the realm, delete the `KeycloakRealmImport` resource, apply again. On an existing realm, a client added to the file is imported on its own from the console (*Clients → Import client*); the file remains the reference for a fresh install.
+
+## Audiences of the token relayed by the interface
+
+When the chat interface relays the person's access token (see [Identity relay](../../../docs/concepts/12-relais-identite.en.md)), each receiving service only accepts tokens that carry **its audience**. It is added to the token of the interface's client by an **audience mapper**, one per service:
+
+| Receiving service | Check | Mapper |
+|---|---|---|
+| MCP server that exchanges the token (files) | signature, then exchange on behalf of its client | client audience (`included.client.audience`) |
+| an application's oauth2-proxy, for its cockpit summary route | `--skip-jwt-bearer-tokens`: the provider's main verifier, the application's `client-id` required in `aud` | client audience, equal to the application's `client-id` |
+| a module that checks the signature itself, without a client of its own (messaging summary) | signature with the realm keys, issuer, audience, originating client, groups | **custom audience** (`included.custom.audience`, `--personnalisee` option): no Keycloak client is created, since it would only serve introspection or exchange |
+
+```bash
+python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <application-client> --dry-run
+python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <application-client>
+python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <free-audience> --personnalisee --dry-run
+```
+
+- The script first reads the client's **group mapper**: oauth2-proxy's `--allowed-group` compares the exact value, hence groups **without path** (`full.path false`) in the **access token**. A non-compliant mapper stops the script.
+- It refuses mismatched cases: `--personnalisee` for a name that is a client, or the reverse.
+- A new audience only appears when the token is renewed: a 403 right after, with an older token, is expected.
+- **Never `--extra-jwt-issuers`** on the application side: that setting triggers an OIDC discovery on the provider's **public** address, which pods cannot reach. The main verifier (keys through the internal Service, public issuer) is enough.
+- The realm's headers do not change: the sign-in page is still refused in a frame (the cockpit offers "Sign in again").
+- These mappers are added to an existing realm; `04-realm-sophia.yaml` only carries RabbitMQ's. On a new installation, run the script again after the import.
+
+Status: three audiences (two applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by both applications.
 
 ## Reserving an application to some groups: persistent chat and video calls
 
