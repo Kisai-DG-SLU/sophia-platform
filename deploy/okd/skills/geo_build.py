@@ -4,7 +4,7 @@ Sources libres, téléchargées depuis le nœud (mise à jour = relancer fetch-g
 - communes françaises : geo.api.gouv.fr (INSEE, IGN — Licence Ouverte Etalab 2.0) ;
 - localités du monde de plus de 1 000 habitants : GeoNames cities1000 (CC BY 4.0), hors France,
   avec leur nom français quand GeoNames en a un (alternateNamesV2, langue « fr » : « Londres »,
-  « Andorre-la-Vieille ») ;
+  « Munich ») ;
 - pays (contours et noms en français) : Natural Earth 1:10 m et 1:50 m (domaine public).
 
 Sortie (gzip JSON, dans le dossier donné) : lieux.json.gz, pays-10m.json.gz, pays-50m.json.gz,
