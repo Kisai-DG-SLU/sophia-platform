@@ -17,9 +17,13 @@ spec:
       ports:
         - { protocol: TCP, port: 5432 }
 ---
-# Keycloak : entrée depuis le routeur (navigateurs), depuis sophia-apps et l'interface
-# Temporal de sophia-core (échanges serveur à serveur des proxys OIDC) et depuis le namespace lui-même (operator,
-# cluster Infinispan). Sortie non restreinte à ce stade : l'operator parle à l'API.
+# Keycloak : entrée depuis le routeur (navigateurs, et les clients qui passent par le nom public), et depuis
+# les seuls clients OIDC qui l'appellent par son Service interne (proxys OIDC, échanges serveur à serveur), sur
+# 8080 seulement ; depuis le namespace lui-même (operator, Jobs d'import) sur 8080 et 9000. Le cluster
+# Infinispan (7800, 57800) est ouvert par la politique de l'opérateur, entre pods Keycloak.
+# Mêmes pairs que spec.networkPolicy.http de 03-keycloak.yaml : un client de plus par le Service interne =
+# une ligne dans les DEUX listes, sinon sa connexion échoue. Les étiquettes « app » sont celles de votre
+# installation (une par application). Sortie non restreinte à ce stade : l'operator parle à l'API.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -32,14 +36,49 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: { policy-group.network.openshift.io/ingress: "" }
+        # oauth2-proxy des modules de sophia-apps (pas les pods de build)
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-apps }
-        # oauth2-proxy de l'interface Temporal (jeton, clés) ; serveur Temporal
-        # (clés de signature), Jobs d'administration (jeton du compte temporal-admin) et
-        # répartiteur (jeton du compte temporal-repartiteur)
+          podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [ecole, recettes, courses] }
+        # navigateur distant du module Courses (oauth2-proxy), dans le sas
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-dmz }
+          podSelector:
+            matchLabels: { app: courses-navigateur }
+        # outil MCP des fichiers (échange de jeton, clés)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-skills }
+          podSelector:
+            matchLabels: { app: mcp-fichiers }
+        # oauth2-proxy de l'outil de visualisation
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-workflow }
+          podSelector:
+            matchLabels: { app: sophia-workflow-collecteur }
+        # oauth2-proxy et API de l'interface de discussion
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-interface }
+          podSelector:
+            matchLabels: { app: sophia-interface }
+        # oauth2-proxy de l'interface Temporal (jeton, clés) ; serveur Temporal (clés de signature),
+        # Jobs d'administration (jeton du compte temporal-admin) et répartiteur (jeton du compte temporal-repartiteur)
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-core }
           podSelector:
             matchExpressions:
               - { key: app, operator: In, values: [temporal-ui, temporal, temporal-admin, repartiteur] }
+        # backend de la bureautique (jeton, userinfo, clés) ; l'éditeur en ligne est exclu
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-workspace }
+          podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [fichiers-backend, fichiers-worker] }
+      ports:
+        - { protocol: TCP, port: 8080 }
+    - from:
         - podSelector: {}
+      ports:
+        - { protocol: TCP, port: 8080 }
+        - { protocol: TCP, port: 9000 }

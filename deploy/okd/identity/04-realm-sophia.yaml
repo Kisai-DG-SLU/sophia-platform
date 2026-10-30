@@ -80,6 +80,43 @@ spec:
               id.token.claim: "true"
               access.token.claim: "true"
               userinfo.token.claim: "true"
+          # Audiences du jeton d'accès relayé par l'interface (voir README, « Audiences du jeton relayé ») :
+          # l'outil MCP des fichiers (échange de jetons), les routes de résumé du cockpit derrière l'oauth2-proxy
+          # d'une application (audience = son client-id) et le module de résumé de la messagerie (audience libre,
+          # sans client : il vérifie lui-même le jeton). Keycloak ne vérifie pas que le client nommé existe :
+          # ces clients peuvent être importés après le realm. Sur un realm existant : ajouter-mappeur-audience.py.
+          - name: audience-sophia-fichiers
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.client.audience: sophia-fichiers
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          - name: audience-recettes
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.client.audience: recettes
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          - name: audience-sophia-workflow
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.client.audience: sophia-workflow
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          - name: audience-sophia-messages
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.custom.audience: sophia-messages
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
       # Interface d'administration de RabbitMQ. Ajouté au realm existant par import
       # dans la console (identity/clients/rabbitmq.json) ; reporté ici pour une installation neuve.
       - clientId: rabbitmq

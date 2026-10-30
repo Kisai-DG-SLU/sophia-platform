@@ -14,9 +14,9 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 | Fichier | Contenu |
 |---|---|
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (approbation manuelle) |
-| `02-network.yaml` | PostgreSQL accepte le namespace d'identité ; Keycloak n'accepte que le routeur, le namespace des applications et lui-même |
-| `03-keycloak.yaml` | instance Keycloak et Route |
-| `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, clients OIDC — interface de discussion (PKCE, secret par *placeholder*), administration de RabbitMQ (client public PKCE, audience `rabbitmq`), interface de Temporal (oauth2-proxy, secret par *placeholder*) |
+| `02-network.yaml` | PostgreSQL accepte le namespace d'identité ; Keycloak n'accepte, sur son port HTTP, que le routeur et une liste nommée de clients qui l'appellent par son Service interne, et sur son port de gestion que son propre namespace |
+| `03-keycloak.yaml` | instance Keycloak (avec la liste des entrées de la politique réseau que crée l'operator) et Route |
+| `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, clients OIDC — interface de discussion (PKCE, secret par *placeholder*), administration de RabbitMQ (client public PKCE, audience `rabbitmq`), interface de Temporal (oauth2-proxy, secret par *placeholder*) ; mappeurs d'audience du jeton relayé par l'interface |
 | `ajouter-mappeur-audience.py` | ajoute au client de l'interface un mappeur d'audience vers un service qui reçoit le jeton relayé (ci-dessous) ; lecture seule avec `--dry-run`, rejouable |
 
 ## Procédure
@@ -40,6 +40,7 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 ## Pièges rencontrés
 
 - **Une liste fournie dans l'import remplace les valeurs par défaut du realm.** Déclarer `clientScopes` pour ajouter un scope supprime `profile`, `email`, `basic`… et la connexion échoue en `invalid_scope`. Ajouter, ne pas redéfinir : le mappeur des groupes est porté par le client.
+- **L'operator crée sa propre NetworkPolicy, ouverte à tout le cluster.** Sans liste dans le CR (`spec.networkPolicy`), elle ouvre le port HTTP (8080) et le port de gestion (9000) à tous les pods ; comme les politiques s'additionnent, celle de `02-network.yaml` ne filtrait alors rien sur ces ports. Le CR porte donc la même liste de pairs que `sophia-identity-ingress` : **un client de plus par le Service interne = une ligne dans les deux listes**, sinon sa connexion échoue. Les clients qui passent par le nom public passent par le routeur, déjà admis. À appliquer à un moment calme, avec un contrôle de connexion de chaque application ; le pod de Keycloak ne redémarre pas. En service.
 - **L'import ne s'applique qu'à la création du realm.** Pour rejouer un import corrigé : supprimer le realm, supprimer la ressource `KeycloakRealmImport`, réappliquer. Sur un realm existant, un client ajouté au fichier s'importe à part, depuis la console (*Clients → Import client*) ; le fichier reste la référence d'une installation neuve.
 
 ## Audiences du jeton relayé par l'interface
@@ -63,7 +64,7 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <audien
 - Une nouvelle audience n'arrive qu'au renouvellement du jeton : un 403 juste après, avec un jeton antérieur, est attendu.
 - **Jamais `--extra-jwt-issuers`** côté application : ce réglage lance une découverte OIDC sur l'adresse **publique** du fournisseur, que les pods ne joignent pas. Le vérificateur principal (clés par le Service interne, émetteur public) suffit.
 - Les en-têtes du realm ne changent pas : la page de connexion reste refusée dans un cadre (le cockpit propose « Se reconnecter »).
-- Ces mappeurs sont ajoutés à un realm existant ; `04-realm-sophia.yaml` ne porte que celui de RabbitMQ. Sur une installation neuve, rejouer le script après l'import.
+- Ces mappeurs sont dans `04-realm-sophia.yaml` pour une installation neuve ; le script sert à les ajouter à un realm existant, puisque l'import ne s'applique qu'à la création.
 
 État : trois audiences (deux applications, la messagerie) en service, contrôlées par rejeu du script (« existe, non modifié ») et par un jeton invalide refusé en 403 par les deux applications.
 

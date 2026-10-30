@@ -24,7 +24,7 @@ Each namespace belongs to a security zone. Communication is restricted by Kubern
 | Zone | Namespaces | Role | Isolation status |
 |---|---|---|---|
 | Orchestration | `sophia-core` | model router, dispatcher, workflows, bus, relational database | **in place**: default ingress deny, one rule per service (the model router only admits applications, agents, development, memory, the ingress router and the node network); egress bounded by an EgressFirewall |
-| Identity and forge | `sophia-identity`, `sophia-git` | SSO, repositories | **in place**: ingress closed except intended flows. **Caveat**: the rule set by the identity provider's operator opens its internal HTTP port to the whole cluster, which cancels the restriction; to be fixed |
+| Identity and forge | `sophia-identity`, `sophia-git` | SSO, repositories | **in place**: ingress closed except intended flows; the identity provider's internal HTTP port is only open to the router and a named list of clients, its management port only to its own namespace, also in the rule set by its operator (which used to open it to the whole cluster) ([`deploy/okd/identity/`](../deploy/okd/identity/README.en.md)) |
 | Inference | `sophia-inference` | local models | **in place**: deny all, ingress from the model router and the image tool only, no egress |
 | Local tools | `sophia-skills` | MCP servers | **in place**: no egress besides DNS and image models, except the files tool (identity provider and the office suite's internal port) |
 | Airlock | `sophia-dmz` | web acquisition | **in place**: default deny; egress to the web reserved for acquisition |
@@ -130,7 +130,6 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 - Semantic Tribunal before storing anything from the web;
 - default deny in `sophia-memory`; admin network policy and image admission in `sophia-sandbox`;
 - egress control for the agents namespace;
-- restricting the identity provider's internal port to client namespaces;
 - access to the applications through the cockpit only, with an exception for the administrator;
 - update and vulnerability watch for pinned images (local scanner, update requests opened without automatic merge, report to the administrator);
 - scheduled, encrypted backups, with a restore test;

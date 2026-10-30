@@ -29,6 +29,16 @@ The service code is not provided; its contract:
 
 Interface-side rules: search is triggered by default for any information request; sources are cited; `fetch_page` only accepts an address coming from a search result or from the person's message; a tool failure is reported as such, with no invented cause.
 
+**Weather for a saved place** (in service): `weather_forecast` accepts coordinates with a label, and then skips online geocoding. The interface sends **the centre of the place's municipality**, never the address: the accuracy of a forecast does not justify sending a home's location to an external service. As a second safety net, the service **rounds the coordinates itself to 0.01°** (about 1 km) before passing them on. The "Municipality (postcode)" form is also accepted: the postcode is removed before geocoding then used to check the answer, which says "not found" rather than keeping a namesake.
+
+**Weather fallback cache** (coded and reviewed, not yet in service):
+
+- `PUT /cache/communes`: the interface sends the anonymous list of the municipalities of its saved places (label and coordinates, with no place name, owner or address), at most 50, rounded to 0.01° by the service; it replaces the previous one;
+- the route requires a **shared token**, compared in constant time: other pods can reach the service, only the interface must be able to replace the list. The token is in a Secret created by the administrator through a single pipe, never displayed, and never logged;
+- every 3 hours, the service preloads D to D+3 for each municipality and keeps the last successful answer, **in memory only**: nothing links a municipality to a person, neither on disk nor in a log;
+- if the online source fails, the cached forecast is returned with the time it was obtained, so that the answer says so;
+- the time zone database is a pinned dependency, checked at build time.
+
 ## Procedure (administrator)
 
 ```bash
