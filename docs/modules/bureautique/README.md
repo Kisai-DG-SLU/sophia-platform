@@ -4,7 +4,7 @@ Module construit sur SophIA à partir de logiciels libres existants : **La Suite
 
 | | |
 |---|---|
-| État | en service dans l'installation de référence ; affichage dans le cockpit en service, en recette ; recette publiée sous forme de procédure, sans les manifestes ; essais détaillés à faire. Prévu : « Sophia, ouvre le document X » et l'insertion de texte par Sophia dans le document ouvert |
+| État | en service dans l'installation de référence ; affichage dans le cockpit en service, en recette ; « Sophia, ouvre le document X » en service, en recette ; écriture par Sophia dans le document ouvert en service, vérifiée ; recette publiée sous forme de procédure, sans les manifestes ; essais détaillés à faire |
 | Utilisateurs | tous les comptes du realm, chacun dans son espace ; les invités n'ont pas l'outil de recherche dans la discussion |
 | Modèle | aucun dans le module ; depuis la discussion, la lecture du contenu d'un document est réservée aux modèles locaux |
 | Briques de la plateforme | SSO, PostgreSQL 18 partagé, stockage objet S3 commun, classes de priorité et quotas, interface de discussion, outil MCP « fichiers » |
