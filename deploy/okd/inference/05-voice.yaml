@@ -45,6 +45,7 @@ spec:
     metadata:
       labels: { app: sophia-voice }
     spec:
+      priorityClassName: sophia-voix    # voix en temps réel (../cluster/priority-classes.yaml)
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
@@ -54,7 +55,7 @@ spec:
           ports: [{ name: http, containerPort: 8000 }]
           env:
             - { name: DEFAULT_VOICE, value: estelle }
-            - { name: TTS_THREADS, value: "4" }
+            - { name: TTS_THREADS, value: "2" }     # génération et décodage ont chacun ce nombre de fils : 2 × 2 = la limite de 4 CPU
             - { name: ASR_THREADS, value: "4" }
           volumeMounts:
             - { name: models, mountPath: /models/voice, subPath: voice, readOnly: true }

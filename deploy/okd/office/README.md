@@ -2,7 +2,7 @@
 
 Recette de l'installation de référence pour le module [Bureautique](../../../docs/modules/bureautique/documentation.md) : La Suite Drive (« Fichiers », 0.25.3) et Collabora Online (CODE 26.04), dans un namespace dédié. Les choix et leurs raisons sont dans la documentation du module ; ici, les composants, les prérequis, les Secrets et la procédure. Les manifestes de l'installation de référence ne sont pas publiés : ils suivent les manifestes amont de Drive, avec les réglages ci-dessous, rendus par Kustomize.
 
-État : en service ; cette recette est une procédure, sans les manifestes de l'installation de référence ; essais détaillés (second compte, partages, lecture depuis la discussion) à faire.
+État : en service ; cette recette est une procédure, sans les manifestes de l'installation de référence ; essais détaillés (second compte, partages, lecture depuis la discussion) à faire. Fichiers et Collabora sont affichables dans le cockpit de l'interface : en service, en recette ([Affichage dans le cockpit](#affichage-dans-le-cockpit)).
 
 Le chat permanent et la visio du [module Communication](../../../docs/modules/communication/documentation.md), installés par le même projet dans deux autres namespaces, ont leur recette en fin de page : [Chat permanent et visio](#chat-permanent-et-visio).
 
@@ -56,6 +56,7 @@ Les valeurs sont produites sur place (mot de passe du rôle, secret du client OI
 - **Collabora** : `always_save_on_exit=true`, `idle_timeout_secs=1800`, `max_concurrency=2`, `cleanup.limit_dirty_mem_mb=1024` ; sonde sur `/`.
 - **nginx** : en-têtes `X-Forwarded-*` vidés vers le S3 (sinon la signature est vérifiée sur l'hôte public) ; `location ~ ^/cool` après la regex du WebSocket ; format de journal qui masque les jetons WOPI. Le serveur interne reprend les `proxy_set_header` du serveur public, `X-Forwarded-Proto: https` compris (sinon l'API, en production, répond 301 vers https).
 - **Pods** : `restricted-v2`, classe `sophia-workspace-low`, images figées par empreinte.
+- **Cockpit** : réglages de `fichiers-nginx` et de Collabora pour l'affichage dans le seul chat, en fin de page.
 
 ## Overlay « API externe » (pour l'outil MCP « fichiers »)
 
@@ -85,7 +86,7 @@ Côté outil et fournisseur d'identité : [`../skills/`](../skills/README.md) et
 
 Recette du [module Communication](../../../docs/modules/communication/documentation.md) : Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) dans `sophia-messagerie`, Jitsi Meet (`stable-11248-2` : web, Prosody, Jicofo, JVB) et un adaptateur OIDC → jeton dans `sophia-visio`. Comme pour la bureautique, c'est une procédure, sans les manifestes de l'installation de référence ; les choix et leurs raisons sont dans la documentation du module.
 
-État : **installé, en recette** ; essais avec les appareils du foyer à faire.
+État : **en service, en recette** : chat et visio installés et contrôlés par le vrai chemin (connexion, salon sans cadenas, adaptateur de la visio) ; essais avec les appareils du foyer (premier message, visio à plusieurs, refus d'un invité, compte d'enfant, compteur de la règle nftables) à l'étape de recette. La visio passe **par le navigateur seulement** (décision du foyer) : l'application mobile de Jitsi n'est plus utilisée.
 
 ### Composants
 
@@ -99,7 +100,7 @@ Recette du [module Communication](../../../docs/modules/communication/documentat
 | | `adaptateur` | connexion OIDC, puis jeton signé de 600 s pour une seule salle ; image construite dans le cluster depuis la forge, figée par empreinte |
 | | `jvb-media` | Service `ClusterIP` avec `externalIPs: [${VPN_IP}]`, port `${JVB_UDP_PORT}/UDP` ; **pas de NodePort** |
 
-Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, pair-à-pair coupé, `JVB_ADVERTISE_PRIVATE_CANDIDATES=false`, `ENABLE_COLIBRI_WEBSOCKET=0` (canal de pont par SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` pour l'UID arbitraire, sans privilège ni `anyuid`.
+Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DEEP_LINKING` (pas de page « Rejoindre dans l'application » : la visio reste dans le navigateur), pair-à-pair coupé, `JVB_ADVERTISE_PRIVATE_CANDIDATES=false`, `ENABLE_COLIBRI_WEBSOCKET=0` (canal de pont par SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` pour l'UID arbitraire, sans privilège ni `anyuid`.
 
 ### Prérequis
 
@@ -115,7 +116,8 @@ Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, pair-à-pai
 ### Réseau
 
 - **Entrée** : depuis le routeur pour les pages et les API ; JVB depuis `${VPN_NETWORK}` seulement, en UDP sur `${JVB_UDP_PORT}`.
-- **Sortie** : Synapse vers MAS et ntfy ; MAS et l'adaptateur vers le nom public du fournisseur d'identité, en 443, par le routeur ; JVB en UDP vers `${VPN_NETWORK}` seulement (réponses aux appareils), dans sa NetworkPolicy **et** dans l'EgressFirewall du socle, avant la règle de refus.
+- **Entrée de Synapse depuis le pod de l'interface**, sur son port HTTP, pour la route de résumé des non-lus (avec la sortie correspondante côté interface).
+- **Sortie** : Synapse vers MAS et ntfy, et vers le nom public du fournisseur d'identité, en 443 par le routeur, pour les clés publiques du realm (module de résumé ; la sortie existante le couvre) ; MAS et l'adaptateur vers le nom public du fournisseur d'identité, en 443, par le routeur ; JVB en UDP vers `${VPN_NETWORK}` seulement (réponses aux appareils), dans sa NetworkPolicy **et** dans l'EgressFirewall du socle, avant la règle de refus.
 - Le pont média n'utilise pas de NodePort : un NodePort serait joignable depuis le réseau local, et le pod n'y verrait que l'adresse de jonction d'OVN-Kubernetes. L'`externalIP` sur l'adresse VPN, comme la forge, n'est joignable que par le VPN et garde l'adresse réelle du client.
 
 ### Variables
@@ -152,3 +154,38 @@ Chaque valeur est générée sur place et écrite par un tube, sans saut de lign
 ### Retour arrière
 
 `oc delete -k` sur le chat ou la visio : la base, le volume des médias et les Secrets restent. Socles, bases, clients OIDC et règle nftables : suppressions par l'administrateur, selon leurs recettes.
+
+## Affichage dans le cockpit
+
+Le [cockpit de l'interface](../apps/chat-interface/README.md) affiche les applications en cadre, au centre. Chaque application doit accepter d'y être affichée **par le chat seul**, et le signaler. État : en service, en recette (affichage réel sur chaque appareil à l'étape de recette).
+
+| Application | Réglage |
+|---|---|
+| Messages (Element) | gabarit nginx de l'image recopié en ConfigMap : `frame-ancestors 'self' ${CHAT_ORIGIN}`, répété dans chaque `location` (un `add_header` dans une location annule ceux du niveau supérieur) ; `sub_filter` qui injecte `/sophia-cockpit/pret.js`. Sans cet en-tête, Element était affichable par n'importe quelle page (détournement de clic). La page de connexion de MAS reste refusée en cadre : « Se reconnecter » ouvre Element dans un onglet |
+| Visio (Jitsi) | `CSP_HEADER` avec `frame-ancestors 'self' ${CHAT_ORIGIN}`, `DISABLE_DEEP_LINKING`, `custom-config.js` (ConfigMap) qui charge `pret.js` ; caméra et micro autorisés par l'attribut `allow` du cadre ; seul `web` redémarre |
+| Bureau (Fichiers) | dans `fichiers-nginx`, **`location /` seulement** : `proxy_hide_header X-Frame-Options`, puis `frame-ancestors 'self' ${CHAT_ORIGIN}` ; l'API, l'administration et les médias gardent leur refus. `Accept-Encoding` vidé vers le frontend, pour que `sub_filter` puisse injecter `pret.js` |
+| Collabora | variable `content_security_policy`, qui **ajoute** `${CHAT_ORIGIN}` à la liste existante (Fichiers et service WOPI) : `frame-ancestors` contrôle toute la chaîne des cadres, l'éditeur imbriqué dans Fichiers l'est aussi dans le chat. Ni `net.frame_ancestors` (obsolète), ni `extra_params` (découpé aux espaces) |
+
+**Signal `sophia.pret`** : un petit script, `pret.js`, servi par chaque application, poste `{type: "sophia.pret", module: "<identifiant>"}` vers l'origine du chat seulement, et seulement dans un cadre, quand l'application est prête (Element avec une session, Fichiers quand `/api/v1.0/users/me/` répond 200). L'identifiant doit être exactement celui du module dans le cockpit (`messages`, `visio`, `bureau`) : un autre est ignoré, et le cockpit propose son repli au bout de 8 s.
+
+**Document ouvert dans le cockpit** (en service, en recette) : Fichiers ouvre l'éditeur par un `window.open` vers `/wopi/<id>`, donc dans un nouvel onglet. Dans le cockpit, `pret.js` remplace ce seul appel, quand l'adresse est exactement `/wopi/<uuid>` de même origine, sans paramètre ni fragment, et que le parent direct est le chat : il poste `{type: "sophia.ouvrir", module: "bureau", chemin: "/wopi/<uuid>"}` au chat, qui ouvre le document dans son propre cadre, avec un bouton « ← Fichiers ». Toute autre adresse, ou tout autre parent, garde l'onglet. Fichiers n'a pas de bouton « Fermer » : le retour passe par le cockpit.
+
+**Résumés « Quoi de neuf ? »** : ces applications n'ont pas d'oauth2-proxy ; leur route de résumé vérifie elle-même le jeton relayé par l'interface. Fichiers : `GET /api/resume` dans l'outil MCP ([`../skills/`](../skills/README.md)). Messages : un module Python monté dans Synapse ([module Communication](../../../docs/modules/communication/documentation.md)). En service, contrôlées sans jeton ; l'appel par l'interface est prévu.
+
+| Variable | Rôle | Exemple |
+|---|---|---|
+| `${CHAT_ORIGIN}` | origine de l'interface de discussion, seule page autorisée à afficher ces applications | `https://sophia.example.org` |
+
+### Procédure (cockpit)
+
+Chaque étape est indépendante, avec `oc diff`, `--dry-run=server`, `oc apply`, et sa sauvegarde :
+
+1. **Fichiers et Collabora** (`fichiers-nginx`, Collabora) : **Collabora redémarre et ferme les documents ouverts** ; appliquer quand personne n'édite. Attendu : sur Fichiers, `frame-ancestors 'self' ${CHAT_ORIGIN}` et plus de `X-Frame-Options` ; `pret.js` servi (200) ; la CSP de Collabora garde sa liste et y ajoute le chat.
+2. **Element et module de résumé de Synapse**, **ensemble** : ils partagent le même rendu Kustomize du chat. Synapse redémarre (environ une minute sans discussion). Attendu : Synapse journalise le chargement du module, la route répond 401 sans jeton ; `pret.js` servi par Element ; MAS et ntfy inchangés.
+3. **Visio** : seul `web` redémarre. Attendu : la CSP servie par la page de la visio, et le réglage de `config.js` présent.
+4. **Résumé de Fichiers** : build de l'outil MCP, contrôle d'import dans l'image construite, nouvelle empreinte commitée puis appliquée. Attendu : pod prêt sans redémarrage, `/health` 200, `/api/resume` 401 sans jeton.
+5. **Ouverture d'un document** : le nouveau `pret.js` dans le ConfigMap de `fichiers-nginx`, **sans redémarrage** (monté en dossier, relu par nginx).
+
+Ensuite, côté interface : le module passe en cadre par la liste `SOPHIA_MODULES_CADRE`, et la sortie de l'interface vers Synapse est ouverte ([interface](../apps/chat-interface/README.md)).
+
+Retour arrière : la sauvegarde de chaque objet, ou la valeur d'avant ; pour le module de Synapse, une seule valeur de configuration (`actif: false`).

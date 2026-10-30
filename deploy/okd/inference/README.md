@@ -14,7 +14,7 @@ Un modèle de langage qui lit aussi les images, servi par le GPU du serveur, une
 | Image | construite dans le cluster, CUDA compatible avec le pilote du nœud | l'image officielle visait une version de CUDA plus récente que le pilote |
 | Accès au GPU | conteneur privilégié, bibliothèque du pilote (`libcuda.so.1`) montée depuis l'hôte, **sans** ressource `nvidia.com/gpu` | sur ce nœud, le crochet du *container toolkit* de l'opérateur NVIDIA échoue ; le *device plugin* est désactivé |
 | Reconnaissance vocale | **Parakeet TDT 0.6B v3** (ONNX int8), CPU | ≈ 5 % d'erreurs en français, 0,4 à 0,6 s par phrase |
-| Synthèse vocale | **Pocket TTS** (modèle français, int8), CPU | premier son en 75 ms, 4,6 fois plus vite que le temps réel ; le GPU reste au texte |
+| Synthèse vocale | **Pocket TTS** (modèle français, int8), CPU, 2 fils | premier son en 75 ms, 4,6 fois plus vite que le temps réel ; le GPU reste au texte. Sous la limite de 4 CPU, 120 caractères en 1,4 à 1,5 s avec 2 fils, contre 1,7 à 1,8 s avec 4 |
 | Génération d'images | **stable-diffusion.cpp**, SDXL-Turbo en 1 étape + décodeur TAESDXL, CPU, 512 × 512 | une dizaine de secondes par image sans GPU ; la carte reste au texte. **Licence de SDXL-Turbo : usage non commercial** — à remplacer par un modèle à licence ouverte pour un usage commercial |
 | Contrôle des images | classifieur d'images (Apache 2.0) après chaque génération | un contrôle déterministe autour de la sortie du modèle, en plus des règles appliquées avant |
 
@@ -61,10 +61,19 @@ Le code n'est pas fourni ; son contrat (API OpenAI, routée par le routeur de mo
 | Route | Rôle |
 |---|---|
 | `POST /v1/audio/transcriptions` | audio des navigateurs (webm/opus, mp4/aac, wav) → texte |
-| `POST /v1/audio/speech` | texte → WAV ; voix sur liste blanche, inconnue → voix par défaut |
+| `POST /v1/audio/speech` | texte → WAV ou PCM ; voix sur liste blanche, inconnue → voix par défaut. Avec `"stream_format": "audio"` et `"response_format": "pcm"`, le PCM 16 bits arrive **au fil du décodage**, avec l'en-tête `X-Sample-Rate` ; un flux en WAV est refusé (400), sa taille n'étant connue qu'à la fin ; sans `stream_format`, rien ne change |
 | `GET /v1/voices`, `GET /health` | voix disponibles, état |
 
-Règles : **nombres, heures, dates et opérations écrits en lettres avant la synthèse** (le modèle ne lit pas les chiffres ; « + » s'écrit « plusse », pour que le « s » final soit prononcé) ; Markdown, liens, emojis et annonces d'outils retirés ; audio ≤ 10 Mo et ≤ 120 s, texte ≤ 2 000 caractères ; un traitement à la fois par modèle. Côté interface : la phrase dictée est envoyée, et la réponse est lue à voix haute, phrase par phrase.
+Règles : **nombres, heures, dates et opérations écrits en lettres avant la synthèse** (le modèle ne lit pas les chiffres ; « + » s'écrit « plusse », pour que le « s » final soit prononcé) ; Markdown, liens, emojis et annonces d'outils retirés ; audio ≤ 10 Mo et ≤ 120 s, texte ≤ 2 000 caractères.
+
+Synthèse (en service) :
+
+- **un seul moteur, servi dans l'ordre d'arrivée** : au plus 8 synthèses en attente (`TTS_MAX_WAITING`), au-delà un 503 ; le moteur n'est pas sûr entre fils, et un second n'ajouterait pas de calcul dans la limite de CPU du pod ;
+- **arrêt relayé** : si le client coupe la connexion (lecture arrêtée), la génération s'arrête et la place est rendue (environ 20 ms mesurés) ;
+- **garde de durée** : au-delà de max(1,8 s ; 0,135 s × caractères), ou si le modèle ne signale pas la fin de sa génération, la synthèse est arrêtée : 502 sans flux, fin anticipée avec flux ;
+- **deux fils de calcul** (`TTS_THREADS=2`) : génération et décodage en ont chacun autant, soit la limite de 4 CPU du pod ; avec 4, ils se disputaient 8 fils.
+
+Côté interface, la réponse est lue **pendant qu'elle s'écrit** : par groupes de phrases (le premier dès une quarantaine de caractères, puis 80 à 150), enchaînés sans trou, avec un délai qui tient compte de la file d'attente ; un groupe en retard est relancé ou réuni au suivant, et n'est sauté que sur une erreur du service, jamais en silence. En service, vérifié sur une longue réponse (la voix part avant la fin du texte). Pas encore fait : le chat demande chaque groupe d'un bloc et ne consomme pas encore le PCM en flux ; le relais du flux par le routeur de modèles reste à éprouver par le vrai chemin (sans relais, le PCM arrive entier, comme avant).
 
 Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistrement sous licence libre (`export-voices.sh`, sur le nœud, avec la version « clonage » du modèle). Jamais la voix d'une personne sans son accord.
 
