@@ -62,7 +62,7 @@ Any output of the model that leaves the conversation (a place passed to a tool, 
 | **Closed-shape path** | — | a path received from an application is refused if it leaves its closed shape, then the address is rebuilt on the module's origin and checked again | the document opens in a frame | in service, under acceptance testing |
 | **Direct insertion into a document** | request to write or rephrase in the open document | intent offered only if the editor announced itself as editable; only the reply's visible text, sanitised and bounded; selection read for a local model only; closed list of relayed messages, never a command or a script; origins and frame checked; nothing from history | insertion at the cursor, or at the end if there was no click, undone with Ctrl+Z; acknowledgement with the position, or a named error | in service, verified |
 | **An application's context** | — | the module header, re-validated against the role's modules, only adds one line of context and no right; the page context sent by an application is accepted only from its origin and frame, closed-shape fields only, re-validated by the server (school: subject and topic, nothing about the child) | context line for the model | in service, under acceptance testing |
-| **A command's text is never copied** | — | a summary meant for another interface never repeats the text of a command proposed by a model, only its existence and state | "awaiting approval" line in "What's new?" | in service, under acceptance testing |
+| **A command's text is never copied** | — | a summary meant for another interface never repeats the text of a command proposed by a model, only its existence and state | "awaiting approval" line in "What's new?" | in service, verified |
 
 ---
 

@@ -155,7 +155,7 @@ L'application de fichiers ouvre l'éditeur dans un nouvel onglet. Dans le cockpi
 - **Identité** : le serveur du chat relaie le jeton d'accès de la personne (voir [Relais de l'identité](../../../../docs/concepts/12-relais-identite.md#vers-les-routes-de-résumé)).
 - Une application sans données propres (l'école, site statique) n'a pas de route : son résumé et la date de première apparition de ses nouveautés sont calculés par le chat dans sa base.
 
-État : en service, en recette : résumé de l'école et nouveautés du contenu calculés par le chat ; appels aux quatre routes de résumé branchés.
+État : en service, vérifié par l'administrateur sur le vrai chemin : appels aux quatre routes de résumé (cuisine, visualisation, messagerie, fichiers), aucune source absente ; résumé de l'école et nouveautés du contenu calculés par le chat, en recette.
 
 ### Accès par le cockpit seul (prévu)
 

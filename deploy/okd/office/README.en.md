@@ -183,7 +183,7 @@ The [interface's cockpit](../apps/chat-interface/README.en.md) displays applicat
 - **Plain text only**: control characters (except tab and line feed), zero-width characters, bidi marks and BOM removed; HTML goes in as text.
 - A versioned test with the real Collabora image (cursor, end, spreadsheet, read-only, refused origins) is **to be rerun with each new image**: the relay depends on the editor's internal selectors.
 
-**"What's new?" summaries**: these applications have no oauth2-proxy; their summary route verifies the token relayed by the interface itself. Files: `GET /api/resume` in the MCP tool ([`../skills/`](../skills/README.en.md)). Messages: a Python module mounted in Synapse ([Communication module](../../../docs/modules/communication/documentation.en.md)). In service; called by the interface for "What's new?": in service, in acceptance testing.
+**"What's new?" summaries**: these applications have no oauth2-proxy; their summary route verifies the token relayed by the interface itself. Files: `GET /api/resume` in the MCP tool ([`../skills/`](../skills/README.en.md)). Messages: a Python module mounted in Synapse ([Communication module](../../../docs/modules/communication/documentation.en.md)). In service; called by the interface for "What's new?": in service, verified.
 
 | Variable | Role | Example |
 |---|---|---|

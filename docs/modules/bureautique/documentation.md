@@ -50,7 +50,7 @@ Le [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md) a
 - **Signal `sophia.pret`** : Fichiers prévient le cockpit qu'il est prêt quand la session de la personne répond ; sans signal au bout de 8 s, le cockpit propose « Ouvrir à part » et « Se reconnecter ».
 - **Un document s'ouvre dans le cockpit** (en service, en recette) : le petit script injecté dans Fichiers remplace la seule ouverture d'onglet vers l'éditeur (`/wopi/<uuid>`, même origine, sans paramètre) par un message `sophia.ouvrir` au chat ; le chat vérifie la source (le cadre du Bureau), l'origine et la forme fermée du chemin, reconstruit l'adresse sur l'origine du module, et ouvre le document dans son propre cadre, avec un bouton « ← Fichiers ». Le document compte dans la limite de deux cadres vivants.
 - **Tablette ancienne** : Fichiers exige un moteur récent ; le cockpit affiche une explication à la place du cadre.
-- **Résumé « Quoi de neuf ? »** : l'outil MCP sert `GET /api/resume` (fichiers partagés avec la personne et modifiés depuis 14 jours), avec le même jeton relayé que ses outils. Appelée par l'interface : en service, en recette.
+- **Résumé « Quoi de neuf ? »** : l'outil MCP sert `GET /api/resume` (fichiers partagés avec la personne et modifiés depuis 14 jours), avec le même jeton relayé que ses outils. Appelée par l'interface : en service, vérifiée.
 
 ### « Sophia, ouvre le document X »
 
