@@ -85,7 +85,7 @@ SophIA is an experimental architecture under construction. We separate what work
 **In service, in acceptance testing**
 
 - The household's permanent chat (Matrix) and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it.
-- Cockpit: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries; Sophia writes into the open document (verified).
+- Cockpit: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries and Sophia writing into the open document (both verified).
 - Household and personal places in the profile; weather only receives the municipality's centre.
 
 **In progress**
