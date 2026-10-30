@@ -42,9 +42,9 @@ Rollout: by **targeted patches** of oauth2-proxy's arguments and of the network 
 
 | Module | In the cockpit |
 |---|---|
-| Cooking | shown in the centre: **in service, verified**; token accepted (403 verified for an invalid token); summary route called by the interface and page context: in service, in acceptance testing |
+| Cooking | shown in the centre: **in service, verified**; token accepted (403 verified for an invalid token); summary route called by the interface: in service, verified; page context: in service, in acceptance testing |
 | School | shown in the centre: **in service, verified** on a computer; logging in again on a phone is under acceptance testing; summary and new items computed by the interface; page context (subject and topic) in service, in acceptance testing |
-| Visualisation | shown in the centre, for the administrator only: **in service, verified** on a computer, logging in again on a phone under acceptance testing; token accepted (403 verified); summary route called by the interface: in service, in acceptance testing |
+| Visualisation | shown in the centre, for the administrator only: **in service, verified** on a computer, logging in again on a phone under acceptance testing; token accepted (403 verified); summary route called by the interface: in service, verified |
 | Office, Communication | shown in the centre: in service, under acceptance testing (see their pages) |
 | Shopping | not in the cockpit yet: opened separately |
 

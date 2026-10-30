@@ -136,7 +136,7 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 | "Files" MCP: verification, exchange, search by name, links built by the chat | in service |
 | Reading a document's content, reserved to local models ([Models by role](13-modeles-par-role.en.md)) | deployed, acceptance test pending |
 | Cockpit summary routes: audiences, network egress, applications that accept the bearer token (403 for an invalid token), messaging summary module (401 without a token) | in service, checked without a valid token |
-| The chat calling the summary routes with the person's token (cooking, visualisation, messaging, files) | in service, under acceptance testing |
+| The chat calling the summary routes with the person's token (cooking, visualisation, messaging, files) | in service, verified by the administrator |
 | Human approvals through the chat, with the same relayed token | planned (see [Observability](10-observabilite.en.md)) |
 
 ---

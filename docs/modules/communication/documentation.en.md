@@ -7,7 +7,7 @@ Status: **in service, in acceptance testing**. Both services run in the referenc
 - **Persistent chat**: rooms between household members, in the browser (Element Web) and on phones and tablets (Matrix clients). Messages and files stay on the home server.
 - **Video calls**: a video room opens through a link, for instance pinned in a chat room; only the household's admitted accounts can join it.
 - **Notifications** on Android, through a local relay, without any third-party notification service.
-- **In the cockpit**: Messages (Element) and Video are displayed in the centre of the [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md), and the "What's new?" panel counts each person's unread messages (in service, in acceptance testing); an "Ask Sophia" panel is offered there, without reading the messages.
+- **In the cockpit**: Messages (Element) and Video are displayed in the centre of the [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md), and the "What's new?" panel counts each person's unread messages (in service, verified); an "Ask Sophia" panel is offered there, without reading the messages.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ Synapse only accepts MAS tokens: the interface server cannot ask it for a person
 - **Condition**: the Matrix account is found from the person's identifier at the identity provider: **an identifier must never move from one person to another**.
 - **Network**: Synapse ingress from the interface pod, on its HTTP port. The route can also be reached through Synapse's public address, inside the VPN: the token guards it.
 
-Status: module loaded, route answering 401 without a token; interface egress to Synapse open; called by the interface for "What's new?": in service, in acceptance testing.
+Status: module loaded, route answering 401 without a token; interface egress to Synapse open; called by the interface for "What's new?": in service, verified.
 
 ### Video calls: Jitsi Meet
 

@@ -136,7 +136,7 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
 | Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
 | Routes de résumé du cockpit : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
-| Appel des routes de résumé par le chat, avec le jeton de la personne (cuisine, visualisation, messagerie, fichiers) | en service, en recette |
+| Appel des routes de résumé par le chat, avec le jeton de la personne (cuisine, visualisation, messagerie, fichiers) | en service, vérifié par l'administrateur |
 | Validations humaines par le chat, avec le même jeton relayé | prévu (voir [Observabilité](10-observabilite.md)) |
 
 ---

@@ -50,7 +50,7 @@ The [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md) 
 - **`sophia.pret` signal**: Files tells the cockpit it is ready when the person's session answers; without a signal after 8 s, the cockpit offers "Open separately" and "Sign in again".
 - **A document opens in the cockpit** (in service, in acceptance testing): the small script injected into Files replaces the single tab opening towards the editor (`/wopi/<uuid>`, same origin, no parameter) with a `sophia.ouvrir` message to the chat; the chat checks the source (the Desk frame), the origin and the closed form of the path, rebuilds the address on the module's origin, and opens the document in its own frame, with a "← Files" button. The document counts towards the limit of two live frames.
 - **Older tablet**: Files requires a recent engine; the cockpit shows an explanation instead of the frame.
-- **"What's new?" summary**: the MCP tool serves `GET /api/resume` (files shared with the person and modified in the last 14 days), with the same relayed token as its tools. Called by the interface: in service, in acceptance testing.
+- **"What's new?" summary**: the MCP tool serves `GET /api/resume` (files shared with the person and modified in the last 14 days), with the same relayed token as its tools. Called by the interface: in service, verified.
 
 ### "Sophia, open document X"
 

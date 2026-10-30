@@ -42,9 +42,9 @@ Mise en service : par **modifications ciblées** des arguments d'oauth2-proxy et
 
 | Module | Dans le cockpit |
 |---|---|
-| Cuisine | affichée au centre : **en service, vérifiée** ; jeton accepté (403 vérifié pour un jeton invalide) ; route de résumé appelée par l'interface et contexte de page : en service, en recette |
+| Cuisine | affichée au centre : **en service, vérifiée** ; jeton accepté (403 vérifié pour un jeton invalide) ; route de résumé appelée par l'interface : en service, vérifiée ; contexte de page : en service, en recette |
 | École | affichée au centre : **en service, vérifiée** sur ordinateur ; la reconnexion au téléphone est en recette ; résumé et nouveautés calculés par l'interface ; contexte de page (matière et thème) en service, en recette |
-| Visualisation | affichée au centre, pour l'administrateur seul : **en service, vérifiée** sur ordinateur, reconnexion au téléphone en recette ; jeton accepté (403 vérifié) ; route de résumé appelée par l'interface : en service, en recette |
+| Visualisation | affichée au centre, pour l'administrateur seul : **en service, vérifiée** sur ordinateur, reconnexion au téléphone en recette ; jeton accepté (403 vérifié) ; route de résumé appelée par l'interface : en service, vérifiée |
 | Bureautique, Communication | affichées au centre : en service, en recette (voir leurs pages) |
 | Courses | pas encore dans le cockpit : ouverte à part |
 

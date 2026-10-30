@@ -183,7 +183,7 @@ Le [cockpit de l'interface](../apps/chat-interface/README.md) affiche les applic
 - **Texte brut seulement** : caractères de contrôle (sauf tabulation et saut de ligne), largeur nulle, marques bidi et BOM retirés ; un HTML entre comme du texte.
 - Un essai versionné avec la vraie image de Collabora (curseur, fin, tableur, lecture seule, origines refusées) est **à relancer à chaque nouvelle image** : le relais dépend de sélecteurs internes de l'éditeur.
 
-**Résumés « Quoi de neuf ? »** : ces applications n'ont pas d'oauth2-proxy ; leur route de résumé vérifie elle-même le jeton relayé par l'interface. Fichiers : `GET /api/resume` dans l'outil MCP ([`../skills/`](../skills/README.md)). Messages : un module Python monté dans Synapse ([module Communication](../../../docs/modules/communication/documentation.md)). En service ; appelées par l'interface pour « Quoi de neuf ? » : en service, en recette.
+**Résumés « Quoi de neuf ? »** : ces applications n'ont pas d'oauth2-proxy ; leur route de résumé vérifie elle-même le jeton relayé par l'interface. Fichiers : `GET /api/resume` dans l'outil MCP ([`../skills/`](../skills/README.md)). Messages : un module Python monté dans Synapse ([module Communication](../../../docs/modules/communication/documentation.md)). En service ; appelées par l'interface pour « Quoi de neuf ? » : en service, vérifiées.
 
 | Variable | Rôle | Exemple |
 |---|---|---|

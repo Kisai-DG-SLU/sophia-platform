@@ -155,7 +155,7 @@ The files application opens the editor in a new tab. In the cockpit, the small s
 - **Identity**: the chat server relays the person's access token (see [Identity relay](../../../../docs/concepts/12-relais-identite.en.md#to-the-summary-routes)).
 - An application with no data of its own (the school, a static site) has no route: its summary and the first-appearance date of its news are computed by the chat in its database.
 
-Status: in service, under acceptance testing: school summary and content news computed by the chat; calls to the four summary routes wired.
+Status: in service, verified by the administrator on the real path: calls to the four summary routes (cooking, visualisation, messaging, files), no source missing; school summary and content news computed by the chat, under acceptance testing.
 
 ### Access through the cockpit only (planned)
 
