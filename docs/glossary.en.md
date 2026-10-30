@@ -126,6 +126,12 @@ A project represents a unit of work that includes:
 
 ---
 
+## Cockpit
+
+The chat interface turned into the shell for every interaction: a home screen to talk to Sophia, a drawer of the modules allowed by the role, each application displayed in the centre in a frame, under its own sign-in, and a "What's new?" drawer made of deterministic summaries supplied by the applications. An application tells the cockpit it is ready with a `sophia.pret` message. See [chat interface](../deploy/okd/apps/chat-interface/README.en.md).
+
+---
+
 # Security Concepts
 
 ## Sas Paranoïaque

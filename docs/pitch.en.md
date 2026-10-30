@@ -71,7 +71,8 @@ SophIA is an experimental architecture under construction. We separate what work
 - Single-node Kubernetes (OKD) cluster on a physical server, VPN-only access, single sign-on (SSO) for every interface.
 - Local inference on the server's GPU (text and vision), voice and images on CPU, without network access; local model by default for the interface and modules.
 - Unified model router: local and remote behind the same aliases.
-- Chat interface in its own namespace, connected to the router and to local tools (geography, images, the person's files), with no key in the browser and no external dependency (fonts and libraries embedded); model enforced by the server per role, one router key per use; visual themes to choose.
+- Chat interface in its own namespace, connected to the router and to local tools (geography, images, the person's files), with no key in the browser and no external dependency (fonts and libraries embedded); model enforced by the server per role, one router key per use; visual themes to choose; replies read aloud while they are being written.
+- Cockpit: the chat becomes the shell for every interaction, with a home screen to talk to Sophia (an avatar shown as a hologram that displays thinking, the tool being called and speech) and the cooking, school and visualisation applications displayed in the centre, each under its own sign-in; a place extracted by the model is kept only if it was said.
 - Office suite (files and online editing); the chat finds, opens and reads the person's documents under their identity, the content going to the local model only.
 - Shared relational database on PostgreSQL 18, on a dedicated volume.
 - Isolated web acquisition through the airlock, first brick of the Paranoid Airlock.
@@ -81,13 +82,15 @@ SophIA is an experimental architecture under construction. We separate what work
 - Pantheon agents on the local model, with priority to chat on the graphics card; one router key per agent, master key confined to the router.
 - Minimal observability: service metrics, alert rules, graphics card, VPN filter safeguard; CPU priorities without preemption and per-namespace quotas; measured state of each component and hourly repository mirror check; filtered alerts sent to the administrator outside the platform.
 
-**Installed, in acceptance testing**
+**In service, in acceptance testing**
 
-- The household's permanent chat (Matrix) and video calls (Jitsi Meet), each in its own namespace, restricted to household accounts, video media reachable through the VPN only.
+- The household's permanent chat (Matrix) and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it.
+- "What's new?" in the cockpit, a first version computed by the server.
 
 **In progress**
 
 - The interface as a requester of the dispatcher.
+- Cockpit: Sophia opening the right module without a click (ready), deterministic summaries from each application, documents opened and filled in by Sophia, places saved in the profile with local geocoding, access through the cockpit only.
 - Development clusters: one ephemeral virtual cluster per project (decided, to be built).
 - Memory service (designed), ingestion pipeline and graph dimension.
 - Scheduled backups, vulnerability watch, compliance (GDPR, AI Act, ISO 27001).
