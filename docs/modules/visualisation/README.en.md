@@ -4,7 +4,7 @@ A private module built on SophIA: a page that shows the **path of a request** (i
 
 | | |
 |---|---|
-| Status | in service in the reference installation (overview, replay, live, still to deploy; mirror check); compliance section designed |
+| Status | in service in the reference installation (overview, replay, live, still to deploy; mirror check); compliance section designed; shown in the centre of the interface's cockpit for the administrator (in service, verified on a computer) |
 | Users | the administration group only |
 | Model | none: everything is deterministic |
 | Platform building blocks | SSO, read access to the cluster API and metrics, read access to the event bus, forge |
