@@ -29,6 +29,16 @@ Le code du service n'est pas fourni ; son contrat :
 
 Règles côté interface : la recherche est déclenchée par défaut pour toute demande d'information ; les sources sont citées ; `fetch_page` n'accepte qu'une adresse issue d'une recherche ou d'un message de la personne ; un échec d'outil est dit tel quel, sans cause inventée.
 
+**Météo d'un lieu enregistré** (en service) : `weather_forecast` accepte des coordonnées avec un libellé, et saute alors le géocodage en ligne. L'interface envoie **le centre de la commune** du lieu, jamais l'adresse : la précision d'une prévision ne justifie pas d'envoyer l'emplacement d'un domicile à un service extérieur. En second filet, le service **arrondit lui-même les coordonnées à 0,01°** (environ 1 km) avant de les transmettre. La forme « Commune (code postal) » est aussi acceptée : le code postal est retiré avant le géocodage puis sert à vérifier la réponse, qui dit « introuvable » plutôt que de retenir un homonyme.
+
+**Cache de secours de la météo** (codé et relu, pas encore en service) :
+
+- `PUT /cache/communes` : l'interface envoie la liste anonyme des communes de ses lieux enregistrés (libellé et coordonnées, sans nom de lieu, propriétaire ni adresse), au plus 50, arrondies à 0,01° par le service ; elle remplace la précédente ;
+- la route exige un **jeton partagé**, comparé en temps constant : d'autres pods peuvent joindre le service, seule l'interface doit pouvoir remplacer la liste. Le jeton est dans un Secret créé par l'administrateur en un seul tube, sans affichage, et n'est jamais journalisé ;
+- toutes les 3 heures, le service précharge J à J+3 pour chaque commune et garde la dernière réponse réussie, **en mémoire seulement** : rien ne relie une commune à une personne, ni sur disque ni dans un journal ;
+- si la source en ligne échoue, la prévision en cache est rendue avec l'heure à laquelle elle a été obtenue, pour que la réponse le dise ;
+- la base des fuseaux horaires est une dépendance figée, contrôlée au build.
+
 ## Procédure (l'administrateur)
 
 ```bash

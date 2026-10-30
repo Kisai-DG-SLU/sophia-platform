@@ -44,14 +44,26 @@ The servers' code is not provided; their contract:
 | Tool | Role |
 |---|---|
 | `lieu` | town, municipality or French postcode: name, country, region, coordinates, population, source; several results if the name is ambiguous |
-| `distance` | great-circle distance between two places |
+| `distance` | great-circle distance between two places; a place may also be given by its coordinates (below) |
 | `carte` | **exact** SVG map (real borders, places at their coordinates), optional route and distances, "simple" or "bd" style (old map, comic-book look) |
 
 Open data: French municipalities (official municipalities API), GeoNames (towns over 1,000 inhabitants, French names), Natural Earth country borders. ≈ 230 MB downloaded, ≈ 8 MB kept. Update: rerun `fetch-geo-data.sh`, then restart `sophia-geo`.
 
 Places the tool receives first go through the interface's guards: a place extracted by the model is only kept if it appears in the person's message or is the name of a saved place (see [the interface](../apps/chat-interface/README.en.md)).
 
-**Planned: local address geocoding**, for the places saved in profiles (home, personal places). A route or tool over the French national address base (open data, prepared on the node like the rest), called **once, when the place is saved**; no address in any log; `lieu`, `distance`, `carte` and the weather then work on the municipality and its coordinates, never on the address. Outside the covered country, a *plus code* (Open Location Code) is decoded locally by the interface, sending nothing out. Other place requests are still geocoded as today.
+**Places by municipality and postcode, or by coordinates** (in service):
+
+- the "Municipality (postcode)" form, the one the interface sends, only keeps the municipalities with that postcode: "Exampletown (00000)" answers "not found" rather than pointing to a namesake elsewhere;
+- `distance` and `carte` accept a place of the form `{"nom": …, "latitude": …, "longitude": …}`. It is **the interface server** that inserts it, in place of the name of a saved place, like its other reserved arguments; a place object coming from the model is refused. The answer gives the place's **name** and its municipality, **never its coordinates**, and the map does not label it with an address.
+
+**Local address base** (coded and reviewed, not yet in service), to geocode once the address of a place saved in a profile:
+
+- open data from the national address base, per département, prepared on the node by `fetch-geo-data.sh --ban <départements>`; the list of départements is given at launch and **is written in no versioned file**; SQLite database with a full-text index, opened read-only; the previous base stays in place if the preparation fails;
+- **candidates route outside MCP** (`POST /api/adresse/candidats`), called only by the interface server when a place is saved, never by the model: the address is in the request body, never in the URL, a log or an error message;
+- deterministic ranking (postcode typed, exact number then the nearest in the street, then the full-text rank); **the person chooses** among the candidates; a département not loaded answers an empty list, and the interface falls back on the municipality;
+- updated by hand, at most once a month: a place is only geocoded when it is saved, and its coordinates are kept with it.
+
+Outside the covered country, a *plus code* (Open Location Code) entered by the administrator is decoded locally by the interface, sending nothing out. Tools and weather work on the municipality and its coordinates, never on the address.
 
 ## Images — `sophia-image`
 

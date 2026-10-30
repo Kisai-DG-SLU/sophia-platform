@@ -24,7 +24,7 @@ Chaque namespace appartient à une zone de sécurité. Les communications sont r
 | Zone | Namespaces | Rôle | État de l'isolation |
 |---|---|---|---|
 | Orchestration | `sophia-core` | routeur de modèles, répartiteur, workflows, bus, base relationnelle | **en place** : refus par défaut en entrée, une règle par service (le routeur de modèles n'admet que les applications, les agents, le développement, la mémoire, le routeur d'entrée et le réseau du nœud) ; sorties bornées par un EgressFirewall |
-| Identité et forge | `sophia-identity`, `sophia-git` | SSO, dépôts | **en place** : entrées fermées hors flux prévus. **Réserve** : la règle posée par l'opérateur du fournisseur d'identité ouvre son port HTTP interne à tout le cluster, ce qui annule la restriction ; à corriger |
+| Identité et forge | `sophia-identity`, `sophia-git` | SSO, dépôts | **en place** : entrées fermées hors flux prévus ; le port HTTP interne du fournisseur d'identité n'est ouvert qu'au routeur et à une liste nommée de clients, son port de gestion qu'à son propre namespace, aussi dans la règle que pose son opérateur (qui l'ouvrait jusque-là à tout le cluster) ([`deploy/okd/identity/`](../deploy/okd/identity/README.md)) |
 | Inférence | `sophia-inference` | modèles locaux | **en place** : tout refusé, entrée depuis le routeur de modèles et l'outil d'images seulement, aucune sortie |
 | Outils locaux | `sophia-skills` | serveurs MCP | **en place** : aucune sortie hors DNS et modèles d'image, sauf l'outil des fichiers (fournisseur d'identité et port interne de la bureautique) |
 | Sas | `sophia-dmz` | acquisition web | **en place** : refus par défaut ; sortie vers le web réservée à l'acquisition |
@@ -130,7 +130,6 @@ Les données persistantes (bases vectorielles, bases relationnelles, dépôts) s
 - Tribunal Sémantique avant toute mémorisation venue du web ;
 - refus par défaut dans `sophia-memory` ; règle réseau d'administration et admission des images dans `sophia-sandbox` ;
 - contrôle des sorties du namespace des agents ;
-- restriction du port interne du fournisseur d'identité aux namespaces clients ;
 - accès aux applications par le cockpit seul, exception pour l'administrateur ;
 - veille des mises à jour et des failles des images figées (scanner local, demandes de mise à jour ouvertes sans fusion automatique, rapport à l'administrateur) ;
 - sauvegardes planifiées et chiffrées, avec essai de restauration ;

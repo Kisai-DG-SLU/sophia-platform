@@ -30,6 +30,38 @@ spec:
     headers: xforwarded
   ingress:
     enabled: false
+  # Entrées des pods Keycloak. L'opérateur crée sa propre NetworkPolicy : sans liste, elle ouvre 8080 et 9000
+  # à tout le cluster, et les politiques s'additionnent, si bien que sophia-identity-ingress (02-network.yaml)
+  # ne filtrerait rien sur ces ports. Chaque liste devient le « from » de la règle de son port ; un pair sans
+  # namespaceSelector est dans sophia-identity. Mêmes pairs que sophia-identity-ingress : un client de plus =
+  # une ligne dans les deux. Les sondes du kubelet viennent du nœud et ne sont pas filtrées.
+  networkPolicy:
+    enabled: true
+    http:
+      - namespaceSelector: { matchLabels: { policy-group.network.openshift.io/ingress: "" } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+        podSelector:
+          matchExpressions:
+            - { key: app, operator: In, values: [ecole, recettes, courses] }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-dmz } }
+        podSelector: { matchLabels: { app: courses-navigateur } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-skills } }
+        podSelector: { matchLabels: { app: mcp-fichiers } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-workflow } }
+        podSelector: { matchLabels: { app: sophia-workflow-collecteur } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-interface } }
+        podSelector: { matchLabels: { app: sophia-interface } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-core } }
+        podSelector:
+          matchExpressions:
+            - { key: app, operator: In, values: [temporal-ui, temporal, temporal-admin, repartiteur] }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-workspace } }
+        podSelector:
+          matchExpressions:
+            - { key: app, operator: In, values: [fichiers-backend, fichiers-worker] }
+      - podSelector: {}
+    management:
+      - podSelector: {}
   resources:
     requests: { cpu: 200m, memory: 768Mi }
     limits: { cpu: "2", memory: 1536Mi }

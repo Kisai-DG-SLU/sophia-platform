@@ -14,9 +14,9 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 | File | Content |
 |---|---|
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (manual approval) |
-| `02-network.yaml` | PostgreSQL accepts the identity namespace; Keycloak only accepts the router, the applications namespace and itself |
-| `03-keycloak.yaml` | Keycloak instance and Route |
-| `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*) |
+| `02-network.yaml` | PostgreSQL accepts the identity namespace; on its HTTP port Keycloak only accepts the router and a named list of clients that call it through its internal Service, and on its management port only its own namespace |
+| `03-keycloak.yaml` | Keycloak instance (with the ingress list of the network policy the operator creates) and Route |
+| `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*); audience mappers of the token relayed by the interface |
 | `ajouter-mappeur-audience.py` | adds to the interface's client an audience mapper towards a service that receives the relayed token (below); read-only with `--dry-run`, replayable |
 
 ## Procedure
@@ -40,6 +40,7 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 ## Pitfalls we hit
 
 - **A list provided in the import replaces the realm defaults.** Declaring `clientScopes` to add one scope removes `profile`, `email`, `basic`… and sign-in fails with `invalid_scope`. Add, do not redefine: the group mapper is carried by the client.
+- **The operator creates its own NetworkPolicy, open to the whole cluster.** Without a list in the CR (`spec.networkPolicy`), it opens the HTTP port (8080) and the management port (9000) to every pod; since policies add up, the one in `02-network.yaml` then filtered nothing on those ports. The CR therefore carries the same list of peers as `sophia-identity-ingress`: **one more client through the internal Service = one line in both lists**, otherwise its sign-in fails. Clients that go through the public name go through the router, already admitted. Apply at a quiet time, with a sign-in check on each application; the Keycloak pod does not restart. In service.
 - **The import only applies when the realm is created.** To replay a fixed import: delete the realm, delete the `KeycloakRealmImport` resource, apply again. On an existing realm, a client added to the file is imported on its own from the console (*Clients → Import client*); the file remains the reference for a fresh install.
 
 ## Audiences of the token relayed by the interface
@@ -63,7 +64,7 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <free-a
 - A new audience only appears when the token is renewed: a 403 right after, with an older token, is expected.
 - **Never `--extra-jwt-issuers`** on the application side: that setting triggers an OIDC discovery on the provider's **public** address, which pods cannot reach. The main verifier (keys through the internal Service, public issuer) is enough.
 - The realm's headers do not change: the sign-in page is still refused in a frame (the cockpit offers "Sign in again").
-- These mappers are added to an existing realm; `04-realm-sophia.yaml` only carries RabbitMQ's. On a new installation, run the script again after the import.
+- These mappers are in `04-realm-sophia.yaml` for a fresh install; the script adds them to an existing realm, since the import only applies at creation.
 
 Status: three audiences (two applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by both applications.
 

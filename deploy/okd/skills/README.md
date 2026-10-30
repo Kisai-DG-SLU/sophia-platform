@@ -44,14 +44,26 @@ Le code des serveurs n'est pas fourni ; leur contrat :
 | Outil | Rôle |
 |---|---|
 | `lieu` | ville, commune ou code postal : nom, pays, région, coordonnées, population, source ; plusieurs résultats si le nom est ambigu |
-| `distance` | distance à vol d'oiseau (grand cercle) entre deux lieux |
+| `distance` | distance à vol d'oiseau (grand cercle) entre deux lieux ; un lieu peut aussi être donné par ses coordonnées (ci-dessous) |
 | `carte` | carte SVG **exacte** (contours réels, lieux à leurs coordonnées), trajet et distances en option, style « simple » ou « bd » (carte ancienne façon bande dessinée) |
 
 Données ouvertes : communes françaises (API officielle des communes), GeoNames (villes de plus de 1 000 habitants, noms français), contours des pays Natural Earth. ≈ 230 Mo téléchargés, ≈ 8 Mo gardés. Mise à jour : relancer `fetch-geo-data.sh`, puis redémarrer `sophia-geo`.
 
 Les lieux que l'outil reçoit passent d'abord par les gardes de l'interface : un lieu tiré par le modèle n'est retenu que s'il figure dans le message de la personne ou s'il est le nom d'un lieu enregistré (voir [l'interface](../apps/chat-interface/README.md)).
 
-**Prévu : géocodage d'adresse en local**, pour les lieux enregistrés dans les profils (domicile, lieux personnels). Une route ou un outil sur la Base Adresse Nationale (données ouvertes, préparées sur le nœud comme les autres), appelée **une fois, à l'enregistrement** ; aucune adresse dans un journal ; les outils `lieu`, `distance`, `carte` et la météo travaillent ensuite sur la commune et ses coordonnées, jamais sur l'adresse. Hors du pays couvert, un *plus code* (Open Location Code) est décodé en local par l'interface, sans rien envoyer dehors. Les autres demandes de lieu restent géocodées comme aujourd'hui.
+**Lieux par commune et code postal, ou par coordonnées** (en service) :
+
+- la forme « Commune (code postal) », celle qu'envoie l'interface, ne retient que les communes de ce code postal : « Exempleville (00000) » répond « introuvable » plutôt que de désigner un homonyme ailleurs ;
+- `distance` et `carte` acceptent un lieu de la forme `{"nom": …, "latitude": …, "longitude": …}`. C'est **le serveur de l'interface** qui l'insère, à la place du nom d'un lieu enregistré, comme ses autres arguments réservés ; un objet lieu venu du modèle est refusé. La réponse rend le **nom** du lieu et sa commune, **jamais ses coordonnées**, et la carte ne l'étiquette pas d'une adresse.
+
+**Base d'adresses locale** (codée et relue, pas encore en service), pour géocoder une fois l'adresse d'un lieu enregistré dans un profil :
+
+- données ouvertes de la base d'adresses nationale, par département, préparées sur le nœud par `fetch-geo-data.sh --ban <départements>` ; la liste des départements est donnée au lancement et **n'est écrite dans aucun fichier versionné** ; base SQLite avec un index plein texte, ouverte en lecture seule ; l'ancienne base reste en place si la préparation échoue ;
+- **route de candidats hors MCP** (`POST /api/adresse/candidats`), que seul le serveur de l'interface appelle à l'enregistrement d'un lieu, jamais le modèle : l'adresse est dans le corps de la requête, jamais dans l'adresse, un journal ou un message d'erreur ;
+- classement déterministe (code postal saisi, numéro exact puis le plus proche dans la voie, puis le rang plein texte) ; **c'est la personne qui choisit** parmi les candidats ; un département non chargé répond une liste vide, et l'interface se rabat sur la commune ;
+- mise à jour à la main, au plus une fois par mois : un lieu n'est géocodé qu'à son enregistrement, et ses coordonnées sont gardées avec lui.
+
+Hors du pays couvert, un *plus code* (Open Location Code) saisi par l'administrateur est décodé en local par l'interface, sans rien envoyer dehors. Les outils et la météo travaillent sur la commune et ses coordonnées, jamais sur l'adresse.
 
 ## Images — `sophia-image`
 
