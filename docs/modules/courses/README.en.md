@@ -4,7 +4,7 @@ A private module built on SophIA: from a shopping list (the [Cooking module](../
 
 | | |
 |---|---|
-| State | in service in the reference install; a few fixes under acceptance testing |
+| State | in service in the reference install; a few fixes under acceptance testing; not yet shown in the interface's cockpit (opened separately) |
 | Users | the household's adults (the only ones allowed to write); no child account |
 | Shape | an engine exposed over **MCP** (Cooking module, chat), a fallback web page, a remote browser in the airlock |
 | Model | `sophia-local`, to **understand** a list line — never to choose a product |

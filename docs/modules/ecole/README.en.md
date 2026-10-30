@@ -4,7 +4,7 @@ A private module built on SophIA: a school in the browser, from primary to lower
 
 | | |
 |---|---|
-| State | in service in the reference install, on its own address; opened from the chat by a button |
+| State | in service in the reference install, on its own address; shown in the centre of the interface's cockpit (in service, verified on a computer; logging in again on a phone under acceptance testing); outside the cockpit, opened from the chat by a button |
 | Users | children (protected accounts), parents (read-only record book, dictation marking); no school for guests |
 | Two versions | **inside SophIA**, on its own address, behind the household's sign-in; **public**, a static site without account or server, limited to allowed courses and redistributable content, published in a separate public repository, where nothing leaves the device |
 | Model | `sophia-local` only (vision included): never a remote model for children's data |

@@ -31,7 +31,10 @@ navigateur ─VPN─→ routeur ─→ [ oauth2-proxy │ application + collecte
 ```
 
 - Un seul conteneur sert la page et l'API (Starlette et uvicorn), derrière oauth2-proxy et le SSO, groupe d'administration ; la confiance d'oauth2-proxy dans les en-têtes `X-Forwarded-*`, est limitée au routeur.
-- Namespace avec quota, valeurs par défaut et entrée fermée ; sortie limitée aux sources lues.
+- Namespace avec quota, valeurs par défaut et entrée fermée, sauf depuis le routeur et, sur le port d'oauth2-proxy, depuis le pod de l'interface ; sortie limitée aux sources lues.
+- **Cockpit** ([contrat d'intégration](../README.md#intégrer-un-module-au-cockpit)) : `frame-ancestors` limité à l'interface sur toute réponse ; signal `sophia.pret` (identifiant `workflow`) après la première réponse de l'état ; affichée au centre du cockpit pour l'administrateur seul : en service, vérifiée sur ordinateur, reconnexion au téléphone en recette. La bascule sans clic par Sophia est prête, en cours de mise en service.
+- **Jeton de la personne** : oauth2-proxy accepte le jeton relayé par le serveur de l'interface (`--skip-jwt-bearer-tokens`, audience de l'application ajoutée par un mappeur sur le client de l'interface, jamais `--extra-jwt-issuers`) ; le groupe d'administration reste exigé ; un jeton refusé reçoit 403, sans redirection (`--bearer-token-login-fallback=false`) : en service, 403 vérifié pour un jeton invalide.
+- **Résumé pour « Quoi de neuf ? »** (`GET /api/resume`, déterministe) : commandes en attente de validation, exécutions en échec sur 24 h, alertes, chaîne d'alertes muette, miroirs. **Le texte d'une commande à valider n'est jamais recopié** : c'est une sortie du modèle, qui ne quitte pas l'écran d'approbation ; le motif d'un échec, écrit par le répartiteur, est repris, tronqué à 160 caractères. Les événements sont gardés en mémoire seulement, et oubliés au redémarrage. Route en service, pas encore appelée par l'interface.
 - Build depuis la forge interne par une **clé de déploiement en lecture seule** sur le seul dépôt, jamais par le jeton d'un administrateur de la forge.
 - Métriques du contrôle des miroirs exposées pour la métrologie, avec une règle d'alerte du namespace.
 

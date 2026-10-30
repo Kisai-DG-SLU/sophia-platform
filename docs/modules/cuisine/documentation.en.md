@@ -14,6 +14,10 @@
 - **Favourite recipes** of the household (in service, under acceptance testing): a star on the recipe card, a search within favourites only (title and ingredients) and adding them straight to the meal plan. Catalogue search ignores accents, case and plurals, and matches the start of words.
 - **In the chat**: "what's for dinner tonight?" is answered by the assistant, from the meal plan. The service always announces the chosen slot (`_trace`); if every requested meal is empty, the service writes the answer itself (`_fin`: "Nothing planned… Shall I suggest a dish?"), shown as is: the model can no longer invent a "planned" meal. A secret party hidden from a child gives the empty-slot answer, without a word about the party. From the chat, adults can also open the application on the week's plan or on the shopping tab.
 
+- **In the cockpit** of the interface ([integration contract](../README.en.md#plugging-a-module-into-the-cockpit)): the application is shown in the centre (in service, verified), with `frame-ancestors` limited to the interface on every response and the `sophia.pret` signal (identifier `cuisine`, read-only mode included). Children get the meal plan read-only there. Switching without a click to the meal plan or the shopping tab, when asked to Sophia, is ready, being rolled out.
+- **Children's reading limited to the meal plan** (in service, under acceptance testing): a protected account can only read the cards of recipes on the household's meal plan, with no limit in weeks; any other card gets 403; surprise parties are still refused. Adults keep the whole catalogue.
+- **Summary for "What's new?"** (`GET /api/resume`, deterministic, `no-store`, at most 20 items, stable identifiers): for adults, today's shopping and next week's meal plan to complete (more urgent from Friday); for children, today's menu only. Route in service, not yet called by the interface.
+
 - **Ingredient table** (under acceptance testing): calories, season and price of each ingredient, to **compute** the cost, calories and season months of recipes instead of estimating them (see below).
 
 - **New-version notice** (in service): every response carries the image version (`X-Sophia-Version`, the commit); a page opened before a build shows a "Reload" banner, never during typing or a pending request, never an automatic reload. In the shopping tab, a single banner shows, Cooking's: the Shopping module's version is never relayed there.
@@ -30,6 +34,7 @@ browser ─VPN─→ router ─→ [ oauth2-proxy │ application ]   (applicati
                                │            │  web airlock (search, page reading)
                                │            └─ Shopping module MCP (closed tool list)
 chat interface ─MCP (read)─→ application
+interface (server) ─person's token─→ oauth2-proxy ─→ /api/resume
 Shopping module ─MCP (limited write)─→ application
 ```
 
@@ -39,9 +44,9 @@ Shopping module ─MCP (limited write)─→ application
 | Image | UBI minimal, Python 3.12, non-root, nothing written to disk, `seccomp` `RuntimeDefault`, capabilities dropped |
 | Data | a **dedicated database** in the shared PostgreSQL 18, own role, schema created at start; photos stored in the database; no persistent volume |
 | Variety | computed on the recipe's identity fields (cooking method, main ingredient, sides), without a vector database |
-| Access | two realm groups: full access, protected accounts (read-only, never photo generation) |
+| Access | two realm groups: full access, protected accounts (read-only, limited to the recipes on the meal plan, never photo generation). oauth2-proxy also accepts the person's token relayed by the interface's server (`--skip-jwt-bearer-tokens`, the application's audience added by a mapper on the interface's client, never `--extra-jwt-issuers`); a refused token gets 403, without a redirect (`--bearer-token-login-fallback=false`): in service, 403 verified for an invalid token |
 | Timeouts | 300 s at the proxy and the Route: the local model takes several tens of seconds |
-| Network | closed list: ingress from the router to the proxy, from the interface (from its own namespace only) to the read MCP, from the Shopping module to the write MCP; egress to the model router, the identity provider, PostgreSQL, the `image` tool, the web airlock, the Shopping module, DNS |
+| Network | closed list: ingress from the router to the proxy, from the interface (from its own namespace only) to the read MCP and to the proxy (summary), from the Shopping module to the write MCP; egress to the model router, the identity provider, PostgreSQL, the `image` tool, the web airlock, the Shopping module, DNS |
 | Build | Docker BuildConfig from the internal forge, image trigger on the Deployment; a least-privilege CronJob starts one build per new commit |
 
 ### Exposed MCP servers

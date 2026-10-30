@@ -4,7 +4,7 @@ Module privé construit sur SophIA : une page qui montre le **chemin d'une deman
 
 | | |
 |---|---|
-| État | en service dans l'installation de référence (vue d'ensemble, relecture, direct, reste à déployer ; contrôle des miroirs) ; volet conformité conçu |
+| État | en service dans l'installation de référence (vue d'ensemble, relecture, direct, reste à déployer ; contrôle des miroirs) ; volet conformité conçu ; affichée au centre du cockpit de l'interface pour l'administrateur (en service, vérifiée sur ordinateur) |
 | Utilisateurs | le groupe d'administration seulement |
 | Modèle | aucun : tout est déterministe |
 | Briques de la plateforme | SSO, API du cluster et métrologie en lecture, bus d'événements en lecture, forge |

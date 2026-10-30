@@ -4,7 +4,7 @@ Module privé construit sur SophIA : une école dans le navigateur, du primaire 
 
 | | |
 |---|---|
-| État | en service dans l'installation de référence, sur sa propre adresse ; ouverte depuis la discussion par un bouton |
+| État | en service dans l'installation de référence, sur sa propre adresse ; affichée au centre du cockpit de l'interface (en service, vérifiée sur ordinateur ; reconnexion au téléphone en recette) ; hors du cockpit, ouverte depuis la discussion par un bouton |
 | Utilisateurs | les enfants (comptes protégés), les parents (livret en lecture, correction des dictées) ; pas d'école pour les invités |
 | Deux versions | **dans SophIA**, sur sa propre adresse, derrière la connexion du foyer ; **publique**, un site statique sans compte ni serveur, limité aux cours autorisés et aux contenus redistribuables, publié dans un dépôt public à part, où rien ne quitte l'appareil |
 | Modèle | `sophia-local` uniquement (vision comprise) : jamais de modèle distant pour les données des enfants |

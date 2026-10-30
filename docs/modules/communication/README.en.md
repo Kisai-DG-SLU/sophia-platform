@@ -4,9 +4,9 @@ A module built on SophIA from existing free software: **Matrix** (Synapse server
 
 | | |
 |---|---|
-| Status | **installed, in acceptance testing** in the reference installation: both services run and the first sign-in is done; acceptance testing (multi-device call, guest refused, protected account, mobile clients) is still to do; deployment recipe published as a procedure, without the manifests |
+| Status | **in service, in acceptance testing** in the reference installation: both services run and the first sign-in is done; Messages and Video are displayed in the interface's cockpit; acceptance testing (multi-device call, guest refused, protected account, chat clients on phone and tablet) is still to do; video calls go through the browser only; deployment recipe published as a procedure, without the manifests |
 | Users | the household's groups; guests are refused by the identity provider, and by the video service itself |
-| Model | none: no agent in the rooms for now |
+| Model | none: no agent in the rooms for now; the unread summary for the interface is a deterministic computation |
 | Platform building blocks | SSO, shared PostgreSQL 18, dedicated local volume, priority classes and quotas, VPN (video media) |
 | Code | upstream software, images pinned by digest; a small adapter written for the video service; the reference installation's manifests are not published; architecture and recipe are described here |
 

@@ -14,6 +14,10 @@
 - **Recettes favorites** du foyer (en service, en recette) : une étoile sur la fiche, une recherche dans les seules favorites (titre et ingrédients) et leur ajout direct au planning. La recherche du catalogue ignore les accents, la casse et le pluriel, et porte sur le début des mots.
 - **Dans la discussion** : « on mange quoi ce soir ? » est répondu par l'assistant, à partir du planning. Le service annonce toujours le créneau retenu (`_trace`) ; si tous les repas demandés sont vides, c'est lui qui écrit la réponse (`_fin` : « Rien de prévu… Tu veux que je te propose un plat ? »), affichée telle quelle : le modèle ne peut plus inventer un repas « prévu ». Une fête secrète cachée à un enfant donne la réponse du créneau vide, sans un mot sur la fête. Depuis la discussion, les adultes ouvrent aussi l'application sur le planning de la semaine ou sur l'onglet des courses.
 
+- **Dans le cockpit** de l'interface ([contrat d'intégration](../README.md#intégrer-un-module-au-cockpit)) : l'application est affichée au centre (en service, vérifiée), avec `frame-ancestors` limité à l'interface sur toute réponse et le signal `sophia.pret` (identifiant `cuisine`, mode lecture compris). Les enfants y ont le planning en lecture. La bascule sans clic sur le planning ou les courses, quand on le demande à Sophia, est prête, en cours de mise en service.
+- **Lecture des enfants limitée au planning** (en service, en recette) : un compte protégé ne lit plus que les fiches des recettes présentes au planning du foyer, sans limite de semaines ; toute autre fiche reçoit 403 ; les fêtes surprises restent refusées. Les adultes gardent tout le catalogue.
+- **Résumé pour « Quoi de neuf ? »** (`GET /api/resume`, déterministe, `no-store`, 20 éléments au plus, identifiants stables) : pour les adultes, les courses du jour et le planning de la semaine suivante à compléter (plus urgent à partir du vendredi) ; pour les enfants, le seul menu du jour. Route en service, pas encore appelée par l'interface.
+
 - **Table des ingrédients** (en recette) : calories, saison et prix de chaque ingrédient, pour **calculer** le coût, les calories et les mois de saison des recettes au lieu de les estimer (voir ci-dessous).
 
 - **Avis de nouvelle version** (en service) : chaque réponse porte la version de l'image (`X-Sophia-Version`, le commit) ; une page ouverte avant un build affiche un bandeau « Recharger », jamais pendant une saisie ou une requête en cours, jamais de rechargement automatique. Dans l'onglet des courses, un seul bandeau s'affiche, celui de Cuisine : la version du module Courses n'y est jamais relayée.
@@ -30,6 +34,7 @@ navigateur ─VPN─→ routeur ─→ [ oauth2-proxy │ application ]   (names
                                    │            │  sas web (recherche, lecture de pages)
                                    │            └─ MCP du module Courses (liste fermée d'outils)
 interface de discussion ─MCP (lecture)─→ application
+interface (serveur) ─jeton de la personne─→ oauth2-proxy ─→ /api/resume
 module Courses ─────────MCP (écriture limitée)─→ application
 ```
 
@@ -39,9 +44,9 @@ module Courses ─────────MCP (écriture limitée)─→ applica
 | Image | UBI minimal, Python 3.12, non root, rien d'écrit sur disque, `seccomp` `RuntimeDefault`, capacités retirées |
 | Données | une **base dédiée** dans le PostgreSQL 18 partagé, rôle propre, schéma créé au démarrage ; photos stockées en base ; aucun volume persistant |
 | Variabilité | calculée sur des champs d'identité de la recette (cuisson, ingrédient principal, accompagnements), sans base vectorielle |
-| Accès | deux groupes du realm : accès complet, comptes protégés (lecture seule, jamais de génération de photo) |
+| Accès | deux groupes du realm : accès complet, comptes protégés (lecture seule, limitée aux recettes du planning, jamais de génération de photo). oauth2-proxy accepte aussi le jeton de la personne relayé par le serveur de l'interface (`--skip-jwt-bearer-tokens`, audience de l'application ajoutée par un mappeur sur le client de l'interface, jamais `--extra-jwt-issuers`) ; un jeton refusé reçoit 403, sans redirection (`--bearer-token-login-fallback=false`) : en service, 403 vérifié pour un jeton invalide |
 | Délais | 300 s au proxy et à la Route : le modèle local met plusieurs dizaines de secondes |
-| Réseau | liste fermée : entrée du routeur vers le proxy, de l'interface (depuis son seul namespace) vers le MCP de lecture, du module Courses vers le MCP d'écriture ; sortie vers le routeur de modèles, le fournisseur d'identité, PostgreSQL, l'outil `image`, le sas web, le module Courses, le DNS |
+| Réseau | liste fermée : entrée du routeur vers le proxy, de l'interface (depuis son seul namespace) vers le MCP de lecture et vers le proxy (résumé), du module Courses vers le MCP d'écriture ; sortie vers le routeur de modèles, le fournisseur d'identité, PostgreSQL, l'outil `image`, le sas web, le module Courses, le DNS |
 | Build | BuildConfig Docker depuis la forge interne, déclencheur d'image sur le Deployment ; un CronJob à droits minimaux lance un build par nouveau commit |
 
 ### Serveurs MCP exposés
