@@ -47,6 +47,23 @@ The loop is **bounded by code** (number of steps, duration). The model makes **o
 
 ---
 
+## Guards on the model's output
+
+Any output of the model that leaves the conversation (a place passed to a tool, an identifier, a path, a text inserted elsewhere) goes through a **deterministic check**. These are not regular expressions used to understand an intent: the model understands, then rules check what it returned. Examples from the chat interface:
+
+| Guard | Analysis (model) | Decision (rules) | Execution | Status |
+|---|---|---|---|---|
+| **A place must be said** | extracts the places from the request | a place is kept only if it appears in the current message, or is the name of a saved place; also applies to the model calling a tool freely | call to the weather, place, distance or map tool, or a question written by the server | in service, under acceptance testing |
+| **A moment is never a place** | same | a closed list of moments is removed from places, as a second net | same | in service |
+| **Expected country** | — | a result outside the expected countries, not named by the person, must be confirmed | confirmation sentence written by the server | in service |
+| **Current place** | — | the server keeps the last place that came from the message and was accepted; the model never rereads the history to find a place | "and tomorrow?" reuses that place | in service, verified |
+| **Identifier from the tool** | "open" intent and search terms | a document's identifier comes only from the tool's result (checked shape), never from the model; choice by number of results | event to the cockpit, path re-checked by the browser | planned |
+| **Closed-shape path** | — | a path received from an application is refused if it leaves its closed shape, then the address is rebuilt on the module's origin and checked again | the document opens in a frame | in service, under acceptance testing |
+| **Direct insertion into a document** | request to write into the open document | insertion only if the analysis asks for it and a document is open; plain text, sanitised and bounded; closed list of two relayed messages, never a command; origins checked | insertion at the cursor, undoable; acknowledgement or error shown | planned |
+| **A command's text is never copied** | — | a summary meant for another interface never repeats the text of a command proposed by a model, only its existence and state | "awaiting approval" line in "What's new?" | in service; call by the chat planned |
+
+---
+
 ## Defining workflows
 
 Workflows are written explicitly, in code or through visual programming. Each one specifies:

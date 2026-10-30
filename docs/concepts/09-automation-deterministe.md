@@ -47,6 +47,23 @@ La boucle est **bornée par le code** (nombre d'étapes, durée). Le modèle pre
 
 ---
 
+## Gardes sur la sortie du modèle
+
+Toute sortie du modèle qui quitte la conversation (un lieu passé à un outil, un identifiant, un chemin, un texte inséré ailleurs) passe par un **contrôle déterministe**. Ce ne sont pas des expressions régulières pour comprendre une intention : le modèle comprend, puis des règles vérifient ce qu'il a rendu. Exemples de l'interface de discussion :
+
+| Garde | Analyse (modèle) | Décision (règles) | Exécution | État |
+|---|---|---|---|---|
+| **Un lieu doit être dit** | tire les lieux de la demande | un lieu n'est retenu que s'il figure dans le message courant, ou s'il est le nom d'un lieu enregistré ; vaut aussi pour l'appel libre d'un outil par le modèle | appel de l'outil de météo, de lieu, de distance ou de carte, ou question écrite par le serveur | en service, en recette |
+| **Un moment n'est jamais un lieu** | idem | une liste fermée de moments est retirée des lieux, en second filet | idem | en service |
+| **Pays attendu** | — | un résultat hors des pays attendus, non nommé par la personne, est soumis à confirmation | phrase de confirmation écrite par le serveur | en service |
+| **Lieu courant** | — | le serveur retient le dernier lieu venu du message et accepté ; le modèle ne relit jamais l'historique pour trouver un lieu | « et demain ? » reprend ce lieu | en service, vérifié |
+| **Identifiant venu de l'outil** | intention « ouvrir » et termes de recherche | l'identifiant d'un document vient du seul résultat de l'outil (forme contrôlée), jamais du modèle ; choix selon le nombre de résultats | événement vers le cockpit, chemin revérifié par le navigateur | prévu |
+| **Chemin de forme fermée** | — | un chemin reçu d'une application est refusé s'il sort de sa forme fermée, puis l'adresse est reconstruite sur l'origine du module et revérifiée | ouverture du document dans un cadre | en service, en recette |
+| **Insertion directe dans un document** | demande d'écrire dans le document ouvert | insertion seulement si l'analyse la demande et qu'un document est ouvert ; texte brut assaini et borné ; liste fermée de deux messages relayés, jamais de commande ; origines contrôlées | insertion à la position du curseur, annulable ; accusé ou erreur affichés | prévu |
+| **Texte d'une commande jamais recopié** | — | un résumé destiné à une autre interface ne reprend jamais le texte d'une commande proposée par un modèle, seulement son existence et son état | ligne « en attente de validation » dans « Quoi de neuf ? » | en service ; appel par le chat prévu |
+
+---
+
 ## Définition des workflows
 
 Les workflows sont écrits explicitement, en code ou par programmation visuelle. Chacun précise :
