@@ -86,7 +86,9 @@ API du chat ──Bearer──► oauth2-proxy de l'application ──► applic
 - Les groupes sont dans le jeton d'accès, **sans chemin** : `--allowed-group` compare la valeur exacte.
 - **Jamais `--extra-jwt-issuers`** : ce réglage lance une découverte OIDC sur l'adresse publique du fournisseur, que les pods ne joignent pas. Le vérificateur principal contrôle déjà émetteur, clés et audience.
 - Le chat appelle le **Service interne** de l'oauth2-proxy de l'application ; une NetworkPolicy à part ouvre cette seule sortie ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/README.md#cockpit)), et l'application ouvre l'entrée correspondante.
+- L'outil MCP des fichiers sert aussi sa route de résumé, avec la même vérification que ses outils.
 - Une application sans données propres (site statique) n'a pas de route : le chat calcule son résumé lui-même, sans jeton.
+- Côté chat : appels en parallèle, 2 s chacun, aux seuls modules du rôle ; une source refusée (401, 403), absente (503), en panne ou trop grosse est omise ; cache de 60 s sans le jeton ; le jeton n'est jamais journalisé, et nginx ne le transmet à l'API que sur la discussion et sur la route de « Quoi de neuf ? ».
 - Un module qui trouve le compte de la personne par son identifiant suppose qu'un identifiant n'est **jamais réattribué** à une autre personne.
 - La route d'un module joignable aussi par l'adresse publique de son application reste gardée par le jeton.
 
@@ -134,7 +136,7 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
 | Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
 | Routes de résumé du cockpit : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
-| Appel des routes de résumé par le chat, avec le jeton de la personne | prévu |
+| Appel des routes de résumé par le chat, avec le jeton de la personne (cuisine, visualisation, messagerie, fichiers) | en service, en recette |
 | Validations humaines par le chat, avec le même jeton relayé | prévu (voir [Observabilité](10-observabilite.md)) |
 
 ---
