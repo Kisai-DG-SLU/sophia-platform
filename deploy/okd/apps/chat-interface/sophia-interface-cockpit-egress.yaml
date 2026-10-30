@@ -1,0 +1,50 @@
+# SophIA - Cockpit, « Quoi de neuf ? » : l'API du chat appelle la route de résumé (GET /api/resume) de chaque
+# application par le Service interne de son oauth2-proxy, avec le jeton relayé de la personne
+# (Authorization: Bearer). L'application l'accepte par --skip-jwt-bearer-tokens (audience = son client-id,
+# ajoutée au jeton du chat par un mappeur d'audience) et --bearer-token-login-fallback=false (403, jamais de
+# redirection). Voir docs/concepts/12-relais-identite.md.
+#
+# Politique à part de celle de l'application (sophia-interface.yaml) : les règles s'additionnent, celle-ci
+# n'ouvre que ces sorties. Chaque application ouvre de son côté l'entrée correspondante depuis ce namespace.
+# Une application sans données propres (site statique) n'a pas de route : son résumé est calculé par le chat.
+# Une application sans oauth2-proxy qui vérifie elle-même le jeton (ici, le module de résumé de la messagerie)
+# est jointe sur son propre port. Une application dont le résumé passe par un serveur MCP déjà joint
+# (bureautique) n'ajoute rien ici.
+#
+# Variables : ${MODULE_A_NAMESPACE}, ${MODULE_A_APP} (label app du pod de l'application, oauth2-proxy en
+# sidecar sur 4180) ; ajouter un bloc par application qui fournit un résumé.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-interface-cockpit-egress
+  namespace: sophia-interface
+  labels: { app: sophia-interface }
+spec:
+  podSelector:
+    matchLabels: { app: sophia-interface }
+  policyTypes: [Egress]
+  egress:
+    # Une application derrière son oauth2-proxy (exemple : le module Cuisine)
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: "${MODULE_A_NAMESPACE}" }
+          podSelector:
+            matchLabels: { app: "${MODULE_A_APP}" }
+      ports:
+        - { protocol: TCP, port: 4180 }
+    # Outil de visualisation (namespace propre)
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-workflow }
+          podSelector:
+            matchLabels: { app: sophia-workflow-collecteur }
+      ports:
+        - { protocol: TCP, port: 4180 }
+    # Messagerie : route de résumé du module monté dans Synapse (port HTTP de Synapse)
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-messagerie }
+          podSelector:
+            matchLabels: { app: synapse }
+      ports:
+        - { protocol: TCP, port: 8008 }
