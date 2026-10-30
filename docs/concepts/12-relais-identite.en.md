@@ -86,7 +86,9 @@ chat API ──Bearer──► application's oauth2-proxy ──► application 
 - Groups are in the access token, **without path**: `--allowed-group` compares the exact value.
 - **Never `--extra-jwt-issuers`**: that setting triggers an OIDC discovery on the provider's public address, which pods cannot reach. The main verifier already checks issuer, keys and audience.
 - The chat calls the **internal Service** of the application's oauth2-proxy; a separate NetworkPolicy opens that egress only ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/README.en.md#cockpit)), and the application opens the matching ingress.
+- The files MCP tool also serves its summary route, with the same verification as its tools.
 - An application with no data of its own (a static site) has no route: the chat computes its summary itself, without a token.
+- On the chat's side: parallel calls, 2 s each, to the role's modules only; a source that is refused (401, 403), absent (503), failing or too large is left out; 60 s cache without the token; the token is never logged, and nginx only forwards it to the API on the chat route and the "What's new?" route.
 - A module that finds the person's account by their identifier assumes that an identifier is **never reassigned** to another person.
 - A module's route that can also be reached through its application's public address stays guarded by the token.
 
@@ -134,7 +136,7 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 | "Files" MCP: verification, exchange, search by name, links built by the chat | in service |
 | Reading a document's content, reserved to local models ([Models by role](13-modeles-par-role.en.md)) | deployed, acceptance test pending |
 | Cockpit summary routes: audiences, network egress, applications that accept the bearer token (403 for an invalid token), messaging summary module (401 without a token) | in service, checked without a valid token |
-| The chat calling the summary routes with the person's token | planned |
+| The chat calling the summary routes with the person's token (cooking, visualisation, messaging, files) | in service, under acceptance testing |
 | Human approvals through the chat, with the same relayed token | planned (see [Observability](10-observabilite.en.md)) |
 
 ---

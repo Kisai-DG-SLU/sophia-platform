@@ -170,7 +170,20 @@ Le [cockpit de l'interface](../apps/chat-interface/README.md) affiche les applic
 
 **Document ouvert dans le cockpit** (en service, en recette) : Fichiers ouvre l'éditeur par un `window.open` vers `/wopi/<id>`, donc dans un nouvel onglet. Dans le cockpit, `pret.js` remplace ce seul appel, quand l'adresse est exactement `/wopi/<uuid>` de même origine, sans paramètre ni fragment, et que le parent direct est le chat : il poste `{type: "sophia.ouvrir", module: "bureau", chemin: "/wopi/<uuid>"}` au chat, qui ouvre le document dans son propre cadre, avec un bouton « ← Fichiers ». Toute autre adresse, ou tout autre parent, garde l'onglet. Fichiers n'a pas de bouton « Fermer » : le retour passe par le cockpit.
 
-**Résumés « Quoi de neuf ? »** : ces applications n'ont pas d'oauth2-proxy ; leur route de résumé vérifie elle-même le jeton relayé par l'interface. Fichiers : `GET /api/resume` dans l'outil MCP ([`../skills/`](../skills/README.md)). Messages : un module Python monté dans Synapse ([module Communication](../../../docs/modules/communication/documentation.md)). En service, contrôlées sans jeton ; l'appel par l'interface est prévu.
+**Écriture dans le document ouvert** (en service, vérifiée sur le vrai chemin ; détection du curseur corrigée, à revérifier) : sur la page `/wopi/<uuid>`, et seulement si le parent direct est le chat, `pret.js` sert aussi de **relais** entre le chat et Collabora (API PostMessage). Il n'accepte que les messages de l'origine du chat venant du parent, et ceux de Collabora (son cadre, même origine que Fichiers) ; le chat lui poste avec l'origine exacte de Fichiers.
+
+| Du chat | Effet | Réponse |
+|---|---|---|
+| `sophia.inserer` (`id`, `texte`) | traitement de texte seulement ; au curseur si la personne a cliqué ou tapé dans le texte, sinon à la fin du document (commande fixe du relais) ; `Action_Paste` en texte brut, annulable par Ctrl+Z | `sophia.insere`, avec la position (`curseur` ou `fin`) |
+| `sophia.lire_selection` (`id`) | `Action_Copy` en texte brut | `sophia.selection`, bornée à 20 000 caractères |
+
+- Spontanés : `sophia.pret`, et `sophia.editeur_pret` (avec `modifiable`) une fois le document chargé, dans n'importe quel ordre des événements de Collabora.
+- Erreurs nommées : pas prêt, lecture seule, type de document (tableur ou présentation), texte vide, trop long (refusé, pas tronqué), occupé, sans réponse en 5 s.
+- **Liste fermée vers Collabora** : collage et copie, plus la poignée de main que Drive n'envoie pas ; tout autre message du chat (commande UNO, enregistrement, message brut, type inconnu) est ignoré.
+- **Texte brut seulement** : caractères de contrôle (sauf tabulation et saut de ligne), largeur nulle, marques bidi et BOM retirés ; un HTML entre comme du texte.
+- Un essai versionné avec la vraie image de Collabora (curseur, fin, tableur, lecture seule, origines refusées) est **à relancer à chaque nouvelle image** : le relais dépend de sélecteurs internes de l'éditeur.
+
+**Résumés « Quoi de neuf ? »** : ces applications n'ont pas d'oauth2-proxy ; leur route de résumé vérifie elle-même le jeton relayé par l'interface. Fichiers : `GET /api/resume` dans l'outil MCP ([`../skills/`](../skills/README.md)). Messages : un module Python monté dans Synapse ([module Communication](../../../docs/modules/communication/documentation.md)). En service ; appelées par l'interface pour « Quoi de neuf ? » : en service, en recette.
 
 | Variable | Rôle | Exemple |
 |---|---|---|
@@ -185,6 +198,7 @@ Chaque étape est indépendante, avec `oc diff`, `--dry-run=server`, `oc apply`,
 3. **Visio** : seul `web` redémarre. Attendu : la CSP servie par la page de la visio, et le réglage de `config.js` présent.
 4. **Résumé de Fichiers** : build de l'outil MCP, contrôle d'import dans l'image construite, nouvelle empreinte commitée puis appliquée. Attendu : pod prêt sans redémarrage, `/health` 200, `/api/resume` 401 sans jeton.
 5. **Ouverture d'un document** : le nouveau `pret.js` dans le ConfigMap de `fichiers-nginx`, **sans redémarrage** (monté en dossier, relu par nginx).
+6. **Écriture dans le document** : le relais dans le même `pret.js`, appliqué de la même façon, sans redémarrage, après la version de l'interface qui porte l'écriture. Attendu : le marqueur de version de `pret.js` à jour ; essai réel par une demande d'écriture dans un document ouvert, avec l'accusé.
 
 Ensuite, côté interface : le module passe en cadre par la liste `SOPHIA_MODULES_CADRE`, et la sortie de l'interface vers Synapse est ouverte ([interface](../apps/chat-interface/README.md)).
 

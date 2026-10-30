@@ -287,6 +287,21 @@ http {
                 proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
                 proxy_read_timeout 60s;
             }
+            # « Quoi de neuf ? » : l'API appelle les routes de résumé des applications avec le jeton de la
+            # personne ; elle le reçoit ici comme sur la discussion, et sur aucune autre route du store.
+            location = /api/store/quoi-de-neuf {
+                if ($sophia_end_user = "") {
+                    return 404;
+                }
+                proxy_pass http://127.0.0.1:8000;
+                proxy_http_version 1.1;
+                proxy_set_header Connection "";
+                proxy_set_header X-Forwarded-Access-Token "";
+                proxy_set_header X-Sophia-Jeton $sophia_jeton;
+                proxy_set_header X-Sophia-User $sophia_end_user;
+                proxy_set_header X-Sophia-Groups $http_x_forwarded_groups;
+                proxy_read_timeout 30s;
+            }
             proxy_pass http://127.0.0.1:8000;
             proxy_http_version 1.1;
             proxy_set_header Connection "";

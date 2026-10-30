@@ -203,6 +203,11 @@ spec:
             # Seuls serveurs MCP qui reçoivent le jeton d'accès de la personne (outils à méta sophia/jeton)
             - name: SOPHIA_MCP_JETON_URLS
               value: "http://mcp-fichiers.sophia-skills.svc.cluster.local:8000/mcp"
+            # Cache de secours de la météo : jeton partagé avec le service web, pour envoyer la liste anonyme des
+            # communes des lieux enregistrés. Facultatif : sans le Secret, rien n'est envoyé. Jamais journalisé.
+            - name: SOPHIA_WEB_CACHE_JETON
+              valueFrom:
+                secretKeyRef: { name: sophia-web-cache, key: jeton, optional: true }
             # Cockpit : modules affichés au centre, en cadre (les autres s'ouvrent à part). Chaque module listé
             # doit poser frame-ancestors pour l'origine du chat et envoyer le signal sophia.pret avec cet
             # identifiant exact. Changer la liste : oc apply, sans build. Voir README.md, section Cockpit.

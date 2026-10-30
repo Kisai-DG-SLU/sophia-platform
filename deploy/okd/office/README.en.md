@@ -170,7 +170,20 @@ The [interface's cockpit](../apps/chat-interface/README.en.md) displays applicat
 
 **Document opened in the cockpit** (in service, in acceptance testing): Files opens the editor with a `window.open` to `/wopi/<id>`, hence in a new tab. In the cockpit, `pret.js` replaces that single call, when the address is exactly `/wopi/<uuid>` on the same origin, with no parameter or fragment, and the direct parent is the chat: it posts `{type: "sophia.ouvrir", module: "bureau", chemin: "/wopi/<uuid>"}` to the chat, which opens the document in its own frame, with a "← Files" button. Any other address, or any other parent, keeps the tab. Files has no "Close" button: going back goes through the cockpit.
 
-**"What's new?" summaries**: these applications have no oauth2-proxy; their summary route verifies the token relayed by the interface itself. Files: `GET /api/resume` in the MCP tool ([`../skills/`](../skills/README.en.md)). Messages: a Python module mounted in Synapse ([Communication module](../../../docs/modules/communication/documentation.en.md)). In service, checked without a token; the call from the interface is planned.
+**Writing into the open document** (in service, verified on the real path; cursor detection corrected, to be checked again): on the `/wopi/<uuid>` page, and only if the direct parent is the chat, `pret.js` also acts as a **relay** between the chat and Collabora (PostMessage API). It only accepts messages from the chat's origin coming from the parent, and those from Collabora (its frame, same origin as Files); the chat posts to it with Files' exact origin.
+
+| From the chat | Effect | Reply |
+|---|---|---|
+| `sophia.inserer` (`id`, `texte`) | word processing only; at the cursor if the person clicked or typed in the text, otherwise at the end of the document (fixed command of the relay); `Action_Paste` as plain text, undone with Ctrl+Z | `sophia.insere`, with the position (`curseur` or `fin`) |
+| `sophia.lire_selection` (`id`) | `Action_Copy` as plain text | `sophia.selection`, capped at 20,000 characters |
+
+- Spontaneous: `sophia.pret`, and `sophia.editeur_pret` (with `modifiable`) once the document is loaded, whatever the order of Collabora's events.
+- Named errors: not ready, read-only, document type (spreadsheet or presentation), empty text, too long (refused, not truncated), busy, no answer within 5 s.
+- **Closed list towards Collabora**: paste and copy, plus the handshake that Drive does not send; any other message from the chat (UNO command, save, raw message, unknown type) is ignored.
+- **Plain text only**: control characters (except tab and line feed), zero-width characters, bidi marks and BOM removed; HTML goes in as text.
+- A versioned test with the real Collabora image (cursor, end, spreadsheet, read-only, refused origins) is **to be rerun with each new image**: the relay depends on the editor's internal selectors.
+
+**"What's new?" summaries**: these applications have no oauth2-proxy; their summary route verifies the token relayed by the interface itself. Files: `GET /api/resume` in the MCP tool ([`../skills/`](../skills/README.en.md)). Messages: a Python module mounted in Synapse ([Communication module](../../../docs/modules/communication/documentation.en.md)). In service; called by the interface for "What's new?": in service, in acceptance testing.
 
 | Variable | Role | Example |
 |---|---|---|
@@ -185,6 +198,7 @@ Each step is independent, with `oc diff`, `--dry-run=server`, `oc apply`, and it
 3. **Video**: only `web` restarts. Expected: the CSP served by the video page, and the `config.js` setting present.
 4. **Files summary**: build of the MCP tool, import check inside the built image, new digest committed then applied. Expected: pod ready without restarts, `/health` 200, `/api/resume` 401 without a token.
 5. **Opening a document**: the new `pret.js` in the `fichiers-nginx` ConfigMap, **without a restart** (mounted as a directory, re-read by nginx).
+6. **Writing into the document**: the relay in the same `pret.js`, applied the same way, without a restart, after the interface version that carries writing. Expected: `pret.js`'s version marker updated; a real test by asking to write into an open document, with the acknowledgement.
 
 Then, on the interface side: the module switches to a frame through the `SOPHIA_MODULES_CADRE` list, and the interface's egress to Synapse is opened ([interface](../apps/chat-interface/README.en.md)).
 
