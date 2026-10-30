@@ -50,24 +50,32 @@ The [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md) 
 - **`sophia.pret` signal**: Files tells the cockpit it is ready when the person's session answers; without a signal after 8 s, the cockpit offers "Open separately" and "Sign in again".
 - **A document opens in the cockpit** (in service, in acceptance testing): the small script injected into Files replaces the single tab opening towards the editor (`/wopi/<uuid>`, same origin, no parameter) with a `sophia.ouvrir` message to the chat; the chat checks the source (the Desk frame), the origin and the closed form of the path, rebuilds the address on the module's origin, and opens the document in its own frame, with a "← Files" button. The document counts towards the limit of two live frames.
 - **Older tablet**: Files requires a recent engine; the cockpit shows an explanation instead of the frame.
-- **"What's new?" summary**: the MCP tool serves `GET /api/resume` (files shared with the person and modified in the last 14 days), with the same relayed token as its tools. In service, checked without a token; the call from the interface is planned.
+- **"What's new?" summary**: the MCP tool serves `GET /api/resume` (files shared with the person and modified in the last 14 days), with the same relayed token as its tools. Called by the interface: in service, in acceptance testing.
 
-### Planned: "Sophia, open document X"
+### "Sophia, open document X"
+
+In service, in acceptance testing.
 
 - **Analysis by the model**: the "files" intent, with the "open" action and the search terms.
 - **Decision by rules**: the server calls `chercher_fichiers` with the person's token and chooses according to the number of results; **the document's identifier comes from the tool's result, never from the model**, and no search word enters an address.
-- **Execution**: an event from the server to the cockpit, with a closed-form path, checked on the server and in the browser.
+- **Execution**: an event from the server to the cockpit, with a closed-form path (identifier as a lowercase UUID), checked on the server and then in the browser.
 - One result: the document (on a phone, its **preview**); several: a clickable list in the cockpit, or the common folder; none: "My files". Drive has no search address and no "all files" view: the cockpit cannot make it display a result list.
 
-### Planned: Sophia writes into the open document
+### Sophia writes into the open document
 
-Through Collabora's PostMessage API, relayed by the script injected into the editor page: plain-text insertion at the cursor, undoable with Ctrl+Z, refused if the document is read-only. Writing through Drive's API is ruled out: it would conflict with the editing session. Household decision: **Sophia inserts directly, without a click**; an "Insert" button remains to insert again. Deterministic checks, since the model's output leaves the conversation:
+**In service, verified on the real path** (direct insertion and acknowledgement); cursor detection, corrected, is to be checked again. It is requested from Sophia's conversation or from the Office's "Ask Sophia" panel.
 
-- insertion only if the analysis asks for it **and** a document is open;
-- plain text, sanitised twice and bounded;
-- origins checked at every hop;
-- **a closed list of two relayed messages**, never a UNO command or a script;
-- acknowledgement or error shown to the person.
+Through Collabora's PostMessage API, relayed by the script injected into the editor page: plain-text insertion, undoable with Ctrl+Z, refused if the document is read-only. Writing through Drive's API is ruled out: it would conflict with the editing session. Household decision: **Sophia inserts directly, without a click**; an "Insert" button remains to insert again. Deterministic checks, since the model's output leaves the conversation:
+
+- the relay announces the editor (`sophia.editeur_pret`) when an editable document is loaded; only then does the interface offer the intent to write or rephrase;
+- insertion only if the analysis asks for it **and** a document is open; only the reply's visible text, never from a reply reloaded from history;
+- plain text, sanitised on both sides and capped at 20,000 characters;
+- the **selection** (to rephrase) is read for a local model only;
+- origins and frame checked at every hop, in both directions;
+- **a closed list of relayed messages** (insert, read the selection, editor announcement, named errors), never a UNO command or a script received from the interface;
+- **position**: at the cursor if the person clicked or typed in the text, otherwise at the end of the document, through a fixed command of the relay; the acknowledgement says where the text went;
+- word processing only in the first version (named error for another document type);
+- a test of the editor's internal selectors, to rerun with each new Collabora image.
 
 ## Confidentiality
 

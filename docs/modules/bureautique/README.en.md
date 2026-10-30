@@ -4,7 +4,7 @@ A module built on SophIA from existing free software: **La Suite Drive** ("Files
 
 | | |
 |---|---|
-| Status | in service in the reference installation; display in the cockpit in service, in acceptance testing; recipe published as a procedure, without the manifests; detailed acceptance testing still to do. Planned: "Sophia, open document X" and text insertion by Sophia into the open document |
+| Status | in service in the reference installation; display in the cockpit in service, in acceptance testing; "Sophia, open document X" in service, in acceptance testing; Sophia writing into the open document in service, verified; recipe published as a procedure, without the manifests; detailed acceptance testing still to do |
 | Users | every account of the realm, each in their own space; guests do not get the search tool in the chat |
 | Model | none inside the module; from the chat, reading a document's content is reserved to local models |
 | Platform building blocks | SSO, shared PostgreSQL 18, common S3 object storage, priority classes and quotas, chat interface, "files" MCP tool |

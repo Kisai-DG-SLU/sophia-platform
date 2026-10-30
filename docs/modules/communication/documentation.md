@@ -7,7 +7,7 @@
 - **Chat permanent** : des salons entre les membres du foyer, sur le navigateur (Element Web) et sur les téléphones et tablettes (clients Matrix). Les messages et les fichiers restent sur le serveur de la maison.
 - **Visio** : une salle de visio s'ouvre par un lien, posé par exemple dans un salon du chat ; seuls les comptes admis du foyer la rejoignent.
 - **Notifications** sur Android, par un relais local, sans service de notification d'un tiers.
-- **Dans le cockpit** : Messages (Element) et Visio s'affichent au centre du [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » pourra compter les messages non lus de chacun.
+- **Dans le cockpit** : Messages (Element) et Visio s'affichent au centre du [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » compte les messages non lus de chacun (en service, en recette) ; un volet « Demander à Sophia » y est offert, sans lire les messages.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ Synapse n'accepte que les jetons de MAS : le serveur de l'interface ne peut pas 
 - **Condition** : le compte Matrix est trouvé par l'identifiant de la personne chez le fournisseur d'identité : **un identifiant ne doit jamais passer d'une personne à une autre**.
 - **Réseau** : entrée de Synapse depuis le pod de l'interface, sur son port HTTP. La route reste aussi joignable par l'adresse publique de Synapse, dans le VPN : c'est le jeton qui la garde.
 
-État : module chargé, route qui répond 401 sans jeton ; sortie de l'interface vers Synapse ouverte ; l'appel par l'interface n'est pas encore codé (prévu).
+État : module chargé, route qui répond 401 sans jeton ; sortie de l'interface vers Synapse ouverte ; appelée par l'interface pour « Quoi de neuf ? » : en service, en recette.
 
 ### Visio : Jitsi Meet
 
@@ -104,7 +104,7 @@ La **première connexion** au chat passe par deux pages de MAS : la liaison du c
 - visio dans le navigateur sous Android, sans page « Rejoindre dans l'application » ; visio et Element Web dans le navigateur de la tablette ancienne ;
 - Element dans le cockpit : session conservée, un message envoyé ;
 - message envoyé dans un salon, sans chiffrement ;
-- résumé des non-lus avec un vrai jeton relayé, quand l'interface l'appellera.
+- résumé des non-lus avec un vrai jeton relayé, dans « Quoi de neuf ? ».
 
 ## Prévu
 
