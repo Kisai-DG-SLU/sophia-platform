@@ -1,13 +1,13 @@
 # Module Communication — documentation
 
-État : **en service, en recette**. Les deux services tournent dans l'installation de référence, contrôlés en lecture ; une première connexion au chat a créé un salon, et un premier passage par la visio a été vu dans le journal de l'adaptateur. Messages et Visio sont affichables dans le cockpit de l'interface, et le module de résumé des non-lus est chargé dans Synapse. La recette avec les appareils du foyer reste à faire (voir [Recette à faire](#recette-à-faire)).
+État : **en service, en recette**. Le chat (Matrix) et la visio tournent dans l'installation de référence, contrôlés en lecture, et s'affichent dans le cockpit de l'interface. La **première visio avec image** entre un ordinateur et la tablette ancienne a eu lieu dans le cockpit, par le VPN, après trois correctifs en chaîne (voir [Média de la visio](#média-de-la-visio--trois-causes-en-chaîne)). **La messagerie change de logiciel** : après un essai sur la vraie tablette, le foyer a retenu **Converse.js et Prosody (XMPP) à la place de Matrix** ; la version définitive est en conception (voir [Messagerie : de Matrix à XMPP](#messagerie--de-matrix-à-xmpp)). La recette avec tous les appareils du foyer reste à faire (voir [Recette à faire](#recette-à-faire)).
 
 ## Ce que fait le module
 
-- **Chat permanent** : des salons entre les membres du foyer, sur le navigateur (Element Web) et sur les téléphones et tablettes (clients Matrix). Les messages et les fichiers restent sur le serveur de la maison.
-- **Visio** : une salle de visio s'ouvre par un lien, posé par exemple dans un salon du chat ; seuls les comptes admis du foyer la rejoignent.
+- **Chat permanent** : des salons et des discussions directes entre les membres du foyer, dans le navigateur et dans le cockpit. Les messages et les fichiers restent sur le serveur de la maison. Aujourd'hui Matrix (Element Web, clients Matrix sur téléphone), bientôt remplacé par Converse.js et Prosody.
+- **Visio** : une salle de visio s'ouvre dans le cockpit ou par un lien ; seuls les comptes admis du foyer la rejoignent.
 - **Notifications** sur Android, par un relais local, sans service de notification d'un tiers.
-- **Dans le cockpit** : Messages (Element) et Visio s'affichent au centre du [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » compte les messages non lus de chacun (en service, vérifié) ; un volet « Demander à Sophia » y est offert, sans lire les messages.
+- **Dans le cockpit** : Messages et Visio s'affichent au centre du [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » compte les messages non lus de chacun (en service, vérifié) ; un volet « Demander à Sophia » y est offert, sans lire les messages.
 
 ## Architecture
 
@@ -30,7 +30,7 @@ serveur de l'interface ──► Synapse, port HTTP (module de résumé) ──�
 | Priorité | classe de la bureautique pour tous les pods, **sauf le pont média de la visio**, dans la classe de la voix ([priorités](../../../deploy/okd/cluster/README.md)) | le média d'une visio en cours ne doit pas attendre derrière un travail de fond |
 | Images | figées par empreinte ; Synapse 1.163.2, Jitsi `stable-11248-2` | une mise à jour est une décision |
 
-### Chat permanent : Matrix
+### Chat permanent : Matrix (en service, à remplacer)
 
 | Élément | Choix | Raison |
 |---|---|---|
@@ -55,66 +55,132 @@ Synapse n'accepte que les jetons de MAS : le serveur de l'interface ne peut pas 
 - **Condition** : le compte Matrix est trouvé par l'identifiant de la personne chez le fournisseur d'identité : **un identifiant ne doit jamais passer d'une personne à une autre**.
 - **Réseau** : entrée de Synapse depuis le pod de l'interface, sur son port HTTP. La route reste aussi joignable par l'adresse publique de Synapse, dans le VPN : c'est le jeton qui la garde.
 
-État : module chargé, route qui répond 401 sans jeton ; sortie de l'interface vers Synapse ouverte ; appelée par l'interface pour « Quoi de neuf ? » : en service, vérifiée.
+État : module chargé, route qui répond 401 sans jeton ; sortie de l'interface vers Synapse ouverte ; appelée par l'interface pour « Quoi de neuf ? » : en service, vérifiée. Il disparaîtra avec Matrix ; la messagerie XMPP aura son propre résumé.
+
+### Messagerie : de Matrix à XMPP
+
+**Décision du foyer, ferme après l'essai sur la vraie tablette** : Converse.js (client web) et Prosody (serveur XMPP) remplacent Matrix pour la messagerie de la famille.
+
+**Pourquoi.** Les critères ont été vérifiés dans l'ordre : fonctionner sur la tablette ancienne (Safari 15), compte unique du fournisseur d'identité, aucune sortie réseau qu'on ne puisse couper, notifications, projet vivant. Element Web ne démarre pas sous Safari 15, et les clients Matrix web plus légers échouent aussi : page blanche (expressions régulières en lookbehind), ou projet arrêté. Converse.js tient sur la tablette ancienne, une fois retirés les logos chargés depuis son site ; il est maintenu, et Prosody suit ses correctifs de sécurité. **Risque assumé** : le module de Prosody qui valide un jeton OIDC est un module communautaire, au stade alpha.
+
+**Essai** (namespace jetable, supprimé en bloc à la fin) :
+
+| Élément | Choix | Raison |
+|---|---|---|
+| Socle | quota, refus par défaut, EgressFirewall limité au cluster ; Prosody sur un volume éphémère | un essai ne laisse rien derrière lui |
+| Pod web | nginx et oauth2-proxy (en boucle locale) ; accès réservé à un **groupe d'essai dédié** et à un client OIDC dédié | l'essai ne touche aucun compte hors du groupe |
+| Jeton | une route `/credentials` remet au client le jeton d'accès de la session, filtré | Converse.js se connecte sans mot de passe XMPP |
+| Prosody | 13.0.7, SASL OAUTHBEARER ; le jeton est validé par l'userinfo du fournisseur d'identité ; le nom du compte XMPP vient de l'userinfo (`preferred_username`), jamais du client ; ni mot de passe XMPP, ni serveur à serveur, ni client en TCP | pas d'usurpation par le nom ; seul le WebSocket est ouvert |
+| WebSocket et fichiers | `auth_request` d'oauth2-proxy sur `/xmpp-websocket` et `/file_share/` : sans session, 401 | Prosody accepte **tout** jeton valide du realm (l'userinfo ne vérifie ni le client, ni l'audience, ni le groupe) : sans ce contrôle, un jeton d'une autre application ouvrait la messagerie d'essai |
+| Fichiers partagés | `proxy_buffering off` sur `/file_share/` | nginx mettait les fichiers lus en tampon dans un `/tmp` éphémère de 64 Mi : deux lectures d'une vidéo faisaient évincer le pod |
+| Noms de Service | **noms complets** en `.svc.cluster.local` | Prosody résout par libunbound, qui n'applique pas les domaines de recherche : un nom court répondait NXDOMAIN, et l'appel userinfo de Prosody, sans délai réglable, restait suspendu |
+| Tuile du cockpit | visible des seuls membres du groupe d'essai (`SOPHIA_ESSAI_GROUPES`) ; le vrai contrôle reste l'oauth2-proxy de la page | masquer n'est pas un contrôle |
+
+**Ce qui marche sur la tablette ancienne** : délai d'arrivée, « écrit… », photos dans les deux sens, clavier, rotation, retour après 5 minutes, connexion au-delà de la vie du jeton (renouvelé), discussion directe, salon, retrait d'un membre (`/revoke`).
+
+**Défauts trouvés**, à corriger dans la version définitive (réglage, petit greffon ou retour forcé au cockpit) :
+
+- **pas de barre de mise en forme** : la mise en forme existe (XEP-0393 : `*gras*`, `_italique_`, code entre accents graves), mais se tape à la main ;
+- **membre affiché deux fois** dans un salon : occupant présent et entrée de la liste des membres, non fusionnés ;
+- **salon resté dans la liste** d'un membre retiré : le signet posé à l'entrée dans le salon n'est pas retiré par `/revoke` ;
+- **fenêtre d'invitation non fermée** dans l'autre session du même compte, qui réapparaît comme une nouvelle invitation ;
+- **double session** : l'onglet de connexion charge la messagerie au lieu de renvoyer au cockpit ;
+- **aucun annuaire** : on ne voit un membre de la famille qu'après l'avoir ajouté par son adresse ;
+- lien vers la visio depuis une discussion : le greffon prévu ne marche pas avec la version 14 du client.
+
+**Version définitive, en conception.** Choix ouverts pour le foyer : contacts de la famille d'office (synchronisés depuis les groupes du fournisseur d'identité, liste écrite à la main, ou rien) ; salon « Famille » créé d'office ; reprise ou non de l'historique de Matrix ; notifications Android par ntfy (passerelle XEP-0357) ; visio lancée depuis une discussion et salle ouverte par la tuile. Déjà fixé : volume local persistant, pas de chiffrement de bout en bout (ni OMEMO), pastille sur la tablette sans notification page fermée. Le **démontage de Matrix** (Synapse, MAS, Element, module de résumé) suivra la bascule.
 
 ### Visio : Jitsi Meet
 
-Jitsi Meet a remplacé la visio de La Suite numérique, d'abord prévue : son interface ne démarre pas sur les tablettes anciennes du foyer, alors que l'application mobile de Jitsi les acceptait (iOS 15.1 au moins).
+Jitsi Meet a remplacé la visio de La Suite numérique, d'abord prévue : son interface ne démarre pas sur les tablettes anciennes du foyer.
 
-**La visio passe désormais par le navigateur seulement**, donc par le cockpit de l'interface (décision du foyer) : `DISABLE_DEEP_LINKING` retire la page « Rejoindre dans l'application », et l'application mobile n'est plus utilisée. Conséquence : la visio dans le navigateur de la tablette ancienne (Safari 15) **n'est pas encore éprouvée** ; elle est à l'étape de recette.
+**La visio passe par le navigateur seulement**, donc par le cockpit de l'interface (décision du foyer) : `DISABLE_DEEP_LINKING` retire la page « Rejoindre dans l'application », et l'application mobile n'est plus utilisée. La visio dans le navigateur de la tablette ancienne **marche** depuis le réglage de son profil VPN (ci-dessous).
 
 | Élément | Choix | Raison |
 |---|---|---|
 | Composants | web, Prosody, Jicofo, JVB (le pont média) ; ni base ni cache | le moins de pièces possible |
 | Accès | un **adaptateur** maison (Python, bibliothèque standard seule) fait la connexion OIDC au fournisseur d'identité et rend un **jeton signé de 10 minutes, valable pour une seule salle** ; l'invité est refusé par le fournisseur d'identité, et par l'adaptateur s'il passait ; états liés au navigateur et à usage unique ; le journal de l'adaptateur ne contient ni la chaîne de requête ni de secret | Jitsi n'accepte qu'un jeton : l'adaptateur le délivre aux seuls comptes admis |
-| Média | **un seul port UDP**, exposé par une `externalIP` sur l'adresse VPN du nœud (`${VPN_IP}:${JVB_UDP_PORT}`), relayé par une règle de la table nftables du VPN ; **pas de NodePort** | le média n'est joignable que par le VPN, jamais depuis le réseau local ; le pont voit l'adresse VPN réelle des appareils |
-| Réseau | pair-à-pair et STUN coupés ; requêtes vers des tiers coupées ; candidats d'adresses privées non annoncés ; canal de pont par le canal de données SCTP | tout passe par le pont de la maison ; rien ne part vers un service extérieur |
+| Connexion dans le cockpit | **en fenêtre** (`tokenAuthInline`, mécanisme natif de Jitsi), voir ci-dessous | le fournisseur d'identité refuse d'être affiché dans un cadre |
+| Média | **un seul port UDP**, exposé par une `externalIP` sur l'adresse VPN du nœud (`${VPN_IP}:${JVB_UDP_PORT}`) ; **pas de NodePort** | le média n'est joignable que par le VPN, jamais depuis le réseau local |
+| Réseau | pair-à-pair et STUN coupés ; requêtes vers des tiers coupées ; **candidats d'adresses privées annoncés** (l'adresse VPN en est une) ; canal de pont par le canal de données SCTP | tout passe par le pont de la maison ; rien ne part vers un service extérieur |
+| Entrée du média | la NetworkPolicy du pont admet le réseau du VPN **et le groupe `host-network`** sur le port UDP | dans la passerelle partagée d'OVN-Kubernetes, le trafic d'une externalIP arrive au pod avec une source réécrite (voir ci-dessous) |
 | UID arbitraire d'OKD | les images Jitsi utilisent s6-overlay, qui refuse un `/run` appartenant à root ; la variable `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` le lui fait accepter | **ni privilège, ni `anyuid`** |
 | Sondes | Jicofo n'écoute son API de santé que sur `127.0.0.1` : sonde en `exec` | l'écoute n'est pas élargie pour la sonde |
 | Chiffrement | pas de chiffrement de bout en bout | le pont de la maison voit le média, comme tout pont de visio |
 | Affichage | affichable par le seul chat de la plateforme (`frame-ancestors` dans `CSP_HEADER`) ; caméra et micro autorisés par l'attribut `allow` du cadre, pour la visio seulement | la visio vit dans le cockpit |
 
+#### Connexion en fenêtre
+
+Quand la visio est passée dans un cadre du cockpit, l'entrée en salle a cessé de marcher : la connexion OIDC se faisait dans le cadre, et le fournisseur d'identité refuse d'y être affiché (« contenu bloqué » sur un ordinateur, rien sur la tablette). On avait vérifié l'affichage dans le cadre, pas l'entrée dans une salle. Décision du foyer : la visio reste dans le cockpit, **seule la connexion passe par une fenêtre**, qui revient à la tuile. Jitsi a ce parcours (`tokenAuthInline`) ; rien n'est ajouté au cockpit.
+
+- Un petit script de configuration, actif **dans un cadre seulement**, active `tokenAuthInline` et ajoute `fenetre=1` à l'adresse de l'adaptateur. Hors cadre, le parcours par redirection reste tel quel.
+- En mode fenêtre, l'adaptateur exige un `nonce` de forme fermée (64 caractères hexadécimaux, contrôle exact de toute la chaîne) et le garde dans l'état.
+- Au retour du fournisseur d'identité, il sert une **page de retour** (`no-store`, `no-referrer`, CSP sans script en ligne, `frame-ancestors 'none'`) qui poste le jeton à `window.opener`, **vers la seule origine de la visio**, puis se ferme. Une page tierce ne reçoit rien ; un retour volé ou rejoué reçoit 400.
+- Les contrôles d'avant restent : état lié au cookie et à usage unique, PKCE, userinfo, groupes.
+- **Limites** : Jitsi ne vérifie pas le `nonce` à la réception (il ne sert qu'à reconnaître le mode) ; la protection tient à la cible du message, à l'état et à PKCE. Le jeton n'apparaît dans aucune adresse de page, mais Jitsi le met dans l'adresse de son WebSocket, dans les deux modes (masqué dans son journal).
+- **Jeton expiré** : en mode fenêtre, le jeton reste dans l'état de Jitsi, qui ne contrôle son expiration qu'au rechargement ; l'entrée suivante était refusée. Le script de configuration le vide 30 s avant son expiration (action interne `SET_JWT`), pour que l'entrée suivante rouvre la fenêtre. Action interne : à revérifier à chaque montée de version.
+
+#### Média de la visio : trois causes en chaîne
+
+La conférence se montait (les participants entraient dans la salle), mais **aucun flux média ne s'était jamais établi** : les métriques du pont donnaient `ice_succeeded 0` depuis l'installation, et le pont expirait chaque participant au bout de 2 min 48. L'essai à plusieurs appareils avait été renvoyé à la recette, jamais faite. Trois causes se cachaient l'une derrière l'autre :
+
+1. **Le pont n'annonçait pas son adresse.** `JVB_ADVERTISE_PRIVATE_CANDIDATES=false` retire des candidats annoncés toute adresse RFC 1918 ; or l'adresse VPN du nœud en est une. Le navigateur ne recevait aucun candidat. Preuve : l'état de débogage du pont (`advertisePrivateCandidates: false`, 0 paquet reçu ou émis). Correctif : `true`. L'adresse du pod est annoncée aussi, mais elle est injoignable et abandonnée par ICE.
+2. **La NetworkPolicy refusait le média.** Le trafic de l'externalIP est bien traduit vers le pod, mais, en passerelle partagée d'OVN-Kubernetes, avec une **source réécrite** en `169.254.0.2` (masquerade de l'hôte). La politique n'admettait que le réseau du VPN : tout restait sans réponse (`[UNREPLIED]` dans la table de suivi des connexions du nœud). Correctif : admettre aussi le groupe `policy-group.network.openshift.io/host-network` sur le port UDP, comme la forge l'est par le groupe `ingress`. Conséquence : la NetworkPolicy ne peut pas filtrer ce trafic par appareil. L'ordinateur a alors établi son média.
+3. **La tablette iOS n'envoyait pas son média dans le tunnel.** Son HTTPS passait par le VPN, mais aucun paquet UDP n'arrivait au nœud. Une page de diagnostic (liste des candidats ICE de l'appareil, requêtes STUN vers le pont, cherchées dans la table de suivi des connexions) l'a prouvé : seule l'adresse Wi-Fi figurait parmi les candidats. **Cause** : le WebRTC de WebKit sur iOS (Safari comme Chrome, qui utilise le même moteur) n'énumère que l'interface « par défaut », et libwebrtc la détermine en ouvrant une socket UDP vers `8.8.8.8` (sans rien envoyer). Avec `AllowedIPs` limité au réseau du VPN, cette interface est le Wi-Fi. **Correctif, dans le profil de l'appareil** : `AllowedIPs = ${VPN_NETWORK}, 8.8.8.8/32`. Le VPN devient l'interface « par défaut » pour WebRTC, et le reste d'Internet reste sur le Wi-Fi ou le réseau mobile. Voir le [profil des appareils iOS](../../../deploy/okd/host/wireguard/README.md#appareils-ios--la-visio-et-le-réseau-par-défaut).
+
+Résultat : **première visio avec image** entre l'ordinateur et la tablette ancienne, dans le cockpit, par le VPN ; les deux participants ont ICE et DTLS établis. Les pistes écartées en route : une connexion directe entre appareils (coupée), un relais TURN en TCP (il aurait échoué pour la même raison que l'UDP), l'application mobile, ou un port sur le réseau local (contraires à « tout par le VPN, dans le cockpit »).
+
+**Ce qui fait foi** : l'état de débogage du pont (`iceConnected`, paquets) et la table de suivi des connexions du nœud. Le compteur de la règle nftables du VPN n'est pas un contrôle : il est resté à zéro pendant une visio réussie.
+
 ## Clients
 
 | Appareil | Chat | Visio |
 |---|---|---|
-| Ordinateur | navigateur (Element Web) | navigateur |
-| Android | Element X, notifications par ntfy ; Element Web dans le cockpit | navigateur, dans le cockpit |
-| Tablette ancienne (iOS 15) | Element classique | navigateur, dans le cockpit : à éprouver |
+| Ordinateur | navigateur | navigateur, dans le cockpit : **image et son établis** |
+| Android | Element X, notifications par ntfy ; Element Web dans le cockpit | navigateur, dans le cockpit : à éprouver (le profil VPN par défaut devrait suffire) |
+| Tablette ancienne (iOS 15) | Element classique ; Converse.js éprouvé (essai) | navigateur, dans le cockpit : **image et son établis**, avec le profil VPN iOS |
 
-La **première connexion** au chat passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. Dans le cockpit, la page de connexion de MAS est refusée en cadre : si la session Matrix a expiré, « Se reconnecter » ouvre Element dans un onglet, puis on revient au cockpit.
+La **première connexion** au chat Matrix passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. Dans le cockpit, la page de connexion de MAS est refusée en cadre : si la session Matrix a expiré, « Se reconnecter » ouvre Element dans un onglet, puis on revient au cockpit.
 
-**Element Web n'est pas pris en charge par Safari 15** : sur la tablette ancienne, le module Messages du cockpit ne marche donc pas tel quel. Options, à trancher après l'essai sur l'appareil : garder Element classique sur cette tablette (recommandé), un client Matrix web plus léger, ou une vue des messages faite par l'interface elle-même.
+**Element Web n'est pas pris en charge par Safari 15** : sur la tablette ancienne, le module Messages du cockpit ne marche pas tel quel. C'est l'une des raisons du passage à Converse.js, qui y fonctionne.
 
 ## Confidentialité et limites
 
 - **Maison seule** : chat et visio ne se joignent que par le VPN.
-- **Pas de chiffrement de bout en bout**, ni dans le chat (par défaut) ni dans la visio : l'administrateur du système peut lire les salons. Aucun salon n'est donc « intime ».
+- **Pas de chiffrement de bout en bout**, ni dans le chat ni dans la visio : l'administrateur du système peut lire les salons. Aucun salon n'est donc « intime ».
 - **Médias du chat sans sauvegarde.**
 - **Visio par le navigateur seulement** : l'application mobile de Jitsi, qui envoyait des mesures d'usage à un service tiers, n'est plus utilisée.
 - **Résumé des non-lus** : la route n'expose que des comptes, jamais un texte ni un expéditeur, et seulement à la personne elle-même, par son jeton.
+- **Déconnexion** : se déconnecter du cockpit ferme aussi les sessions des modules d'une liste fermée, dont la messagerie d'essai ; la visio ne garde pas de session. Element garde son jeton dans le navigateur, hors de portée du cockpit : limite connue, levée avec le retrait de Matrix.
 - **Pas d'agent** dans les salons pour l'instant ; le chat ne reçoit pas les alertes de la plateforme (elles ont leur propre canal, voir [Observabilité](../../concepts/10-observabilite.md)).
 - **Adaptateur** : un appareil du VPN peut épuiser sa réserve d'états en mémoire et bloquer les connexions à la visio pendant 10 minutes.
 
 ## Recette à faire
 
-- visio à trois appareils au moins, et compteur de la règle UDP du VPN qui augmente ;
+- visio à trois appareils : chacun voit les deux autres, sortie puis retour sans recharger, partage d'écran depuis un ordinateur ;
+- chaque appareil du foyer passé par la page de diagnostic des candidats, à la maison puis sur le réseau mobile (Android compris) ; la page est retirée ensuite ;
 - invité refusé (chat et visio), compte protégé admis ;
-- Element classique sur tablette ancienne, Element X avec ntfy sur Android ;
-- visio dans le navigateur sous Android, sans page « Rejoindre dans l'application » ; visio et Element Web dans le navigateur de la tablette ancienne ;
-- Element dans le cockpit : session conservée, un message envoyé ;
-- message envoyé dans un salon, sans chiffrement ;
+- messagerie définitive (Converse.js et Prosody) sur chaque appareil, puis démontage de Matrix ;
+- Element X avec ntfy sur Android, tant que Matrix reste en service ;
 - résumé des non-lus avec un vrai jeton relayé, dans « Quoi de neuf ? ».
 
 ## Prévu
 
+- **Messagerie définitive** sur XMPP, après les choix du foyer ; puis retrait de Matrix.
 - **Courrier unifié** : décidé, **reporté** derrière les autres projets ; rien n'est ouvert au foyer.
-- **Accès par le cockpit seulement**, une fois le cockpit validé sur tous les appareils : une page de l'application ouverte directement sera renvoyée vers le cockpit ; les clients natifs du chat ne sont pas concernés ; un accès direct reste à l'administrateur, pour le dépannage.
+- **Accès par le cockpit seulement**, une fois le cockpit validé sur tous les appareils : une page de l'application ouverte directement sera renvoyée vers le cockpit ; un accès direct reste à l'administrateur, pour le dépannage.
 - **Lancer une visio depuis la discussion de Sophia**, et Sophia dans les salons : plus tard, avec les agents.
 
 ## Leçons
 
 - Un essai local « sous UID arbitraire » doit aussi reproduire la **propriété des volumes** : sous OKD, un `emptyDir` appartient à root, ce que l'essai local ne montrait pas.
-- Un service exposé par `externalIP` sur l'adresse VPN, plutôt que par NodePort, reste injoignable depuis le réseau local et voit la vraie adresse du client.
+- Un service exposé par `externalIP` sur l'adresse VPN, plutôt que par NodePort, reste injoignable depuis le réseau local. Mais, en passerelle partagée d'OVN-Kubernetes, **le pod voit une source réécrite** (`169.254.0.2`), pas l'adresse de l'appareil : une NetworkPolicy en `ipBlock` du VPN le refuse, et ne peut pas filtrer par appareil.
+- « Ne pas annoncer les candidats privés » retire aussi l'adresse VPN, qui est privée : sur un réseau privé, c'est la seule adresse utile.
+- **WebRTC sur iOS ne suit pas les routes du VPN** comme le reste du système : il ne propose que l'interface par défaut, déterminée par la route vers `8.8.8.8`. Une page qui affiche les candidats ICE de l'appareil tranche en une minute ce que des heures de journaux n'ont pas tranché.
+- Afficher une application dans un cadre ne prouve pas qu'on peut **s'y connecter** dans ce cadre : un fournisseur d'identité refuse d'être encadré. Contrôler le parcours complet, jusqu'à l'action.
+- Un compteur de règle de pare-feu à zéro ne prouve pas l'absence de trafic : le chemin réel du paquet peut éviter la chaîne. Ce qui fait foi : l'état du service et la table de suivi des connexions.
+- Un logiciel qui résout les noms par sa propre bibliothèque (libunbound pour Prosody) **ignore les domaines de recherche** du pod : écrire les noms de Service en entier, et faire résoudre le banc comme le cluster.
+- Un serveur qui valide un jeton par l'userinfo accepte tout jeton du realm, quel que soit le client : garder chaque entrée (WebSocket compris) par l'oauth2-proxy de l'application.
+- Une archive faite sur un Mac à partir de fichiers téléchargés porte des attributs étendus (`com.apple.provenance`) que le build binaire d'OKD ne sait pas lire : `COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata`, puis contrôler l'archive avant le build.
 - Une condition de flux d'authentification niée se règle par une clé de négation propre à la condition : à vérifier en essai, invité compris.
 - Un `add_header` dans une `location` de nginx annule ceux du niveau supérieur : l'en-tête `frame-ancestors` d'Element est répété dans chaque location.

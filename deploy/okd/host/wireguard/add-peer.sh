@@ -32,6 +32,14 @@ printf '\n# %s (%s)\n[wireguard-peer.%s]\nallowed-ips=%s/32;\npersistent-keepali
 chmod 600 "$CONF"
 
 nmcli connection reload
-# reapply : applique les pairs sans couper les tunnels existants ; sinon redémarrage de wg0.
-nmcli device reapply wg0 2>/dev/null && echo "✓ $name → $ip (sans coupure)" \
-    || { nmcli connection up wg0 >/dev/null && echo "✓ $name → $ip (wg0 redémarré)"; }
+# reapply : applique les pairs sans couper les tunnels existants. Jamais « nmcli connection up wg0 » :
+# relancer wg0 couperait tous les appareils, poste d'administration compris (seul chemin d'administration).
+# En cas d'échec, le pair reste écrit dans le profil et s'applique plus tard, par reapply seulement.
+if nmcli device reapply wg0; then
+    echo "✓ $name → $ip (sans coupure)"
+else
+    echo "⚠ $name → $ip : écrit dans le profil, mais PAS encore appliqué (nmcli device reapply wg0 a échoué)."
+    echo "  wg0 n'est pas relancé : les autres appareils restent connectés."
+    echo "  Plus tard : sudo nmcli device reapply wg0"
+    exit 2
+fi

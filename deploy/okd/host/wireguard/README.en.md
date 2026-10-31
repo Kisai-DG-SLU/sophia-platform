@@ -29,7 +29,7 @@ Any address outside `${VPN_ADMIN_RANGE}` is a **user** device: HTTP/HTTPS only.
 | `test-garde-fou-metrique.sh` | local bench, **Linux only**: compares the old and new safeguard with fake `crictl`, `podman`, `nft` and `logger` |
 | `sophia-wg-filter-check.{service,timer}` | re-runs the safeguard 3 min after boot, then every 15 min (OKD updates) |
 | `test-nft-ovn.sh` | tests, expression by expression, what OVN's nft can read back (hook-less tables, deleted immediately) |
-| `add-peer.sh` | adds a device: name, address, **public key**; checks (format, duplicates, range), profile backup, applied without dropping tunnels |
+| `add-peer.sh` | adds a device: name, address, **public key**; checks (format, duplicates, range), profile backup, applied without dropping tunnels; if applying fails, stops (code 2) with the peer written in the profile, **never restarting `wg0`** |
 
 ## 1. Server-side interface
 
@@ -71,6 +71,21 @@ Without the filter, **every peer reaches every port of the node** (SSH, cluster 
 4. iOS: *On-Demand Activation* on Wi-Fi **and** cellular. Android: *Settings → Network → VPN → ⚙ → Always-on VPN*.
 
 Record each device in the peer comment (done by `add-peer.sh`); keep administration addresses for administration workstations only.
+
+### iOS devices: video calls and the default network
+
+On an iPhone or iPad, the profile adds **`8.8.8.8/32`**:
+
+```ini
+AllowedIPs = ${VPN_NETWORK}, 8.8.8.8/32
+```
+
+**Why**: WebKit's WebRTC on iOS (Safari, and Chrome, which uses the same engine) only enumerates the "default" network interface, and libwebrtc determines it by opening a UDP socket towards `8.8.8.8`, without sending anything. With the base profile, that interface is the Wi-Fi or mobile network: the device only offers that address as a candidate, and the video media never goes through the tunnel, while its pages do. With the route to `8.8.8.8` in the tunnel, the VPN becomes the "default" interface for WebRTC; the rest of the Internet stays outside the tunnel. Real case: without this setting, the call opened on the tablet, but picture and sound never reached the bridge ([Communication module](../../../../docs/modules/communication/documentation.en.md#video-media-three-causes-in-a-row)).
+
+- **Side effect**: an application that queries `8.8.8.8` directly as its DNS server goes through the tunnel, where the filter refuses it; the system DNS is not affected.
+- **IPv6**: no equivalent needed as long as the bridge only advertises an IPv4 address and the tunnel has no IPv6.
+- **Android**: base profile. Chrome on Android enumerates every interface, VPN included, once camera or microphone are allowed (to be confirmed by testing each device); `8.8.8.8/32` is only added if it requires it: with Android's private DNS set to that provider, all of the phone's DNS would be refused.
+- **Test each device**, at home then on the mobile network: a diagnostic page served by the video service lists the device's ICE candidates (camera allowed long enough to unmask them); a `host` candidate within `${VPN_NETWORK}` is expected. The page is removed once every device has been tested.
 
 ## 3. Filter (administrator, on the node)
 
@@ -146,7 +161,7 @@ This is the only administration path: a change to the safeguard is installed wit
 
 The video service of the [Communication module](../../../../docs/modules/communication/documentation.en.md) (installed, in acceptance testing) carries its media over **a single UDP port**, exposed like Forgejo through an externalIP on `${VPN_SERVER_IP}`, not through a NodePort: a NodePort would be reachable from the local network, and the bridge would only see OVN-Kubernetes' join address there. The service's recipe is in [`../../office/`](../../office/README.en.md#persistent-chat-and-video-calls).
 
-OVN-Kubernetes' DNAT happens before the filter: this traffic goes through the **`forward`** chain, not `input`. A single rule, open to **every** VPN device (users included), to place before the `counter drop` of `forward`:
+A rule, open to **every** VPN device (users included), to place before the `counter drop` of `forward`:
 
 ```
 ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept comment "video: media"
@@ -154,11 +169,12 @@ ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept c
 
 Add `$JVB_UDP_PORT` to `envsubst`'s explicit list, then load the filter as in section 3: `nft -c` check, **3-minute automatic switch**, which reloads the previous filter (or removes the table), safeguard at 0, new administration session, then stop the switch. The bridge's replies to devices go through `ct state established,related`.
 
-**Check**: during a call between two VPN devices, the rule's counter increases:
+**This rule's counter is not a check**: it stayed at zero during a call whose media was established. externalIP traffic is translated by OVN-Kubernetes (shared gateway) and most likely does not go through this chain; its exact path through the filter is being measured. What counts as proof:
 
-```bash
-sudo nft list chain inet sophia_wg forward | grep video
-```
+- the media bridge's debug state (participants `iceConnected`, packets received and sent);
+- the node's connection-tracking table (`/proc/net/nf_conntrack`): one entry per device towards `${VPN_SERVER_IP}:${JVB_UDP_PORT}`, without `[UNREPLIED]`.
+
+On the cluster side, the bridge pod sees a source rewritten by the host masquerade: its NetworkPolicy admits the `host-network` group on that port (see the [recipe](../../office/README.en.md#persistent-chat-and-video-calls)). iOS devices need their own profile (section 2).
 
 ## Open points
 

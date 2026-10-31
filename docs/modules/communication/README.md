@@ -1,10 +1,10 @@
 # Module Communication — chat permanent et visio du foyer
 
-Module construit sur SophIA à partir de logiciels libres existants : **Matrix** (serveur Synapse, client Element) pour un chat permanent entre les membres du foyer, **Jitsi Meet** pour la visio. Connexion unique par le fournisseur d'identité de la plateforme, sans compte local ; tout reste à la maison, joint par le VPN.
+Module construit sur SophIA à partir de logiciels libres existants : un chat permanent entre les membres du foyer, aujourd'hui **Matrix** (serveur Synapse, client Element), remplacé par **Converse.js et Prosody** (XMPP), décision prise après un essai sur la vraie tablette ; **Jitsi Meet** pour la visio. Connexion unique par le fournisseur d'identité de la plateforme, sans compte local ; tout reste à la maison, joint par le VPN.
 
 | | |
 |---|---|
-| État | **en service, en recette** dans l'installation de référence : les deux services tournent et la première connexion est faite ; Messages et Visio s'affichent dans le cockpit de l'interface ; la recette (visio à plusieurs appareils, invité refusé, compte protégé, clients du chat sur téléphone et tablette) reste à faire ; la visio passe par le navigateur seulement ; recette de déploiement publiée sous forme de procédure, sans les manifestes |
+| État | **en service, en recette** dans l'installation de référence : chat Matrix et visio affichés dans le cockpit ; **première visio avec image** entre un ordinateur et la tablette ancienne, dans le cockpit, par le VPN ; messagerie XMPP éprouvée sur la tablette ancienne (essai), version définitive en conception, puis démontage de Matrix ; recette à trois appareils et sur chaque appareil du foyer à faire ; la visio passe par le navigateur seulement ; recette de déploiement publiée sous forme de procédure, sans les manifestes |
 | Utilisateurs | les groupes du foyer ; les invités sont refusés par le fournisseur d'identité, et par la visio elle-même |
 | Modèle | aucun : pas d'agent dans les salons pour l'instant ; le résumé des non-lus pour l'interface est un calcul déterministe |
 | Briques de la plateforme | SSO, PostgreSQL 18 partagé, volume local dédié, classes de priorité et quotas, VPN (média de la visio) |

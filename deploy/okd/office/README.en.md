@@ -86,7 +86,7 @@ Tool and identity-provider side: [`../skills/`](../skills/README.en.md) and [Ide
 
 Recipe of the [Communication module](../../../docs/modules/communication/documentation.en.md): Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) in `sophia-messagerie`, Jitsi Meet (`stable-11248-2`: web, Prosody, Jicofo, JVB) and an OIDC → token adapter in `sophia-visio`. As for the office suite, this is a procedure, without the reference installation's manifests; the choices and their reasons are in the module documentation.
 
-Status: **in service, in acceptance testing**: chat and video calls installed and checked through the real path (sign-in, room without a padlock, video adapter); tests with the household's devices (first message, multi-party call, guest refusal, child account, nftables rule counter) at the acceptance step. Video calls go **through the browser only** (household decision): Jitsi's mobile app is no longer used.
+Status: **in service, in acceptance testing**: chat and video calls installed and checked through the real path (sign-in, room without a padlock, video adapter); **first video call with picture** between a computer and the older tablet, in the cockpit, through the VPN; three-device call, guest refusal, child account and testing each device at the acceptance step. Video calls go **through the browser only** (household decision): Jitsi's mobile app is no longer used. Matrix messaging will be replaced by Converse.js and Prosody ([Communication module](../../../docs/modules/communication/documentation.en.md#messaging-from-matrix-to-xmpp)); its recipe will be published with the final version.
 
 ### Components
 
@@ -100,7 +100,7 @@ Status: **in service, in acceptance testing**: chat and video calls installed an
 | | `adaptateur` | OIDC sign-in, then a signed 600 s token for a single room; image built in the cluster from the forge, pinned by digest |
 | | `jvb-media` | `ClusterIP` Service with `externalIPs: [${VPN_IP}]`, port `${JVB_UDP_PORT}/UDP`; **no NodePort** |
 
-Jitsi settings to remember: `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DEEP_LINKING` (no "Join in the app" page: the call stays in the browser), peer-to-peer off, `JVB_ADVERTISE_PRIVATE_CANDIDATES=false`, `ENABLE_COLIBRI_WEBSOCKET=0` (bridge channel over SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` for the arbitrary UID, with neither privilege nor `anyuid`.
+Jitsi settings to remember: `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DEEP_LINKING` (no "Join in the app" page: the call stays in the browser), peer-to-peer off, **`JVB_ADVERTISE_PRIVATE_CANDIDATES=true`** (the VPN address is a private address: with `false`, the bridge advertised no reachable candidate), `ENABLE_COLIBRI_WEBSOCKET=0` (bridge channel over SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` for the arbitrary UID, with neither privilege nor `anyuid`.
 
 ### Prerequisites
 
@@ -115,7 +115,7 @@ Jitsi settings to remember: `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DEEP_L
 
 ### Network
 
-- **Ingress**: from the router for pages and APIs; JVB from `${VPN_NETWORK}` only, over UDP on `${JVB_UDP_PORT}`.
+- **Ingress**: from the router for pages and APIs; JVB over UDP on `${JVB_UDP_PORT}`, from `${VPN_NETWORK}` **and from the `policy-group.network.openshift.io/host-network` group**: in OVN-Kubernetes' shared gateway, externalIP traffic reaches the pod with a source rewritten by the host masquerade (`169.254.0.2`). Without this group, no media is established. The NetworkPolicy therefore cannot filter this traffic per device.
 - **Synapse ingress from the interface pod**, on its HTTP port, for the unread-summary route (with the matching egress on the interface side).
 - **Egress**: Synapse to MAS and ntfy, and to the identity provider's public name, on 443 through the router, for the realm's public keys (summary module; the existing egress covers it); MAS and the adapter to the identity provider's public name, on 443, through the router; JVB over UDP to `${VPN_NETWORK}` only (replies to devices), in its NetworkPolicy **and** in the base's EgressFirewall, before the deny rule.
 - The media bridge uses no NodePort: a NodePort would be reachable from the local network, and the pod would only see OVN-Kubernetes' join address there. The `externalIP` on the VPN address, like the forge, is reachable through the VPN only and keeps the client's real address.
@@ -149,7 +149,7 @@ Each value is generated on the spot and written through a pipe, without a traili
 2. **Prerequisites 1 to 5** in place; if one is missing: stop.
 3. **Secrets**, written through a pipe, with no variable and nothing displayed (above).
 4. **Chat**: `oc diff -k`, server dry-run, `oc apply -k`, wait for the rollouts. Checks through the real path: `.well-known` with `io.element.e2ee` set to `false`, the API's `versions`, sign-in flows served by MAS, MAS OIDC discovery, ntfy, Element. Sign-in of an admitted account (two MAS pages the first time), refusal of a guest, room created without a padlock.
-5. **Video**: build the adapter, then `oc apply -k`. Checks: pods ready; JVB advertises the VPN address and is joined by Jicofo; `config.js` without third-party requests, peer-to-peer off; adapter healthy; a test with at least two devices, guest refused, **the nftables rule's counter increasing**.
+5. **Video**: build the adapter, then `oc apply -k`. Checks: pods ready; JVB advertises the VPN address and is joined by Jicofo; `config.js` without third-party requests, peer-to-peer off; adapter healthy; outside a frame, the adapter redirects to the identity provider (unchanged); in a frame, `config.js` contains `tokenAuthInline` and the adapter's window-mode address without a `nonce` answers 400; a test with at least two devices, guest refused. **Media check**: the bridge's debug state (participants `iceConnected`, packets) and the node's connection-tracking table (one entry per device towards `${VPN_IP}:${JVB_UDP_PORT}`, without `[UNREPLIED]`); the nftables rule's counter is not a check. An iOS tablet needs its [own VPN profile](../host/wireguard/README.en.md#ios-devices-video-calls-and-the-default-network).
 
 ### Rollback
 
