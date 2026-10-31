@@ -1,6 +1,6 @@
 # Volume du Valkey des sessions d'oauth2-proxy : fichier AOF seulement, quelques Mo.
-# Préalable sur le nœud : sudo mkdir -p /var/lib/sophia/valkey-sessions
-#                         sudo chcon -t container_file_t /var/lib/sophia/valkey-sessions
+# Préalable sur le nœud : sudo mkdir -p ${SESSIONS_MOUNT_POINT}
+#                         sudo chcon -t container_file_t ${SESSIONS_MOUNT_POINT}
 # PV et PVC désignés l'un l'autre (claimRef / volumeName) : aucune autre PVC ne peut le prendre.
 ---
 apiVersion: v1
@@ -15,7 +15,7 @@ spec:
   storageClassName: local-storage
   volumeMode: Filesystem
   local:
-    path: /var/lib/sophia/valkey-sessions
+    path: ${SESSIONS_MOUNT_POINT}
   nodeAffinity:
     required:
       nodeSelectorTerms:
