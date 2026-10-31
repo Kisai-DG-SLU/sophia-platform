@@ -20,7 +20,7 @@ modules (e.g. cooking) ─MCP :8000──→ sophia-image only        generator 
 |---|---|
 | `00-namespace-guardrails.yaml` | `ResourceQuota`, `LimitRange` |
 | `01-network.yaml` | deny all; ingress: the interface → 8000 (pods `sophia-mcp: "true"`), a module → `sophia-image` only; egress: DNS, `sophia-image` → `sophia-image-gen` |
-| `02-storage.yaml` | local PV `/var/mnt/models/skills` (same volume as the models, separate directory) and PVC `pvc-skills-data`, read-only |
+| `02-storage.yaml` | local PV `${MODELS_MOUNT_POINT}/skills` (same volume as the models, separate directory) and PVC `pvc-skills-data`, read-only |
 | `03-geo.yaml` | `sophia-geo`: `lieu`, `distance`, `carte` tools |
 | `04-image.yaml` | `sophia-image`: `image` tool; models in [`../inference/06-image.yaml`](../inference/06-image.yaml) |
 | `fetch-geo-data.sh`, `geo_build.py` | geographic data, prepared on the node in a throw-away container; the previous version stays in place if preparation fails |
@@ -103,6 +103,7 @@ HTTP route next to the MCP: `GET /api/resume`, the Files summary for the interfa
 | `${MODULE_APP}` | `app` label of a module allowed to reach the `image` tool (one block per module) |
 | `${NODE_ADDR}` | node administration address (data preparation) |
 | `${NODE_NAME}` | node carrying the volume (`oc get nodes`), in `02-storage.yaml` |
+| `${MODELS_MOUNT_POINT}` | mount point of the models volume ([`../inference/`](../inference/)), in `02-storage.yaml`; named substitution: `envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 02-storage.yaml` |
 | `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | directories with the servers' code (binary builds) |
 
 ## Procedure (administrator)

@@ -10,7 +10,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /var/lib/sophia/notebook-workspace
+    path: ${NOTEBOOK_MOUNT_POINT}
   nodeAffinity:
     required:
       nodeSelectorTerms:

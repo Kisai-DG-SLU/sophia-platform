@@ -8,7 +8,7 @@ The heart of the platform: the model router (LiteLLM), the shared PostgreSQL dat
 |---|---|
 | `litellm/` | model router: stable aliases (`sophia-local`, `sophia-local-fond`, `sophia-embedder`, `sophia-stt`, `sophia-tts`, and remote aliases for development), restricted virtual keys, costs |
 | [`postgres18/`](postgres18/) | **PostgreSQL 18**, shared instance for every database (LiteLLM, Keycloak, interface, Temporal, memory, human approvals, office suite, modules), one owner role per database, no network superuser; dedicated logical volume |
-| `postgres/` | former PostgreSQL 15 instance, replaced by `postgres18/`: at 0 replicas for a 7-day hold, then removed; `pv.yaml` carries the `${NODE_NAME}` variable (volume node) |
+| `postgres/` | former PostgreSQL 15 instance, replaced by `postgres18/`: at 0 replicas for a 7-day hold, then removed; `pv.yaml` carries the `${NODE_NAME}` (volume node) and `${PG15_MOUNT_POINT}` (the volume's directory on the node) variables |
 | [`rabbitmq/`](rabbitmq/) | event bus, with the dispatcher as only publisher; management UI behind Keycloak |
 | [`temporal/`](temporal/) | agents' durable workflows (delegation, recovery after failure) |
 | [`repartiteur/`](repartiteur/) | delegation dispatcher: rules without a model, only Temporal client, only event publisher |

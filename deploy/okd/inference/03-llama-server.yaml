@@ -15,7 +15,7 @@
 # Accès au GPU : « chemin pur » (contournement de l'opérateur NVIDIA, voir README).
 # L'opérateur NVIDIA ne fonctionne pas sur ce nœud (crochet du container toolkit en échec,
 # device plugin désactivé) : pas de ressource nvidia.com/gpu, conteneur privilégié qui voit
-# /dev/nvidia*, et libcuda.so.1 du pilote montée depuis /var/lib/nvidia-pure.
+# /dev/nvidia*, et libcuda.so.1 du pilote montée depuis ${NVIDIA_LIB_DIR}.
 # SCC privileged accordée au compte default de sophia-inference.
 ---
 apiVersion: apps/v1
@@ -104,7 +104,7 @@ spec:
         - name: models
           persistentVolumeClaim: { claimName: pvc-models, readOnly: true }
         - name: nvidia-libs
-          hostPath: { path: /var/lib/nvidia-pure, type: Directory }
+          hostPath: { path: "${NVIDIA_LIB_DIR}", type: Directory }
 ---
 apiVersion: v1
 kind: Service

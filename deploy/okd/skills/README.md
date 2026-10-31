@@ -20,7 +20,7 @@ modules (ex. cuisine) ──────────MCP :8000──→ sophia-im
 |---|---|
 | `00-namespace-guardrails.yaml` | `ResourceQuota`, `LimitRange` |
 | `01-network.yaml` | tout refusé ; entrée : l'interface → 8000 (pods `sophia-mcp: "true"`), un module → `sophia-image` seul ; sortie : DNS, `sophia-image` → `sophia-image-gen` |
-| `02-storage.yaml` | PV local `/var/mnt/models/skills` (même volume que les modèles, dossier à part) et PVC `pvc-skills-data`, lus en lecture seule |
+| `02-storage.yaml` | PV local `${MODELS_MOUNT_POINT}/skills` (même volume que les modèles, dossier à part) et PVC `pvc-skills-data`, lus en lecture seule |
 | `03-geo.yaml` | `sophia-geo` : outils `lieu`, `distance`, `carte` |
 | `04-image.yaml` | `sophia-image` : outil `image` ; modèles dans [`../inference/06-image.yaml`](../inference/06-image.yaml) |
 | `fetch-geo-data.sh`, `geo_build.py` | données géographiques, préparées sur le nœud dans un conteneur jetable ; l'ancienne version reste en place si la préparation échoue |
@@ -103,6 +103,7 @@ Route HTTP à côté du MCP : `GET /api/resume`, le résumé de Fichiers pour le
 | `${MODULE_APP}` | étiquette `app` d'un module autorisé à joindre l'outil `image` (un bloc par module) |
 | `${NODE_ADDR}` | adresse d'administration du nœud (préparation des données) |
 | `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`), dans `02-storage.yaml` |
+| `${MODELS_MOUNT_POINT}` | point de montage du volume des modèles ([`../inference/`](../inference/)), dans `02-storage.yaml` ; substitution nommée : `envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 02-storage.yaml` |
 | `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | dossiers du code des serveurs (builds binaires) |
 
 ## Procédure (l'administrateur)

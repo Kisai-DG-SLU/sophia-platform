@@ -1,7 +1,7 @@
 # SPOut.2 — sophia-geo : lieux, distances, cartes (MCP), données locales en lecture seule.
 # Code non fourni (contrat : README). Image construite dans sophia-apps (build binaire) :
 #   oc start-build sophia-geo -n sophia-apps --from-dir=${GEO_SRC_DIR} --follow
-# Données : /var/mnt/models/skills/geo (fetch-geo-data.sh, depuis le nœud), via pvc-skills-data.
+# Données : ${MODELS_MOUNT_POINT}/skills/geo (fetch-geo-data.sh, depuis le nœud), via pvc-skills-data.
 ---
 apiVersion: image.openshift.io/v1
 kind: ImageStream

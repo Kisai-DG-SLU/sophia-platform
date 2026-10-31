@@ -2,7 +2,7 @@
 # Code du service non fourni (contrat : README). Image construite dans sophia-apps (build binaire,
 # depuis une copie locale du code), tirée par sophia-inference.
 #   oc start-build sophia-voice -n sophia-apps --from-dir=<code de sophia-voice> --follow
-# Modèles : /var/mnt/models/voice (fetch-voice-models.sh, depuis le nœud), via pvc-models.
+# Modèles : ${MODELS_MOUNT_POINT}/voice (fetch-voice-models.sh, depuis le nœud), via pvc-models.
 # Pas de GPU : le modèle de texte garde la carte. Pas de sortie réseau (04-network).
 ---
 apiVersion: image.openshift.io/v1

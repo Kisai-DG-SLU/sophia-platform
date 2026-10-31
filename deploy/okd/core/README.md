@@ -8,7 +8,7 @@ Le cœur de la plateforme : le routeur de modèles (LiteLLM), la base PostgreSQL
 |---|---|
 | `litellm/` | routeur de modèles : alias stables (`sophia-local`, `sophia-local-fond`, `sophia-embedder`, `sophia-stt`, `sophia-tts`, et des alias distants pour le développement), clés virtuelles restreintes, coûts |
 | [`postgres18/`](postgres18/) | **PostgreSQL 18**, instance commune de toutes les bases (LiteLLM, Keycloak, interface, Temporal, mémoire, validations humaines, bureautique, modules), un rôle propriétaire par base, sans superutilisateur réseau ; volume logique dédié |
-| `postgres/` | ancienne instance PostgreSQL 15, remplacée par `postgres18/` : à 0 réplique pendant une garde de 7 jours, puis retirée ; `pv.yaml` porte la variable `${NODE_NAME}` (nœud du volume) |
+| `postgres/` | ancienne instance PostgreSQL 15, remplacée par `postgres18/` : à 0 réplique pendant une garde de 7 jours, puis retirée ; `pv.yaml` porte les variables `${NODE_NAME}` (nœud du volume) et `${PG15_MOUNT_POINT}` (répertoire du volume sur le nœud) |
 | [`rabbitmq/`](rabbitmq/) | bus d'événements, dont le répartiteur est le seul éditeur ; interface d'administration derrière Keycloak |
 | [`temporal/`](temporal/) | workflows durables des délégations (reprise après panne) |
 | [`repartiteur/`](repartiteur/) | répartiteur des délégations : règles sans modèle, seul client de Temporal, seul éditeur des événements |
