@@ -50,14 +50,14 @@ Mot de passe par la variable `OAUTH2_PROXY_REDIS_PASSWORD`, en `secretKeyRef` su
 
 **Aucun secret dans une variable du terminal** : chaque mot de passe est généré puis écrit aussitôt par un tube dans son Secret, jamais affiché. Chaque `oc apply` passe d'abord à blanc (`--dry-run=server`).
 
-1. **Sur le nœud** : `sudo mkdir -p /var/lib/sophia/valkey-sessions`, puis `sudo chcon -t container_file_t` sur ce répertoire.
+1. **Sur le nœud** : `sudo mkdir -p` du répertoire `${SESSIONS_MOUNT_POINT}` (par exemple `/var/lib/sophia/valkey-sessions`), puis `sudo chcon -t container_file_t` sur ce répertoire.
 2. **Mots de passe** (contrôle, puis une application) :
    ```bash
    openssl rand -hex 32 | tr -d '\n' | oc -n sophia-identity create secret generic valkey-sessions-controle --from-file=password=/dev/stdin
    openssl rand -hex 32 | tr -d '\n' | oc -n sophia-interface create secret generic sophia-interface-sessions --from-file=password=/dev/stdin
    ```
 3. **Fichier d'ACL** : `bash deploy/okd/identity/sessions/acl.sh` (relecture, empreintes seulement), `--a-blanc`, puis `--appliquer`.
-4. **Volume, Valkey, réseau** : `01-volume.yaml` (variable `${NODE_NAME}` : nœud qui porte le volume, `oc get nodes`, par exemple `node-0` ; `envsubst '${NODE_NAME}' < 01-volume.yaml | oc apply -f -`), `02-valkey.yaml`, `03-network.yaml`.
+4. **Volume, Valkey, réseau** : `01-volume.yaml` (variables `${NODE_NAME}`, nœud qui porte le volume, `oc get nodes`, par exemple `node-0`, et `${SESSIONS_MOUNT_POINT}`, répertoire de l'étape 1 ; `envsubst '${NODE_NAME} ${SESSIONS_MOUNT_POINT}' < 01-volume.yaml | oc apply -f -`), `02-valkey.yaml`, `03-network.yaml`.
 5. **Contrôles** : sans mot de passe, `valkey-cli ping` est refusé (`NOAUTH`) ; avec `controle` (mot de passe passé par un tube jusque dans le pod), `aof_enabled:1`, `maxmemory_policy:noeviction`, et `GET` refusé (`NOPERM`).
 6. Puis chaque application passe à `--session-store-type=redis`, avec sa sortie réseau ; `DBSIZE` monte à chaque connexion.
 
