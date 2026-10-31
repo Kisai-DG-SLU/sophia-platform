@@ -10,6 +10,9 @@ Fournir une interface JupyterLab réutilisable pour plusieurs projets.
 - Les dépendances scientifiques vivent dans chaque repo projet (`pixi.toml` / `pixi.lock`)
 - Le workspace persistant est monté sur `/workspace`
 
+## Volume
+`pv.yaml` porte la variable `${NODE_NAME}`, nœud qui porte le volume (`oc get nodes`) : `envsubst '${NODE_NAME}' < pv.yaml | oc apply -f -`.
+
 ## Utilisation
 Dans Jupyter terminal :
 

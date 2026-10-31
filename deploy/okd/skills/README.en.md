@@ -102,6 +102,7 @@ HTTP route next to the MCP: `GET /api/resume`, the Files summary for the interfa
 |---|---|
 | `${MODULE_APP}` | `app` label of a module allowed to reach the `image` tool (one block per module) |
 | `${NODE_ADDR}` | node administration address (data preparation) |
+| `${NODE_NAME}` | node carrying the volume (`oc get nodes`), in `02-storage.yaml` |
 | `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | directories with the servers' code (binary builds) |
 
 ## Procedure (administrator)

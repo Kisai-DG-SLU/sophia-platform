@@ -18,4 +18,4 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - master-0 # Vérifie ton hostname avec 'oc get nodes'
+          - "${NODE_NAME}" # nœud qui porte le volume (oc get nodes)

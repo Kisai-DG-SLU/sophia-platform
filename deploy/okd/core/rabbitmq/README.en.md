@@ -58,8 +58,9 @@ Client side: declare queues and exchanges with `passive=True` (no `configure` pe
 | `${RABBITMQ_HOST}` | DNS name of the management UI, resolving to the VPN address |
 | `${IDP_HOST}` | Keycloak's public name (token issuer, signing keys) |
 | `${VIEWER_NAMESPACE}` | the visualisation relay's own namespace, with no agent account bound to it |
+| `${NODE_NAME}` | node carrying the volume (`oc get nodes`), in `01-storage.yaml` |
 
-Replace the node name (`master-0` in `01-storage.yaml`) with the one from `oc get nodes`.
+Variables are replaced by a named substitution, for instance `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
 
 ## Procedure (administrator)
 
