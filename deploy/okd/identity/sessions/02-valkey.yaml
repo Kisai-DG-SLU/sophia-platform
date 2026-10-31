@@ -1,0 +1,96 @@
+# Valkey réservé aux sessions des oauth2-proxy : aucun autre usage.
+# Image Valkey de sclorg (compatible Redis), figée par empreinte (index multi-architecture).
+# Aucun mot de passe par variable : les utilisateurs viennent du fichier d'ACL (Secret valkey-sessions-acl,
+# construit par acl.sh, empreintes SHA-256 seulement), l'utilisateur default est désactivé.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: valkey-sessions
+  namespace: sophia-identity
+  labels: { app: valkey-sessions }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valkey-sessions
+  namespace: sophia-identity
+  labels: { app: valkey-sessions }
+spec:
+  replicas: 1
+  # Volume RWO : jamais deux Valkey sur le même fichier AOF
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: valkey-sessions }
+  template:
+    metadata:
+      labels: { app: valkey-sessions }
+    spec:
+      # Le chat en dépend pour chaque requête, comme de Keycloak
+      priorityClassName: sophia-chat
+      serviceAccountName: valkey-sessions
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: valkey
+          image: quay.io/sclorg/valkey-8-c10s@sha256:bd6d3a41d5a1ffb0e904e2c044ff19c5c692f0a0de13d59d9fb8be26adb95642
+          imagePullPolicy: IfNotPresent
+          # run-valkey passe ses arguments à valkey-server, après valkey.conf.
+          # noeviction : plein, Valkey refuse l'écriture (connexion impossible) au lieu d'effacer une session.
+          # AOF seul, fsync chaque seconde : un redémarrage ne déconnecte personne (README, « Persistance »).
+          args:
+            - run-valkey
+            - --aclfile
+            - /etc/valkey-sessions/users.acl
+            - --maxmemory
+            - 64mb
+            - --maxmemory-policy
+            - noeviction
+            - --appendonly
+            - "yes"
+            - --appendfsync
+            - everysec
+            - --save
+            - ""
+          ports:
+            - { name: valkey, containerPort: 6379, protocol: TCP }
+          readinessProbe:
+            tcpSocket: { port: 6379 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            # La réécriture de l'AOF dédouble le processus : la limite laisse deux fois maxmemory
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 192Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/valkey/data }
+            - { name: acl, mountPath: /etc/valkey-sessions, readOnly: true }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: valkey-sessions-data }
+        - name: acl
+          secret:
+            secretName: valkey-sessions-acl
+            defaultMode: 0440
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey-sessions
+  namespace: sophia-identity
+  labels: { app: valkey-sessions }
+spec:
+  selector: { app: valkey-sessions }
+  ports:
+    - { name: valkey, port: 6379, targetPort: 6379, protocol: TCP }

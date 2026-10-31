@@ -1,0 +1,42 @@
+# Flux du Valkey des sessions.
+# sophia-identity-ingress (02-network.yaml) choisit tous les pods du namespace, celui-ci compris, mais
+# n'ouvre que 8080 et 9000, où il n'écoute pas. Les Keycloak et l'opérateur ne joignent donc pas 6379.
+---
+# Entrée : seulement les pods qui portent un oauth2-proxy passé aux sessions côté serveur, sur 6379.
+# Une application s'ajoute ici en même temps que son utilisateur dans acl.sh (README, « Ajouter une application »).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: valkey-sessions-ingress
+  namespace: sophia-identity
+spec:
+  podSelector:
+    matchLabels: { app: valkey-sessions }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        # Chat : oauth2-proxy du pod de l'interface
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-interface }
+          podSelector:
+            matchLabels: { app: sophia-interface }
+        # Une autre application derrière oauth2-proxy, avec son utilisateur d'ACL (même motif) :
+        # - namespaceSelector:
+        #     matchLabels: { kubernetes.io/metadata.name: <namespace> }
+        #   podSelector:
+        #     matchLabels: { app: <application> }
+      ports:
+        - { protocol: TCP, port: 6379 }
+---
+# Sortie : aucune. Valkey ne joint rien (ni DNS, ni API) ; les réponses aux clients et aux sondes du
+# kubelet ne sont pas concernées.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: valkey-sessions-egress
+  namespace: sophia-identity
+spec:
+  podSelector:
+    matchLabels: { app: valkey-sessions }
+  policyTypes: [Egress]
+  egress: []

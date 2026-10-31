@@ -117,6 +117,7 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 | Trap | Effect | Remedy |
 |---|---|---|
 | A one-hour `--cookie-refresh` for a 5-minute access token | the relayed token is expired most of the time | refresh the session below the token's lifetime, without touching the realm |
+| Session in the cookie, split into chunks beyond 4 KB (the relayed token and its audiences make it grow) | oauth2-proxy reads an old whole cookie before its chunks, and never deletes it: the `Cookie` header exceeds the web server's limit (400) on a device that keeps an old session | server-side sessions, in a [dedicated Valkey](../../deploy/okd/identity/sessions/README.en.md) (one ACL user per application); header limit raised to 32 KB during the transition, on nginx **and** on uvicorn, whose h11 server caps at 16 KB by default |
 | nginx forwards every received header by default | without an explicit rule, the token would reach the model gateway and every API route | each `proxy_pass` block sets or clears the header; tested with the nginx binary and fake services, route by route |
 | Without `--pass-access-token`, oauth2-proxy lets the header through | a value forged by the browser would reach nginx | with the option on, oauth2-proxy removes the received value before injecting its own; nginx overwrites the internal header anyway |
 | A client description longer than 255 characters | Keycloak answers 500 on import (255-character column); nothing is created | the import script rejects any over-long text field, before connecting |
@@ -133,6 +134,7 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 | Item | Status |
 |---|---|
 | Token relay (oauth2-proxy, nginx, closed list) | in service |
+| Server-side oauth2-proxy sessions (chat and other applications behind oauth2-proxy) | in service |
 | "Files" MCP: verification, exchange, search by name, links built by the chat | in service |
 | Reading a document's content, reserved to local models ([Models by role](13-modeles-par-role.en.md)) | deployed, acceptance test pending |
 | Cockpit summary routes: audiences, network egress, applications that accept the bearer token (403 for an invalid token), messaging summary module (401 without a token) | in service, checked without a valid token |

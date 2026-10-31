@@ -117,6 +117,7 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | Piège | Effet | Parade |
 |---|---|---|
 | `--cookie-refresh` d'une heure pour un jeton d'accès de 5 minutes | le jeton relayé est expiré la plupart du temps | rafraîchir la session en dessous de la vie du jeton, sans toucher au realm |
+| Session dans le cookie, découpée en morceaux au-delà de 4 Ko (le jeton relayé et ses audiences la grossissent) | oauth2-proxy relit un ancien cookie entier avant ses morceaux, sans jamais l'effacer : l'en-tête `Cookie` dépasse la limite du serveur web (400) sur un appareil qui garde une vieille session | sessions côté serveur, dans un [Valkey réservé](../../deploy/okd/identity/sessions/README.md) (un utilisateur d'ACL par application) ; limite d'en-tête relevée à 32 Ko pendant la transition, sur nginx **et** sur uvicorn, dont le serveur h11 plafonne à 16 Ko par défaut |
 | nginx transmet par défaut tous les en-têtes reçus | sans règle explicite, le jeton partirait vers la passerelle de modèles et vers toutes les routes de l'API | chaque bloc `proxy_pass` pose ou vide l'en-tête ; éprouvé avec le binaire nginx et de faux services, route par route |
 | Sans `--pass-access-token`, oauth2-proxy laisse passer l'en-tête | une valeur forgée par le navigateur arriverait jusqu'à nginx | l'option active, oauth2-proxy supprime la valeur reçue avant d'injecter la sienne ; nginx écrase de toute façon l'en-tête interne |
 | Description d'un client de plus de 255 caractères | Keycloak répond 500 à l'import (colonne de 255) ; rien n'est créé | le script d'import refuse tout champ texte trop long, avant toute connexion |
@@ -133,6 +134,7 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | Élément | État |
 |---|---|
 | Relais du jeton (oauth2-proxy, nginx, liste fermée) | en service |
+| Sessions d'oauth2-proxy côté serveur (chat et autres applications derrière oauth2-proxy) | en service |
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
 | Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
 | Routes de résumé du cockpit : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
