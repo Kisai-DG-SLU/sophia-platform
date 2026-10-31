@@ -57,7 +57,7 @@ Password through the `OAUTH2_PROXY_REDIS_PASSWORD` variable, as a `secretKeyRef`
    openssl rand -hex 32 | tr -d '\n' | oc -n sophia-interface create secret generic sophia-interface-sessions --from-file=password=/dev/stdin
    ```
 3. **ACL file**: `bash deploy/okd/identity/sessions/acl.sh` (review, digests only), `--a-blanc` (dry run), then `--appliquer` (apply).
-4. **Volume, Valkey, network**: `01-volume.yaml`, `02-valkey.yaml`, `03-network.yaml`.
+4. **Volume, Valkey, network**: `01-volume.yaml` (variable `${NODE_NAME}`: node carrying the volume, `oc get nodes`, for instance `node-0`; `envsubst '${NODE_NAME}' < 01-volume.yaml | oc apply -f -`), `02-valkey.yaml`, `03-network.yaml`.
 5. **Checks**: without a password, `valkey-cli ping` is refused (`NOAUTH`); with `controle` (password piped into the pod), `aof_enabled:1`, `maxmemory_policy:noeviction`, and `GET` refused (`NOPERM`).
 6. Then each application switches to `--session-store-type=redis`, with its network egress; `DBSIZE` grows with each sign-in.
 
