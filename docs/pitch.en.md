@@ -86,12 +86,12 @@ SophIA is an experimental architecture under construction. We separate what work
 
 - The household's permanent chat (Matrix) and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it.
 - Cockpit: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries and Sophia writing into the open document (both verified).
-- Household and personal places in the profile; weather only receives the municipality's centre.
+- Household and personal places in the profile; weather only receives the municipality's centre, and a fallback cache keeps the forecast for the saved municipalities (verified).
 
 **In progress**
 
 - The interface as a requester of the dispatcher.
-- Cockpit: local geocoding of saved addresses, weather fallback cache, access through the cockpit only.
+- Cockpit: local geocoding of saved addresses, access through the cockpit only.
 - Development clusters: one ephemeral virtual cluster per project (decided, to be built).
 - Memory service (designed), ingestion pipeline and graph dimension.
 - Scheduled backups, vulnerability watch, compliance (GDPR, AI Act, ISO 27001).

@@ -86,12 +86,12 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 
 - Chat permanent du foyer (Matrix) et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre.
 - Cockpit : ouverture de la bonne page par Sophia sans clic, « ouvre le document X », « Demander à Sophia » dans chaque application, « Quoi de neuf ? » nourri par les résumés déterministes des applications et Sophia qui écrit dans le document ouvert (tous deux vérifiés).
-- Lieux du foyer et lieux personnels dans le profil ; la météo ne reçoit que le centre de la commune.
+- Lieux du foyer et lieux personnels dans le profil ; la météo ne reçoit que le centre de la commune, et un cache de secours garde la prévision des communes enregistrées (vérifié).
 
 **En cours**
 
 - L'interface comme demandeur du répartiteur.
-- Cockpit : géocodage local des adresses enregistrées, cache de secours de la météo, accès par le cockpit seul.
+- Cockpit : géocodage local des adresses enregistrées, accès par le cockpit seul.
 - Clusters de développement : un cluster virtuel éphémère par projet (décidé, à construire).
 - Service mémoire (conçu), pipeline d'ingestion et dimension graphe.
 - Sauvegardes planifiées, veille des failles, conformité (RGPD, AI Act, ISO 27001).
