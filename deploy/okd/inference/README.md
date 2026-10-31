@@ -97,7 +97,7 @@ Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistr
 0. Volume `lv-models` créé et monté sur le nœud (ci-dessus).
 1. Modèle de texte et module de vision déposés sur le nœud (`curl` à une révision figée, `sha256sum -c`, étiquette SELinux `container_file_t`) ; modèles vocaux : `fetch-voice-models.sh` ; modèles d'image : `fetch-image-models.sh`.
 2. Images : `oc start-build` du serveur de texte, du service vocal, du générateur et du classifieur d'images.
-3. `00`, `01`, `04`, puis `03`, `05` et `06` : `--dry-run=server`, puis `apply`.
+3. `00`, `01`, `04`, puis `03`, `05` et `06` : `--dry-run=server`, puis `apply`. `01-storage.yaml` porte la variable `${NODE_NAME}`, nœud qui porte le volume (`oc get nodes`) : `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
 4. Routeur de modèles : alias de texte et de voix, puis ajout des alias aux clés virtuelles restreintes.
 
 **Limites :** 4 discussions à la fois (une cinquième attend) ; 61 440 tokens par discussion, au-delà la discussion est résumée (échanges les plus anciens) et un fichier trop gros est refusé avec un message clair ; voix d'un petit modèle sur CPU, correcte mais peu expressive.

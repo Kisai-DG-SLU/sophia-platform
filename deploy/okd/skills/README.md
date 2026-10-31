@@ -102,6 +102,7 @@ Route HTTP à côté du MCP : `GET /api/resume`, le résumé de Fichiers pour le
 |---|---|
 | `${MODULE_APP}` | étiquette `app` d'un module autorisé à joindre l'outil `image` (un bloc par module) |
 | `${NODE_ADDR}` | adresse d'administration du nœud (préparation des données) |
+| `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`), dans `02-storage.yaml` |
 | `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | dossiers du code des serveurs (builds binaires) |
 
 ## Procédure (l'administrateur)

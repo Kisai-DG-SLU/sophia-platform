@@ -21,7 +21,7 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-            - { key: kubernetes.io/hostname, operator: In, values: [master-0] }   # nom du nœud
+            - { key: kubernetes.io/hostname, operator: In, values: ["${NODE_NAME}"] }
   claimRef:
     namespace: sophia-core
     name: pvc-rabbitmq-data

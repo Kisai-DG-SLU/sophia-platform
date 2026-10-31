@@ -58,8 +58,9 @@ Côté clients : déclarer files et exchanges en `passive=True` (pas de droit `c
 | `${RABBITMQ_HOST}` | nom DNS de l'interface d'administration, résolu vers l'adresse du VPN |
 | `${IDP_HOST}` | nom public de Keycloak (émetteur des jetons, clés de signature) |
 | `${VIEWER_NAMESPACE}` | namespace propre au relais de visualisation, sans compte d'agent lié |
+| `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`), dans `01-storage.yaml` |
 
-Le nom du nœud (`master-0` dans `01-storage.yaml`) se remplace par celui de `oc get nodes`.
+Les variables se remplacent par une substitution nommée, par exemple `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
 
 ## Procédure (l'administrateur)
 
