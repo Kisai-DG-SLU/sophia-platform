@@ -84,7 +84,9 @@ SophIA is an experimental architecture under construction. We separate what work
 
 **In service, in acceptance testing**
 
-- The household's permanent chat (Matrix) and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it.
+- The household's permanent chat and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it. First video call with picture between a computer and an older tablet, through the VPN. Messaging moves from Matrix to XMPP (Converse.js and Prosody), proven on the older tablet; final version being designed.
+- One browser workstation per child, displayed in the cockpit of older tablets: a gatekeeper routes by session, switches the workstation on on demand and off when idle.
+- Signing out of the cockpit also closes the modules' sessions.
 - Cockpit: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries and Sophia writing into the open document (both verified).
 - Household and personal places in the profile; weather only receives the municipality's centre, and a fallback cache keeps the forecast for the saved municipalities (verified).
 
@@ -93,8 +95,9 @@ SophIA is an experimental architecture under construction. We separate what work
 - The interface as a requester of the dispatcher.
 - Cockpit: local geocoding of saved addresses, access through the cockpit only.
 - Development clusters: one ephemeral virtual cluster per project (decided, to be built).
-- Memory service (designed), ingestion pipeline and graph dimension.
-- Scheduled backups, vulnerability watch, compliance (GDPR, AI Act, ISO 27001).
+- Memory, resumed as a priority: memory service coded, reviewed and ready to install (validation by a single person, isolated file extraction), the cockpit's "Memory" page, then the ingestion pipeline; graph dimension blocked.
+- Grey zone: study in progress (visual mock-ups of each person's projects, following the agents).
+- Vulnerability watch, compliance (GDPR, AI Act, ISO 27001); scheduled backups **postponed**, no backup medium yet.
 
 **Planned**
 
