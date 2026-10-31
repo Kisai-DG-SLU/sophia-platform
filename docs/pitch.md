@@ -84,7 +84,9 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 
 **En service, en recette**
 
-- Chat permanent du foyer (Matrix) et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre.
+- Chat permanent du foyer et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre. Première visio avec image entre un ordinateur et une tablette ancienne, par le VPN. La messagerie passe de Matrix à XMPP (Converse.js et Prosody), éprouvé sur la tablette ancienne ; version définitive en conception.
+- Un poste au navigateur par enfant, affiché dans le cockpit des tablettes anciennes : un portier aiguille par la session, allume le poste à la demande et l'éteint au repos.
+- Se déconnecter du cockpit ferme aussi les sessions des modules.
 - Cockpit : ouverture de la bonne page par Sophia sans clic, « ouvre le document X », « Demander à Sophia » dans chaque application, « Quoi de neuf ? » nourri par les résumés déterministes des applications et Sophia qui écrit dans le document ouvert (tous deux vérifiés).
 - Lieux du foyer et lieux personnels dans le profil ; la météo ne reçoit que le centre de la commune, et un cache de secours garde la prévision des communes enregistrées (vérifié).
 
@@ -93,8 +95,9 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - L'interface comme demandeur du répartiteur.
 - Cockpit : géocodage local des adresses enregistrées, accès par le cockpit seul.
 - Clusters de développement : un cluster virtuel éphémère par projet (décidé, à construire).
-- Service mémoire (conçu), pipeline d'ingestion et dimension graphe.
-- Sauvegardes planifiées, veille des failles, conformité (RGPD, AI Act, ISO 27001).
+- Mémoire, reprise en priorité : service mémoire codé, relu et prêt à installer (validation par une seule personne, extraction des fichiers isolée), page « Mémoire » du cockpit, puis pipeline d'ingestion ; dimension graphe bloquée.
+- Zone grise : étude en cours (maquettes visuelles des projets de chacun, suivi des agents).
+- Veille des failles, conformité (RGPD, AI Act, ISO 27001) ; sauvegardes planifiées **reportées**, faute de support.
 
 **Prévu**
 
