@@ -57,7 +57,7 @@ Mot de passe par la variable `OAUTH2_PROXY_REDIS_PASSWORD`, en `secretKeyRef` su
    openssl rand -hex 32 | tr -d '\n' | oc -n sophia-interface create secret generic sophia-interface-sessions --from-file=password=/dev/stdin
    ```
 3. **Fichier d'ACL** : `bash deploy/okd/identity/sessions/acl.sh` (relecture, empreintes seulement), `--a-blanc`, puis `--appliquer`.
-4. **Volume, Valkey, réseau** : `01-volume.yaml`, `02-valkey.yaml`, `03-network.yaml`.
+4. **Volume, Valkey, réseau** : `01-volume.yaml` (variable `${NODE_NAME}` : nœud qui porte le volume, `oc get nodes`, par exemple `node-0` ; `envsubst '${NODE_NAME}' < 01-volume.yaml | oc apply -f -`), `02-valkey.yaml`, `03-network.yaml`.
 5. **Contrôles** : sans mot de passe, `valkey-cli ping` est refusé (`NOAUTH`) ; avec `controle` (mot de passe passé par un tube jusque dans le pod), `aof_enabled:1`, `maxmemory_policy:noeviction`, et `GET` refusé (`NOPERM`).
 6. Puis chaque application passe à `--session-store-type=redis`, avec sa sortie réseau ; `DBSIZE` monte à chaque connexion.
 
