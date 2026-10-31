@@ -49,7 +49,7 @@ The [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md) 
 - **Displayable by the chat only**: `frame-ancestors 'self'` plus the chat's origin on Files pages; the API, administration and media keep refusing to be framed. Collabora adds the chat's origin to its own list: `frame-ancestors` checks the whole chain of frames, and the editor is nested. Settings: [`deploy/okd/office/`](../../../deploy/okd/office/README.en.md#display-in-the-cockpit).
 - **`sophia.pret` signal**: Files tells the cockpit it is ready when the person's session answers; without a signal after 8 s, the cockpit offers "Open separately" and "Sign in again".
 - **A document opens in the cockpit** (in service, in acceptance testing): the small script injected into Files replaces the single tab opening towards the editor (`/wopi/<uuid>`, same origin, no parameter) with a `sophia.ouvrir` message to the chat; the chat checks the source (the Desk frame), the origin and the closed form of the path, rebuilds the address on the module's origin, and opens the document in its own frame, with a "← Files" button. The document counts towards the limit of two live frames.
-- **Older tablet**: Files requires a recent engine; the cockpit shows an explanation instead of the frame.
+- **Older tablet**: Files requires a recent engine. For a child, the "Desk" tile opens their [browser workstation](#per-child-browser-workstation); for other accounts, the cockpit shows an explanation instead of the frame.
 - **"What's new?" summary**: the MCP tool serves `GET /api/resume` (files shared with the person and modified in the last 14 days), with the same relayed token as its tools. Called by the interface: in service, verified.
 
 ### "Sophia, open document X"
@@ -76,6 +76,42 @@ Through Collabora's PostMessage API, relayed by the script injected into the edi
 - **position**: at the cursor if the person clicked or typed in the text, otherwise at the end of the document, through a fixed command of the relay; the acknowledgement says where the text went;
 - word processing only in the first version (named error for another document type);
 - a test of the editor's internal selectors, to rerun with each new Collabora image.
+
+## Per-child browser workstation
+
+**In service, in acceptance testing.** The household's older tablets cannot run Files and Collabora (engine too old). For the children, the cockpit's "Desk" tile therefore shows a **browser workstation**: a recent browser running in the cluster, opened on Files, of which the tablet only receives the picture (VNC in the page, through noVNC). One workstation per child, with its own browser profile; adults and guests keep Files in the centre of the cockpit.
+
+```
+tablet (cockpit, "Desk" frame) ──► router ──► gatekeeper: nginx ─► oauth2-proxy (session, children's group)
+                                                  │      └─► portier.py (person → workstation table, wake-up, shutdown)
+                                                  └──► the child's workstation (noVNC ─► kiosk browser ─► Files)
+```
+
+| Element | Choice | Reason |
+|---|---|---|
+| Namespace | dedicated (`sophia-postes`), quota, default deny, EgressFirewall | workstations are full browsers: isolate them from the rest |
+| Workstation | an image pinned by digest: Chromium in kiosk mode on Files, virtual X server, noVNC and websockify; one Deployment per child (`poste-a`, `poste-b`, never a first name), **without a replica count**: the gatekeeper switches it on and off; browser profile on a `Retain` local volume; no service-account token mounted | each child finds their tabs and session again; nothing runs when nobody uses it |
+| Gatekeeper | a single address for everyone, no identifier in the URL; a three-container pod: nginx, oauth2-proxy (pinned by digest), and a small Python program (standard library, fixed rules, no model) | the target is decided server-side, never from the request |
+| Routing | two-stage nginx: the first checks the session and sets the person's identifier (header **overwritten**, even when empty, every variant ignored); the second, on loopback, asks the gatekeeper for the target **on every request, WebSocket included** | a child cannot aim at another child's workstation |
+| Table | person → workstation, by the identity provider's **technical identifier** (never a name), in a ConfigMap set by the administrator; forms checked, a malformed table refused at startup | no personal data in the cluster |
+| Access | reserved to the children's group (`--allowed-group`), then to the table: an adult or a guest is refused twice (refusal page, then 403) | the workstation is a tool for the children |
+| Wake-up | on the Desk's first request, the gatekeeper scales the workstation to 1 replica and serves a waiting page; the page declares failure at 55 s, before the cockpit's 60 s timeout, so that there is a single trigger; "Retry" starts again | a workstation that is off costs nothing |
+| Idle shutdown | after **30 minutes without a connection** to the remote screen; the gatekeeper polls each workstation's state every 15 s; the noVNC client does not reconnect on its own (otherwise the workstation would never fall asleep) | give memory and CPU back to the rest of the platform |
+| Gatekeeper rights | a Role limited to the workstations' Deployments (`get`) and their `scale` subresource (`get`, `patch`), by name; token mounted in the gatekeeper container only | switch on and off, nothing else |
+| Signals to the cockpit | `sophia.poste` (`reveil`, `echec`, `veille`, `refuse`), `sophia.connexion_requise`, `sophia.pret`, to the cockpit's origin only and only inside a frame; the cockpit writes the texts itself ("Your desk is getting ready…", "has fallen asleep") | no text coming from the page is displayed |
+| Retrieving a document | the workstation tells the gatekeeper which document is open; the cockpit offers to retrieve it, without waking a workstation that is off; sending and retrieving go through the "files" MCP tool | no download onto the tablet |
+| Monitoring | gatekeeper metrics (workstation on, wake-up failures); alerts: 3 wake-up failures in 30 min, a failure lasting more than 10 min, missing metrics | a failing wake-up is visible |
+
+**Isolation.** A workstation only accepts ingress from the gatekeeper, and only goes out to the router over HTTPS and to DNS: neither another workstation nor the gatekeeper. The gatekeeper only accepts the router, the chat pod and monitoring (the last two on its state port only); it only goes out to the workstations, the identity provider's pod and the cluster API. The chat reads the state of the person's workstation on a route that verifies the relayed token (its own audience and client, then userinfo; same identifier required). The review tried twelve attacks (forged identifier, doubled header, WebSocket to another child's workstation, modified or unsigned adult token, internal routes): all refused. **Known limit**: an already open WebSocket is not rechecked, for up to an hour; to cut it at once, switch the workstation off.
+
+**Stale session cleared.** On a tablet, another account's session cookie stayed in the browser: oauth2-proxy refused it, but the deletion it issued stayed in nginx's subrequest, and sign-in was asked for endlessly. Beyond 4 KB, the session is split into several cookies (`_0`, `_1`…), and nginx only returned the first deletion (it merges a subrequest's `Set-Cookie` headers into one, of which the browser only reads the first). Fix: the no-session page (on 401 only) itself clears the whole cookie and its chunks `_0` to `_3` (`Max-Age=0`, same attributes); a valid cookie is never touched.
+
+**Pitfalls at go-live.**
+
+- **The EgressFirewall cut off the cluster API**: the `kubernetes` Service ends at the node's address, on the API port; the NetworkPolicy allowed it, the namespace's EgressFirewall did not. The gatekeeper could neither read, nor switch on, nor switch off a workstation. Fix: a rule towards the control-plane nodes, on the API port, before the deny. The test bench had no EgressFirewall: cross-check NetworkPolicy **and** EgressFirewall when reviewing.
+- **Another account's session left on the tablet** made the gatekeeper see an adult, refused: hence the clearing above, and the **module sign-out** by the cockpit (see the [interface](../../../deploy/okd/apps/chat-interface/README.en.md#cockpit)).
+
+**Status**: in service; both children have their desk; real idle shutdowns observed. Still to prove: the first real cold wake-up (measured time), retrieving a document, falling asleep then waking up on each tablet, and the real cost of display at scale 2.
 
 ## Confidentiality
 

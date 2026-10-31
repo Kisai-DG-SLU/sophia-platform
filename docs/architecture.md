@@ -124,8 +124,9 @@ Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 | sophia-interface | l'interface de discussion, devenue le cockpit, hors de la portée de l'agent de déploiement ; ses sorties vers les applications sont explicites |
 | sophia-workflow | l'outil de visualisation, même raison |
 | sophia-workspace | la bureautique : fichiers et édition en ligne |
-| sophia-messagerie | chat permanent du foyer (Matrix), en service, en recette ; affiché dans le cockpit |
+| sophia-messagerie | chat permanent du foyer (Matrix), en service, en recette ; affiché dans le cockpit ; Matrix sera remplacé par XMPP (Converse.js et Prosody) |
 | sophia-visio | visioconférence (Jitsi Meet) par le navigateur seulement, en service, en recette ; affichée dans le cockpit |
+| sophia-postes | un poste au navigateur par enfant, allumé à la demande et éteint au repos par un portier ; affiché dans le cockpit |
 | namespaces de build | construction d'outils sensibles, sans compte d'agent |
 | prod-* | charges de travail des locataires |
 

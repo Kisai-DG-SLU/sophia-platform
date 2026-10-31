@@ -7,8 +7,8 @@ A **module** is an application for the household or the organisation, built on t
 | [Cooking](cuisine/README.en.md) | meal plan, recipe catalogue, rule-bound recipe generation, shopping | SSO, local model, PostgreSQL, `image` tool, web airlock, MCP to the chat and to the Shopping module |
 | [Shopping](courses/README.en.md) | choosing a drive-through store's products according to household rules, filling the real basket, express basket from the chat | SSO, local model, PostgreSQL, remote browser in the airlock, MCP |
 | [School](ecole/README.en.md) | playful school from primary to lower secondary, hints without the answer, report book, reading photographed homework | SSO and roles, local model with vision, chat interface, content through Git |
-| [Office](bureautique/README.en.md) | each person's files, private by default, document editing in the browser, search and reading from the chat | SSO, PostgreSQL 18, common S3, "files" MCP tool under the person's identity |
-| [Communication](communication/README.en.md) | persistent chat between household members and video calls, at home only; installed, in acceptance testing | SSO, PostgreSQL 18, dedicated local volume, VPN for video media |
+| [Office](bureautique/README.en.md) | each person's files, private by default, document editing in the browser, search and reading from the chat; one browser workstation per child for older tablets | SSO, PostgreSQL 18, common S3, "files" MCP tool under the person's identity, cluster API (switching workstations on) |
+| [Communication](communication/README.en.md) | persistent chat between household members and video calls, at home only; installed, in acceptance testing; first video call with picture; messaging moves from Matrix to XMPP | SSO, PostgreSQL 18, dedicated local volume, VPN for video media |
 | [Visualisation](visualisation/README.en.md) | measured state of each component and path of a request, hourly check of repository mirrors; compliance planned | SSO, read access to the cluster API and metrics, read access to the event bus, forge |
 
 ## The common pattern
