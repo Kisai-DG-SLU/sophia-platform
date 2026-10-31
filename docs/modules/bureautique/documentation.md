@@ -49,7 +49,7 @@ Le [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md) a
 - **Affichable par le seul chat** : `frame-ancestors 'self'` plus l'origine du chat sur les pages de Fichiers ; l'API, l'administration et les médias gardent leur refus d'être affichés en cadre. Collabora ajoute l'origine du chat à sa propre liste : `frame-ancestors` contrôle toute la chaîne des cadres, et l'éditeur est imbriqué. Réglages : [`deploy/okd/office/`](../../../deploy/okd/office/README.md#affichage-dans-le-cockpit).
 - **Signal `sophia.pret`** : Fichiers prévient le cockpit qu'il est prêt quand la session de la personne répond ; sans signal au bout de 8 s, le cockpit propose « Ouvrir à part » et « Se reconnecter ».
 - **Un document s'ouvre dans le cockpit** (en service, en recette) : le petit script injecté dans Fichiers remplace la seule ouverture d'onglet vers l'éditeur (`/wopi/<uuid>`, même origine, sans paramètre) par un message `sophia.ouvrir` au chat ; le chat vérifie la source (le cadre du Bureau), l'origine et la forme fermée du chemin, reconstruit l'adresse sur l'origine du module, et ouvre le document dans son propre cadre, avec un bouton « ← Fichiers ». Le document compte dans la limite de deux cadres vivants.
-- **Tablette ancienne** : Fichiers exige un moteur récent ; le cockpit affiche une explication à la place du cadre.
+- **Tablette ancienne** : Fichiers exige un moteur récent. Pour un enfant, la tuile « Bureau » ouvre son [poste au navigateur](#poste-au-navigateur-par-enfant) ; pour les autres comptes, le cockpit affiche une explication à la place du cadre.
 - **Résumé « Quoi de neuf ? »** : l'outil MCP sert `GET /api/resume` (fichiers partagés avec la personne et modifiés depuis 14 jours), avec le même jeton relayé que ses outils. Appelée par l'interface : en service, vérifiée.
 
 ### « Sophia, ouvre le document X »
@@ -76,6 +76,42 @@ Par l'API PostMessage de Collabora, relayée par le script injecté sur la page 
 - **position** : au curseur si la personne a cliqué ou tapé dans le texte, sinon à la fin du document, par une commande fixe du relais ; l'accusé dit où le texte a été mis ;
 - traitement de texte seulement en première version (erreur nommée pour un autre type de document) ;
 - un test des sélecteurs internes de l'éditeur, à relancer à chaque nouvelle image de Collabora.
+
+## Poste au navigateur par enfant
+
+**En service, en recette.** Les tablettes anciennes du foyer ne peuvent pas faire tourner Fichiers et Collabora (moteur trop ancien). Pour les enfants, la tuile « Bureau » du cockpit affiche donc un **poste au navigateur** : un navigateur récent qui tourne dans le cluster, ouvert sur Fichiers, et dont la tablette ne reçoit que l'image (VNC dans la page, par noVNC). Un poste par enfant, avec son propre profil de navigateur ; adultes et invités gardent Fichiers au centre du cockpit.
+
+```
+tablette (cockpit, cadre « Bureau ») ──► routeur ──► portier : nginx ─► oauth2-proxy (session, groupe des enfants)
+                                                         │      └─► portier.py (table personne → poste, réveil, extinction)
+                                                         └──► poste de l'enfant (noVNC ─► navigateur en kiosque ─► Fichiers)
+```
+
+| Élément | Choix | Raison |
+|---|---|---|
+| Namespace | dédié (`sophia-postes`), quota, refus par défaut, EgressFirewall | les postes sont des navigateurs complets : les isoler du reste |
+| Poste | une image figée par empreinte : Chromium en kiosque sur Fichiers, serveur X virtuel, noVNC et websockify ; un Deployment par enfant (`poste-a`, `poste-b`, jamais un prénom), **sans nombre de réplicas** : c'est le portier qui allume et éteint ; profil du navigateur sur un volume local `Retain` ; aucun jeton de compte de service monté | chaque enfant retrouve ses onglets et sa session ; rien ne tourne quand personne ne s'en sert |
+| Portier | une seule adresse pour tous, sans identifiant dans l'URL ; un pod à trois conteneurs : nginx, oauth2-proxy (figé par empreinte), et un petit programme Python (bibliothèque standard, règles fixes, aucun modèle) | la cible se décide côté serveur, jamais d'après la requête |
+| Aiguillage | nginx à deux étages : le premier vérifie la session et pose l'identifiant de la personne (en-tête **écrasé**, même vide, toute variante ignorée) ; le second, en boucle locale, demande la cible au portier **à chaque requête, WebSocket comprise** | un enfant ne peut pas viser le poste d'un autre |
+| Table | personne → poste, par l'**identifiant technique** du fournisseur d'identité (jamais un nom), dans une ConfigMap posée par l'administrateur ; formes contrôlées, table mal formée refusée au démarrage | aucune donnée nominative dans le cluster |
+| Accès | réservé au groupe des enfants (`--allowed-group`), puis à la table : un adulte ou un invité est refusé deux fois (page de refus, puis 403) | le poste est un outil pour les enfants |
+| Réveil | à la première requête du Bureau, le portier passe le poste à 1 réplica et sert une page d'attente ; la page déclare l'échec à 55 s, avant le délai de 60 s du cockpit, pour qu'il n'y ait qu'un seul déclencheur ; « Réessayer » relance | un poste éteint ne coûte rien |
+| Extinction au repos | après **30 minutes sans connexion** à l'écran distant ; le portier interroge l'état de chaque poste toutes les 15 s ; le client noVNC ne se reconnecte pas tout seul (sinon le poste ne s'endormirait jamais) | rendre la mémoire et le processeur au reste de la plateforme |
+| Droits du portier | un Role limité aux Deployments des postes (`get`) et à leur sous-ressource `scale` (`get`, `patch`), par nom ; jeton monté dans le seul conteneur du portier | allumer et éteindre, rien d'autre |
+| Signaux au cockpit | `sophia.poste` (`reveil`, `echec`, `veille`, `refuse`), `sophia.connexion_requise`, `sophia.pret`, vers la seule origine du cockpit et seulement dans un cadre ; le cockpit écrit lui-même les textes (« Ton bureau se prépare… », « s'est endormi ») | aucun texte venu de la page n'est affiché |
+| Récupérer un document | le poste signale au portier le document ouvert ; le cockpit propose de le récupérer, sans réveiller un poste éteint ; l'envoi et la récupération passent par l'outil MCP « fichiers » | sans téléchargement dans la tablette |
+| Supervision | métriques du portier (poste allumé, échecs de réveil) ; alertes : 3 échecs de réveil en 30 min, un échec de plus de 10 min, métriques absentes | un réveil qui échoue se voit |
+
+**Isolement.** Un poste n'accepte en entrée que le portier, et ne sort que vers le routeur en HTTPS et le DNS : ni un autre poste, ni le portier. Le portier n'accepte que le routeur, le pod du chat et la métrologie (ces deux derniers sur son seul port d'état) ; il ne sort que vers les postes, le seul pod du fournisseur d'identité et l'API du cluster. Le chat lit l'état du poste de la personne sur une route qui vérifie le jeton relayé (audience et client propres, puis userinfo ; même identifiant exigé). La relecture a tenté douze attaques (identifiant forgé, en-tête doublé, WebSocket vers le poste d'un autre enfant, jeton d'adulte modifié ou non signé, routes internes) : toutes refusées. **Limite connue** : un WebSocket déjà ouvert n'est plus recontrôlé, jusqu'à une heure ; pour couper tout de suite, éteindre le poste.
+
+**Session périmée effacée.** Sur une tablette, le cookie de session d'un autre compte restait dans le navigateur : oauth2-proxy le refusait, mais l'effacement qu'il émettait restait dans la sous-requête de nginx, et la connexion était redemandée sans fin. Au-delà de 4 Ko, la session tient en plusieurs cookies (`_0`, `_1`…), et nginx ne rendait que le premier effacement (il fusionne les `Set-Cookie` d'une sous-requête en un seul en-tête, dont le navigateur ne lit que le premier). Correctif : la page sans session (sur 401 seulement) efface elle-même le cookie entier et ses morceaux `_0` à `_3` (`Max-Age=0`, mêmes attributs) ; un cookie valide n'est jamais touché.
+
+**Pièges de la mise en service.**
+
+- **L'EgressFirewall coupait l'API du cluster** : le Service `kubernetes` aboutit à l'adresse du nœud, sur le port de l'API ; la NetworkPolicy l'autorisait, l'EgressFirewall du namespace non. Le portier ne pouvait ni lire, ni allumer, ni éteindre un poste. Correctif : une règle vers les nœuds du plan de contrôle, sur le port de l'API, avant le refus. Le banc n'avait pas d'EgressFirewall : croiser NetworkPolicy **et** EgressFirewall à la relecture.
+- **Une session d'un autre compte restée sur la tablette** faisait voir le portier un adulte, refusé : d'où l'effacement ci-dessus, et la **déconnexion des modules** par le cockpit (voir l'[interface](../../../deploy/okd/apps/chat-interface/README.md#cockpit)).
+
+**État** : en service ; les deux enfants ont leur bureau ; extinctions au repos réelles observées. Restent à éprouver : le premier réveil à froid réel (temps mesuré), la récupération d'un document, l'endormissement puis le réveil sur chaque tablette, et le coût réel de l'affichage à l'échelle 2.
 
 ## Confidentialité
 
