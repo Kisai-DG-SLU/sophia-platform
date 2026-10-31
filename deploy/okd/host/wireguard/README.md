@@ -29,7 +29,7 @@ Toute adresse hors de `${VPN_ADMIN_RANGE}` est un appareil **utilisateur** : HTT
 | `sophia-wg-filter-check.{service,timer}` | relance le garde-fou 3 min après le démarrage puis toutes les 15 min (mises à jour d'OKD) |
 | `test-garde-fou-metrique.sh` | banc local, **sous Linux seulement** : compare l'ancien et le nouveau garde-fou avec de faux `crictl`, `podman`, `nft` et `logger` |
 | `test-nft-ovn.sh` | teste expression par expression ce que le nft d'OVN sait relire (tables sans hook, supprimées aussitôt) |
-| `add-peer.sh` | ajoute un appareil : nom, adresse, **clé publique** ; contrôles (format, doublons, plage), sauvegarde du profil, application sans couper les tunnels |
+| `add-peer.sh` | ajoute un appareil : nom, adresse, **clé publique** ; contrôles (format, doublons, plage), sauvegarde du profil, application sans couper les tunnels ; si l'application échoue, s'arrête (code 2) avec le pair écrit dans le profil, **sans jamais relancer `wg0`** |
 
 ## 1. Interface côté serveur
 
@@ -71,6 +71,21 @@ Sans filtre, **tout pair joint tous les ports du nœud** (SSH, API du cluster, k
 4. iOS : *Activation à la demande* sur Wi-Fi **et** cellulaire. Android : *Paramètres → Réseau → VPN → ⚙ → VPN permanent*.
 
 Consigner chaque appareil dans le commentaire du pair (fait par `add-peer.sh`) ; garder les adresses d'administration pour les seuls postes d'administration.
+
+### Appareils iOS : la visio et le réseau par défaut
+
+Sur un iPhone ou un iPad, le profil ajoute **`8.8.8.8/32`** :
+
+```ini
+AllowedIPs = ${VPN_NETWORK}, 8.8.8.8/32
+```
+
+**Pourquoi** : le WebRTC de WebKit sur iOS (Safari, et Chrome, qui utilise le même moteur) n'énumère que l'interface réseau « par défaut », et libwebrtc la détermine en ouvrant une socket UDP vers `8.8.8.8`, sans rien envoyer. Avec le profil de base, cette interface est le Wi-Fi ou le réseau mobile : l'appareil ne propose que cette adresse comme candidat, et le média de la visio ne passe jamais par le tunnel, alors que ses pages y passent. Avec la route vers `8.8.8.8` dans le tunnel, le VPN devient l'interface « par défaut » pour WebRTC ; le reste d'Internet reste hors du tunnel. Cas réel : sans ce réglage, la visio s'ouvrait sur la tablette, mais l'image et le son n'arrivaient jamais au pont ([module Communication](../../../../docs/modules/communication/documentation.md#média-de-la-visio--trois-causes-en-chaîne)).
+
+- **Effet de bord** : une application qui interroge directement `8.8.8.8` comme serveur DNS passe par le tunnel, où le filtre la refuse ; le DNS du système n'est pas touché.
+- **IPv6** : pas d'équivalent nécessaire tant que le pont n'annonce qu'une adresse IPv4 et que le tunnel n'a pas d'IPv6.
+- **Android** : profil de base. Chrome sous Android énumère toutes les interfaces, VPN compris, une fois la caméra ou le micro autorisés (à confirmer par l'essai de chaque appareil) ; on n'ajoute `8.8.8.8/32` que s'il l'exige : avec le DNS privé d'Android réglé sur ce fournisseur, tout le DNS du téléphone serait refusé.
+- **Essai de chaque appareil**, à la maison puis sur le réseau mobile : une page de diagnostic servie par la visio liste les candidats ICE de l'appareil (caméra autorisée le temps de les démasquer) ; on attend un candidat `host` dans `${VPN_NETWORK}`. La page est retirée une fois tous les appareils essayés.
 
 ## 3. Filtre (administrateur, sur le nœud)
 
@@ -146,7 +161,7 @@ C'est le seul chemin d'administration : un changement du garde-fou s'installe av
 
 La visio du [module Communication](../../../../docs/modules/communication/documentation.md) (installée, en recette) fait passer son média par **un seul port UDP**, exposé comme Forgejo par une externalIP sur `${VPN_SERVER_IP}`, et non par un NodePort : un NodePort serait joignable depuis le réseau local, et le pont n'y verrait que l'adresse de jonction d'OVN-Kubernetes. La recette du service est dans [`../../office/`](../../office/README.md#chat-permanent-et-visio).
 
-Le DNAT d'OVN-Kubernetes a lieu avant le filtre : ce trafic passe par la chaîne **`forward`**, pas `input`. Une seule règle, ouverte à **tous** les appareils du VPN (utilisateurs compris), à placer avant le `counter drop` de `forward` :
+Une règle, ouverte à **tous** les appareils du VPN (utilisateurs compris), à placer avant le `counter drop` de `forward` :
 
 ```
 ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept comment "visio : média"
@@ -154,11 +169,12 @@ ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept c
 
 Ajouter `$JVB_UDP_PORT` à la liste explicite d'`envsubst`, puis charger le filtre comme à la section 3 : contrôle `nft -c`, **interrupteur automatique de 3 minutes**, qui recharge l'ancien filtre (ou retire la table), garde-fou à 0, nouvelle session d'administration, puis arrêt de l'interrupteur. Les réponses du pont vers les appareils passent par `ct state established,related`.
 
-**Vérification** : pendant une visio entre deux appareils du VPN, le compteur de la règle augmente :
+**Le compteur de cette règle n'est pas un contrôle** : il est resté à zéro pendant une visio dont le média était établi. Le trafic de l'externalIP est traduit par OVN-Kubernetes (passerelle partagée) et ne traverse vraisemblablement pas cette chaîne ; son chemin exact dans le filtre est en cours de mesure. Ce qui fait foi :
 
-```bash
-sudo nft list chain inet sophia_wg forward | grep visio
-```
+- l'état de débogage du pont média (participants `iceConnected`, paquets reçus et émis) ;
+- la table de suivi des connexions du nœud (`/proc/net/nf_conntrack`) : une entrée par appareil vers `${VPN_SERVER_IP}:${JVB_UDP_PORT}`, sans `[UNREPLIED]`.
+
+Côté cluster, le pod du pont voit une source réécrite par la masquerade de l'hôte : sa NetworkPolicy admet le groupe `host-network` sur ce port (voir la [recette](../../office/README.md#chat-permanent-et-visio)). Les appareils iOS ont besoin de leur profil propre (section 2).
 
 ## Points ouverts
 

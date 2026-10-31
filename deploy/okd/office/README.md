@@ -86,7 +86,7 @@ Côté outil et fournisseur d'identité : [`../skills/`](../skills/README.md) et
 
 Recette du [module Communication](../../../docs/modules/communication/documentation.md) : Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) dans `sophia-messagerie`, Jitsi Meet (`stable-11248-2` : web, Prosody, Jicofo, JVB) et un adaptateur OIDC → jeton dans `sophia-visio`. Comme pour la bureautique, c'est une procédure, sans les manifestes de l'installation de référence ; les choix et leurs raisons sont dans la documentation du module.
 
-État : **en service, en recette** : chat et visio installés et contrôlés par le vrai chemin (connexion, salon sans cadenas, adaptateur de la visio) ; essais avec les appareils du foyer (premier message, visio à plusieurs, refus d'un invité, compte d'enfant, compteur de la règle nftables) à l'étape de recette. La visio passe **par le navigateur seulement** (décision du foyer) : l'application mobile de Jitsi n'est plus utilisée.
+État : **en service, en recette** : chat et visio installés et contrôlés par le vrai chemin (connexion, salon sans cadenas, adaptateur de la visio) ; **première visio avec image** entre un ordinateur et la tablette ancienne, dans le cockpit, par le VPN ; essai à trois appareils, refus d'un invité, compte d'enfant et essai de chaque appareil à l'étape de recette. La visio passe **par le navigateur seulement** (décision du foyer) : l'application mobile de Jitsi n'est plus utilisée. La messagerie Matrix sera remplacée par Converse.js et Prosody ([module Communication](../../../docs/modules/communication/documentation.md#messagerie--de-matrix-à-xmpp)) ; sa recette sera publiée avec la version définitive.
 
 ### Composants
 
@@ -100,7 +100,7 @@ Recette du [module Communication](../../../docs/modules/communication/documentat
 | | `adaptateur` | connexion OIDC, puis jeton signé de 600 s pour une seule salle ; image construite dans le cluster depuis la forge, figée par empreinte |
 | | `jvb-media` | Service `ClusterIP` avec `externalIPs: [${VPN_IP}]`, port `${JVB_UDP_PORT}/UDP` ; **pas de NodePort** |
 
-Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DEEP_LINKING` (pas de page « Rejoindre dans l'application » : la visio reste dans le navigateur), pair-à-pair coupé, `JVB_ADVERTISE_PRIVATE_CANDIDATES=false`, `ENABLE_COLIBRI_WEBSOCKET=0` (canal de pont par SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` pour l'UID arbitraire, sans privilège ni `anyuid`.
+Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DEEP_LINKING` (pas de page « Rejoindre dans l'application » : la visio reste dans le navigateur), pair-à-pair coupé, **`JVB_ADVERTISE_PRIVATE_CANDIDATES=true`** (l'adresse VPN est une adresse privée : à `false`, le pont n'annonçait aucun candidat joignable), `ENABLE_COLIBRI_WEBSOCKET=0` (canal de pont par SCTP), `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` pour l'UID arbitraire, sans privilège ni `anyuid`.
 
 ### Prérequis
 
@@ -115,7 +115,7 @@ Réglages de Jitsi à retenir : `ENABLE_THIRD_PARTY_REQUESTS=false`, `DISABLE_DE
 
 ### Réseau
 
-- **Entrée** : depuis le routeur pour les pages et les API ; JVB depuis `${VPN_NETWORK}` seulement, en UDP sur `${JVB_UDP_PORT}`.
+- **Entrée** : depuis le routeur pour les pages et les API ; JVB en UDP sur `${JVB_UDP_PORT}`, depuis `${VPN_NETWORK}` **et depuis le groupe `policy-group.network.openshift.io/host-network`** : en passerelle partagée d'OVN-Kubernetes, le trafic de l'externalIP arrive au pod avec une source réécrite par la masquerade de l'hôte (`169.254.0.2`). Sans ce groupe, aucun média ne s'établit. La NetworkPolicy ne peut donc pas filtrer ce trafic par appareil.
 - **Entrée de Synapse depuis le pod de l'interface**, sur son port HTTP, pour la route de résumé des non-lus (avec la sortie correspondante côté interface).
 - **Sortie** : Synapse vers MAS et ntfy, et vers le nom public du fournisseur d'identité, en 443 par le routeur, pour les clés publiques du realm (module de résumé ; la sortie existante le couvre) ; MAS et l'adaptateur vers le nom public du fournisseur d'identité, en 443, par le routeur ; JVB en UDP vers `${VPN_NETWORK}` seulement (réponses aux appareils), dans sa NetworkPolicy **et** dans l'EgressFirewall du socle, avant la règle de refus.
 - Le pont média n'utilise pas de NodePort : un NodePort serait joignable depuis le réseau local, et le pod n'y verrait que l'adresse de jonction d'OVN-Kubernetes. L'`externalIP` sur l'adresse VPN, comme la forge, n'est joignable que par le VPN et garde l'adresse réelle du client.
@@ -149,7 +149,7 @@ Chaque valeur est générée sur place et écrite par un tube, sans saut de lign
 2. **Prérequis 1 à 5** en place ; un point manque : s'arrêter.
 3. **Secrets**, écrits par tube, sans variable ni affichage (ci-dessus).
 4. **Chat** : `oc diff -k`, dry-run serveur, `oc apply -k`, attente des déploiements. Contrôles par le vrai chemin : `.well-known` avec `io.element.e2ee` à `false`, `versions` de l'API, flux de connexion servis par MAS, découverte OIDC de MAS, ntfy, Element. Connexion d'un compte admis (deux pages de MAS à la première fois), refus d'un invité, salon créé sans cadenas.
-5. **Visio** : build de l'adaptateur, puis `oc apply -k`. Contrôles : pods prêts ; JVB annonce l'adresse VPN et est joint par Jicofo ; `config.js` sans requête tierce, pair-à-pair coupé ; adaptateur en bonne santé ; essai à deux appareils au moins, invité refusé, **compteur de la règle nftables qui augmente**.
+5. **Visio** : build de l'adaptateur, puis `oc apply -k`. Contrôles : pods prêts ; JVB annonce l'adresse VPN et est joint par Jicofo ; `config.js` sans requête tierce, pair-à-pair coupé ; adaptateur en bonne santé ; hors cadre, l'adaptateur redirige vers le fournisseur d'identité (inchangé) ; en cadre, `config.js` contient `tokenAuthInline` et l'adresse de l'adaptateur en mode fenêtre sans `nonce` répond 400 ; essai à deux appareils au moins, invité refusé. **Contrôle du média** : l'état de débogage du pont (participants `iceConnected`, paquets) et la table de suivi des connexions du nœud (une entrée par appareil vers `${VPN_IP}:${JVB_UDP_PORT}`, sans `[UNREPLIED]`) ; le compteur de la règle nftables n'est pas un contrôle. Une tablette iOS a besoin de son [profil VPN propre](../host/wireguard/README.md#appareils-ios--la-visio-et-le-réseau-par-défaut).
 
 ### Retour arrière
 
