@@ -10,7 +10,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: "" # Doit être vide pour matcher une PVC sans classe
   local:
-    path: /var/lib/sophia/postgres-data
+    path: ${PG15_MOUNT_POINT}
   nodeAffinity:
     required:
       nodeSelectorTerms:

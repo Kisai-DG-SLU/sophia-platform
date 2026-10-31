@@ -6,7 +6,7 @@
 # Code non fourni (contrat : README). Images construites dans sophia-apps (builds binaires) :
 #   oc start-build sophia-image-sd   -n sophia-apps --from-dir=${IMAGE_SRC_DIR} --follow   # ≈ 15 min
 #   oc start-build sophia-image-nsfw -n sophia-apps --from-dir=${IMAGE_SRC_DIR} --follow
-# Modèles : /var/mnt/models/image (fetch-image-models.sh, depuis le nœud), via pvc-models.
+# Modèles : ${MODELS_MOUNT_POINT}/image (fetch-image-models.sh, depuis le nœud), via pvc-models.
 ---
 apiVersion: image.openshift.io/v1
 kind: ImageStream

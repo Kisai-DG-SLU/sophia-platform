@@ -1,4 +1,4 @@
-# Volume des modèles : LV lv-models (200 Go, XFS) monté sur /var/mnt/models.
+# Volume des modèles : LV lv-models (200 Go, XFS) monté sur ${MODELS_MOUNT_POINT}.
 # Les fichiers GGUF y sont déposés depuis le nœud (README, étape 2) : le namespace
 # sophia-inference n'a jamais accès à Internet. Le serveur le monte en lecture seule.
 ---
@@ -14,7 +14,7 @@ spec:
   storageClassName: local-storage
   volumeMode: Filesystem
   local:
-    path: /var/mnt/models
+    path: ${MODELS_MOUNT_POINT}
   nodeAffinity:
     required:
       nodeSelectorTerms:

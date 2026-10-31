@@ -79,10 +79,13 @@ Le garde-fou du filtre VPN est décrit dans [`../host/wireguard/`](../host/wireg
 |---|---|---|
 | `${AGENT_NAMESPACE}` | namespace des agents, surveillé par les règles communes | `agents` |
 | `${NVIDIA_LIB_DIR}` | répertoire du nœud qui contient `libnvidia-ml.so.1`, le même que pour llama-server | `/var/lib/nvidia` |
+| `${METRICS_DIR}` | répertoire du nœud où les scripts du nœud déposent leurs fichiers `.prom` | `/var/lib/sophia/metrics` |
+| `${VOLUMES_ROOT}` | répertoire du nœud sous lequel sont montés les volumes logiques | `/var/mnt` |
+| `${SOPHIA_VAR_DIR}` | répertoire du nœud sur `/var`, qui porte les volumes en `hostPath` (mesure de `/var`) | `/var/lib/sophia` |
 | `ALERTES_CHAT_ID` | (environnement de `alertes-telegram-ajout.py`) conversation privée entre le bot et l'administrateur | identifiant numérique |
 | `CONSOLE_URL` | (même script) adresse de la console d'OKD, en fin de message | `https://console.example.org` |
 
-Les annotations des règles contiennent des `{{ $labels… }}` et des `{{ $value }}`. **La substitution se restreint à la variable du fichier** : `envsubst '${AGENT_NAMESPACE}' < 20-regles.yaml` et `envsubst '${NVIDIA_LIB_DIR}' < 40-node-metrics.yaml`. Un `envsubst` sans liste viderait les annotations sans erreur.
+Les annotations des règles contiennent des `{{ $labels… }}` et des `{{ $value }}`. **La substitution se restreint aux variables du fichier** : `envsubst '${AGENT_NAMESPACE}' < 20-regles.yaml` et `envsubst '${NVIDIA_LIB_DIR} ${METRICS_DIR} ${VOLUMES_ROOT} ${SOPHIA_VAR_DIR}' < 40-node-metrics.yaml`. Un `envsubst` sans liste viderait les annotations sans erreur.
 
 | Secret | Namespace | Clés |
 |---|---|---|

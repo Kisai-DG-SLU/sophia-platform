@@ -79,10 +79,13 @@ The VPN filter safeguard is described in [`../host/wireguard/`](../host/wireguar
 |---|---|---|
 | `${AGENT_NAMESPACE}` | agents namespace, covered by the common rules | `agents` |
 | `${NVIDIA_LIB_DIR}` | node directory holding `libnvidia-ml.so.1`, the same as for llama-server | `/var/lib/nvidia` |
+| `${METRICS_DIR}` | node directory where the node's scripts drop their `.prom` files | `/var/lib/sophia/metrics` |
+| `${VOLUMES_ROOT}` | node directory under which the logical volumes are mounted | `/var/mnt` |
+| `${SOPHIA_VAR_DIR}` | node directory on `/var`, holding the `hostPath` volumes (measurement of `/var`) | `/var/lib/sophia` |
 | `ALERTES_CHAT_ID` | (environment of `alertes-telegram-ajout.py`) private chat between the bot and the administrator | numeric ID |
 | `CONSOLE_URL` | (same script) OKD console address, at the end of the message | `https://console.example.org` |
 
-Rule annotations contain `{{ $labels… }}` and `{{ $value }}`. **Substitution is restricted to the file's variable**: `envsubst '${AGENT_NAMESPACE}' < 20-regles.yaml` and `envsubst '${NVIDIA_LIB_DIR}' < 40-node-metrics.yaml`. An `envsubst` without a list would empty the annotations without any error.
+Rule annotations contain `{{ $labels… }}` and `{{ $value }}`. **Substitution is restricted to the file's variables**: `envsubst '${AGENT_NAMESPACE}' < 20-regles.yaml` and `envsubst '${NVIDIA_LIB_DIR} ${METRICS_DIR} ${VOLUMES_ROOT} ${SOPHIA_VAR_DIR}' < 40-node-metrics.yaml`. An `envsubst` without a list would empty the annotations without any error.
 
 | Secret | Namespace | Keys |
 |---|---|---|

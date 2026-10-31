@@ -1,5 +1,5 @@
 # Données des outils de sophia-skills (géographie aujourd'hui ; sources officielles demain), déposées
-# DEPUIS LE NŒUD dans /var/mnt/models/skills (même LV que les modèles, dossier à part) et montées
+# DEPUIS LE NŒUD dans ${MODELS_MOUNT_POINT}/skills (même LV que les modèles, dossier à part) et montées
 # en lecture seule : les pods de sophia-skills n'ont pas d'accès à Internet.
 ---
 apiVersion: v1
@@ -14,7 +14,7 @@ spec:
   storageClassName: local-storage
   volumeMode: Filesystem
   local:
-    path: /var/mnt/models/skills
+    path: ${MODELS_MOUNT_POINT}/skills
   nodeAffinity:
     required:
       nodeSelectorTerms:

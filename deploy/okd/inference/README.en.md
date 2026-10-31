@@ -31,12 +31,12 @@ A language model that also reads images, served by the server's GPU, a voice (re
 
 ## Model volume (node prerequisite)
 
-Models live on a dedicated logical volume, created once on the node following [`../../stockage-persistant.en.md`](../../stockage-persistant.en.md) — `LV_NAME=lv-models`, `LV_SIZE=200G`, `MOUNT_POINT=/var/mnt/models`, XFS, persistent mount —, then exposed by `01-storage.yaml` (local `Retain` PV, bound by name to `pvc-models`, mounted read-only). 200 GB from the start: a local volume cannot grow, and it holds text, vision, voice, image models and the tools' data (`/var/mnt/models/skills`, see [`../skills/`](../skills/)).
+Models live on a dedicated logical volume, created once on the node following [`../../stockage-persistant.en.md`](../../stockage-persistant.en.md) — `LV_NAME=lv-models`, `LV_SIZE=200G`, `MOUNT_POINT=${MODELS_MOUNT_POINT}` (for instance `/var/mnt/models`), XFS, persistent mount —, then exposed by `01-storage.yaml` (local `Retain` PV, bound by name to `pvc-models`, mounted read-only). 200 GB from the start: a local volume cannot grow, and it holds text, vision, voice, image models and the tools' data (`${MODELS_MOUNT_POINT}/skills`, see [`../skills/`](../skills/)).
 
 ```bash
 sudo lvs ${VG_NAME}                       # lv-models present
-df -h /var/mnt/models                     # mounted, XFS
-ls -lZ /var/mnt/models                    # container_file_t label
+df -h ${MODELS_MOUNT_POINT}               # mounted, XFS
+ls -lZ ${MODELS_MOUNT_POINT}              # container_file_t label
 ```
 
 ## Vision
@@ -97,7 +97,7 @@ Voices: the model's catalogue, or a voice converted from a freely licensed recor
 0. `lv-models` volume created and mounted on the node (above).
 1. Text model and vision module placed on the node (`curl` at a pinned revision, `sha256sum -c`, SELinux label `container_file_t`); voice models: `fetch-voice-models.sh`; image models: `fetch-image-models.sh`.
 2. Images: `oc start-build` for the text server, the voice service, the image generator and its classifier.
-3. `00`, `01`, `04`, then `03`, `05` and `06`: `--dry-run=server`, then `apply`. `01-storage.yaml` carries the `${NODE_NAME}` variable, the node carrying the volume (`oc get nodes`): `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
+3. `00`, `01`, `04`, then `03`, `05` and `06`: `--dry-run=server`, then `apply`. Variables, through a named substitution: `01-storage.yaml` carries `${NODE_NAME}`, the node carrying the volume (`oc get nodes`), and `${MODELS_MOUNT_POINT}`, the models volume's mount point (`envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 01-storage.yaml | oc apply -f -`); `03-llama-server.yaml` carries `${NVIDIA_LIB_DIR}`, the node directory holding `libcuda.so.1`, the same as for the node exporter (`envsubst '${NVIDIA_LIB_DIR}' < 03-llama-server.yaml | oc apply -f -`).
 4. Model router: text and voice aliases, then add the aliases to restricted virtual keys.
 
 **Limits:** 4 conversations at a time (a fifth waits); 61,440 tokens per conversation, beyond that the conversation is summarised (oldest exchanges) and an oversized file is refused with a clear message; voice from a small CPU model, correct but not very expressive.

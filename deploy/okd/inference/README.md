@@ -31,12 +31,12 @@ Un modèle de langage qui lit aussi les images, servi par le GPU du serveur, une
 
 ## Volume des modèles (préalable sur le nœud)
 
-Les modèles vivent sur un volume logique dédié, créé une fois sur le nœud selon [`../../stockage-persistant.md`](../../stockage-persistant.md) — `LV_NAME=lv-models`, `LV_SIZE=200G`, `MOUNT_POINT=/var/mnt/models`, XFS, montage persistant —, puis exposé par `01-storage.yaml` (PV local `Retain`, lié nommément à `pvc-models`, monté en lecture seule). 200 Go d'emblée : un volume local ne s'agrandit pas, et il porte texte, vision, voix, images et les données des outils (`/var/mnt/models/skills`, voir [`../skills/`](../skills/)).
+Les modèles vivent sur un volume logique dédié, créé une fois sur le nœud selon [`../../stockage-persistant.md`](../../stockage-persistant.md) — `LV_NAME=lv-models`, `LV_SIZE=200G`, `MOUNT_POINT=${MODELS_MOUNT_POINT}` (par exemple `/var/mnt/models`), XFS, montage persistant —, puis exposé par `01-storage.yaml` (PV local `Retain`, lié nommément à `pvc-models`, monté en lecture seule). 200 Go d'emblée : un volume local ne s'agrandit pas, et il porte texte, vision, voix, images et les données des outils (`${MODELS_MOUNT_POINT}/skills`, voir [`../skills/`](../skills/)).
 
 ```bash
 sudo lvs ${VG_NAME}                       # lv-models présent
-df -h /var/mnt/models                     # monté, XFS
-ls -lZ /var/mnt/models                    # étiquette container_file_t
+df -h ${MODELS_MOUNT_POINT}               # monté, XFS
+ls -lZ ${MODELS_MOUNT_POINT}              # étiquette container_file_t
 ```
 
 ## Vision
@@ -97,7 +97,7 @@ Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistr
 0. Volume `lv-models` créé et monté sur le nœud (ci-dessus).
 1. Modèle de texte et module de vision déposés sur le nœud (`curl` à une révision figée, `sha256sum -c`, étiquette SELinux `container_file_t`) ; modèles vocaux : `fetch-voice-models.sh` ; modèles d'image : `fetch-image-models.sh`.
 2. Images : `oc start-build` du serveur de texte, du service vocal, du générateur et du classifieur d'images.
-3. `00`, `01`, `04`, puis `03`, `05` et `06` : `--dry-run=server`, puis `apply`. `01-storage.yaml` porte la variable `${NODE_NAME}`, nœud qui porte le volume (`oc get nodes`) : `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
+3. `00`, `01`, `04`, puis `03`, `05` et `06` : `--dry-run=server`, puis `apply`. Variables, par substitution nommée : `01-storage.yaml` porte `${NODE_NAME}`, nœud qui porte le volume (`oc get nodes`), et `${MODELS_MOUNT_POINT}`, point de montage du volume des modèles (`envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 01-storage.yaml | oc apply -f -`) ; `03-llama-server.yaml` porte `${NVIDIA_LIB_DIR}`, répertoire du nœud qui contient `libcuda.so.1`, le même que pour l'exporteur du nœud (`envsubst '${NVIDIA_LIB_DIR}' < 03-llama-server.yaml | oc apply -f -`).
 4. Routeur de modèles : alias de texte et de voix, puis ajout des alias aux clés virtuelles restreintes.
 
 **Limites :** 4 discussions à la fois (une cinquième attend) ; 61 440 tokens par discussion, au-delà la discussion est résumée (échanges les plus anciens) et un fichier trop gros est refusé avec un message clair ; voix d'un petit modèle sur CPU, correcte mais peu expressive.

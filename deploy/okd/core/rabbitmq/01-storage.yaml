@@ -1,7 +1,7 @@
 # Volume dédié à RabbitMQ. Une PVC sans PV désigné se lie au premier PV libre de taille suffisante :
 # dans l'installation de référence, elle avait pris le volume prévu pour les embeddings du RAG.
-# Préalable sur le nœud : sudo mkdir -p /var/lib/sophia/rabbitmq
-#                         sudo chcon -t container_file_t /var/lib/sophia/rabbitmq
+# Préalable sur le nœud : sudo mkdir -p ${RABBITMQ_MOUNT_POINT}
+#                         sudo chcon -t container_file_t ${RABBITMQ_MOUNT_POINT}
 # PV et PVC désignés l'un l'autre (claimRef / volumeName) : aucune autre PVC ne peut le prendre.
 ---
 apiVersion: v1
@@ -16,7 +16,7 @@ spec:
   storageClassName: local-storage
   volumeMode: Filesystem
   local:
-    path: /var/lib/sophia/rabbitmq
+    path: ${RABBITMQ_MOUNT_POINT}
   nodeAffinity:
     required:
       nodeSelectorTerms:

@@ -5,7 +5,9 @@
 # droit nouveau. Privilégié pour ouvrir /dev/nvidia* ; lecture seule de deux répertoires du nœud ; aucune
 # sortie réseau (refus par défaut de sophia-inference) ; llama-server n'est pas touché.
 # ${NVIDIA_LIB_DIR} : répertoire du nœud qui contient libnvidia-ml.so.1 (le même que llama-server).
-# Substitution restreinte : envsubst '${NVIDIA_LIB_DIR}' < 40-node-metrics.yaml (les annotations
+# ${METRICS_DIR}, ${VOLUMES_ROOT}, ${SOPHIA_VAR_DIR} : répertoires du nœud (README, « Variables ») ; côté pod,
+# les chemins de montage restent fixes, l'exporteur les lit.
+# Substitution restreinte : envsubst '${NVIDIA_LIB_DIR} ${METRICS_DIR} ${VOLUMES_ROOT} ${SOPHIA_VAR_DIR}' < 40-node-metrics.yaml (les annotations
 # contiennent des {{ $value }} qu'un envsubst sans liste viderait).
 apiVersion: apps/v1
 kind: Deployment
@@ -57,11 +59,11 @@ spec:
         - name: nvidia-libs
           hostPath: { path: "${NVIDIA_LIB_DIR}", type: Directory }
         - name: metriques-noeud
-          hostPath: { path: /var/lib/sophia/metrics, type: DirectoryOrCreate }
+          hostPath: { path: "${METRICS_DIR}", type: DirectoryOrCreate }
         - name: hote-mnt
-          hostPath: { path: /var/mnt, type: Directory }
+          hostPath: { path: "${VOLUMES_ROOT}", type: Directory }
         - name: hote-var
-          hostPath: { path: /var/lib/sophia, type: Directory }
+          hostPath: { path: "${SOPHIA_VAR_DIR}", type: Directory }
 ---
 apiVersion: v1
 kind: Service

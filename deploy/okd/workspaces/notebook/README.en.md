@@ -11,7 +11,7 @@ Provide a reusable JupyterLab interface for multiple projects.
 - The persistent workspace is mounted on `/workspace`
 
 ## Volume
-`pv.yaml` carries the `${NODE_NAME}` variable, the node carrying the volume (`oc get nodes`): `envsubst '${NODE_NAME}' < pv.yaml | oc apply -f -`.
+`pv.yaml` carries the `${NODE_NAME}` variable, the node carrying the volume (`oc get nodes`), and `${NOTEBOOK_MOUNT_POINT}`, the volume's directory on the node: `envsubst '${NODE_NAME} ${NOTEBOOK_MOUNT_POINT}' < pv.yaml | oc apply -f -`.
 
 ## Usage
 In Jupyter terminal:

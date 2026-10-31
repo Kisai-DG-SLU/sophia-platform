@@ -59,8 +59,9 @@ Côté clients : déclarer files et exchanges en `passive=True` (pas de droit `c
 | `${IDP_HOST}` | nom public de Keycloak (émetteur des jetons, clés de signature) |
 | `${VIEWER_NAMESPACE}` | namespace propre au relais de visualisation, sans compte d'agent lié |
 | `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`), dans `01-storage.yaml` |
+| `${RABBITMQ_MOUNT_POINT}` | répertoire du volume sur le nœud (par exemple `/var/lib/sophia/rabbitmq`), dans `01-storage.yaml` |
 
-Les variables se remplacent par une substitution nommée, par exemple `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
+Les variables se remplacent par une substitution nommée, par exemple `envsubst '${NODE_NAME} ${RABBITMQ_MOUNT_POINT}' < 01-storage.yaml | oc apply -f -`.
 
 ## Procédure (l'administrateur)
 

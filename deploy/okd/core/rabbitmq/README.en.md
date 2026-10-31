@@ -59,8 +59,9 @@ Client side: declare queues and exchanges with `passive=True` (no `configure` pe
 | `${IDP_HOST}` | Keycloak's public name (token issuer, signing keys) |
 | `${VIEWER_NAMESPACE}` | the visualisation relay's own namespace, with no agent account bound to it |
 | `${NODE_NAME}` | node carrying the volume (`oc get nodes`), in `01-storage.yaml` |
+| `${RABBITMQ_MOUNT_POINT}` | the volume's directory on the node (for instance `/var/lib/sophia/rabbitmq`), in `01-storage.yaml` |
 
-Variables are replaced by a named substitution, for instance `envsubst '${NODE_NAME}' < 01-storage.yaml | oc apply -f -`.
+Variables are replaced by a named substitution, for instance `envsubst '${NODE_NAME} ${RABBITMQ_MOUNT_POINT}' < 01-storage.yaml | oc apply -f -`.
 
 ## Procedure (administrator)
 
