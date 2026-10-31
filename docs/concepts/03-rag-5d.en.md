@@ -86,11 +86,11 @@ The Tribunal Semantique validates information before it enters the system. The S
 |---|---|
 | Embedding (bge-m3, 1,024 dimensions, CPU), through the router's `sophia-embedder` alias | in service |
 | Vector collection and its schema: 18 tags in French (owner, type, project, confidentiality, provenance, validation…), 17 metadata indexes, `source` not indexed; idempotent script, without deletion | in service, empty |
-| **Memory service**: REST with an MCP façade; proven identity (service account token or OIDC); rights filter set by the service, never by the caller; writes "pending" with a confidence set by rule; validation reserved to humans and to the [Semantic Tribunal](05-tribunal-semantique.en.md); audit log | designed |
+| **Memory service**: REST with an MCP façade; proven identity (service account token or OIDC); rights filter set by the service, never by the caller; writes "pending" with a confidence set by rule; validation by a single designated person (the household's administrator), other people's personal and intimate documents reduced to author, level, date and size; grouped deposit from a "Memory" page in the cockpit; file extraction in a pod without secrets or network; audit log | coded and reviewed, ready to install, **not yet in service** |
 | Graph database (dimension 5) | image pinned, at 0 replicas for now |
 | Ingestion | suspended, to be rebuilt (its image could not be rebuilt) |
 | S3 object storage for source files | in service for the platform ([`deploy/okd/storage/`](../../deploy/okd/storage/)); memory has no identity or bucket there yet |
-| Default deny in the memory zone | target, after the memory service: the vector database currently answers without a key ([security](../security.en.md)) |
+| Default deny in the memory zone | target, ready with the memory service installation: the vector database currently answers without a key ([security](../security.en.md)) |
 
 Recipe: [`deploy/okd/memory/`](../../deploy/okd/memory/).
 
