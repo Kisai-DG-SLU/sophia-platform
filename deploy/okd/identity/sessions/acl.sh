@@ -41,7 +41,7 @@ COMMANDES='+ping +hello +auth +client|setinfo +get +set +del +exists +mget +mset
 # Une application : utilisateur, namespace et Secret de son mot de passe, nom de son cookie.
 # oauth2-proxy nomme ses clés `<cookie>-<ticket>` et son verrou `<cookie>-<ticket>.lock` : le motif
 # `~<cookie>-*` les couvre, sans toucher aux clés d'une autre application (`_sophia-*` ne prend pas
-# `_sophia_ecole-…`).
+# `_sophia_autre-…`).
 application() {
   local utilisateur=$1 ns=$2 secret=$3 cookie=$4 h
   h=$(empreinte_secret "$ns" "$secret") || return 1
