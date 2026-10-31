@@ -18,6 +18,7 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 | `03-keycloak.yaml` | instance Keycloak (avec la liste des entrées de la politique réseau que crée l'operator) et Route |
 | `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, clients OIDC — interface de discussion (PKCE, secret par *placeholder*), administration de RabbitMQ (client public PKCE, audience `rabbitmq`), interface de Temporal (oauth2-proxy, secret par *placeholder*) ; mappeurs d'audience du jeton relayé par l'interface |
 | `ajouter-mappeur-audience.py` | ajoute au client de l'interface un mappeur d'audience vers un service qui reçoit le jeton relayé (ci-dessous) ; lecture seule avec `--dry-run`, rejouable |
+| [`sessions/`](sessions/README.md) | Valkey réservé aux sessions des oauth2-proxy : un utilisateur d'ACL par application, persistance AOF, aucune sortie réseau |
 
 ## Procédure
 

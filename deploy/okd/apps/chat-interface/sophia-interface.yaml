@@ -12,6 +12,8 @@
 #                                       et LITELLM_AUDIO_API_KEY (facultative) = virtual key limitée
 #                                       à sophia-stt et sophia-tts (routes de la voix)
 #   - secret sophia-interface-oauth2  : client-secret (client Keycloak sophia-interface) et cookie-secret
+#   - secret sophia-interface-sessions: password = mot de passe de l'utilisateur d'ACL du chat dans le Valkey
+#                                       des sessions (../../identity/sessions/README.md), créé avant ce manifeste
 #   - secret sophia-chat-db           : PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (base sophia_chat)
 #   - secret sophia-chat-forgejo      : FORGEJO_TOKEN du compte de service Forgejo « sophia-chat » (facultatif)
 #
@@ -134,6 +136,18 @@ spec:
             # Jeton d'accès de la personne vers nginx (X-Forwarded-Access-Token ; une valeur envoyée par le navigateur
             # est retirée avant). nginx ne le relaie qu'à store-api sur /v1/chat/completions (X-Sophia-Jeton).
             - --pass-access-token=true
+            # Sessions côté serveur : le cookie _sophia ne porte qu'un ticket, la session va dans le Valkey
+            # réservé aux sessions (../../identity/sessions/), clé _sophia-<ticket>, durée --cookie-expire.
+            # Utilisateur ACL du chat, limité aux clés _sophia-*. Un ancien cookie entier n'est plus lu : il est
+            # effacé et la personne se reconnecte une fois. Les anciens morceaux _sophia_N restent dans le
+            # navigateur jusqu'à leur expiration : d'où large_client_header_buffers dans nginx.conf.in.
+            - --session-store-type=redis
+            - --redis-connection-url=redis://valkey-sessions.sophia-identity.svc.cluster.local:6379/0
+            - --redis-username=sophia-interface
+          env:
+            - name: OAUTH2_PROXY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: sophia-interface-sessions, key: password }
           ports:
             - { name: http, containerPort: 4180 }
           volumeMounts:
@@ -267,6 +281,14 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: sophia-identity }
       ports:
         - { protocol: TCP, port: 8080 }
+    # Valkey des sessions d'oauth2-proxy (entrée valkey-sessions-ingress, ../../identity/sessions/)
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-identity }
+          podSelector:
+            matchLabels: { app: valkey-sessions }
+      ports:
+        - { protocol: TCP, port: 6379 }
     - to:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-core }

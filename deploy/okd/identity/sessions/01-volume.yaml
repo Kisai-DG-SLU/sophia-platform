@@ -1,0 +1,39 @@
+# Volume du Valkey des sessions d'oauth2-proxy : fichier AOF seulement, quelques Mo.
+# Préalable sur le nœud : sudo mkdir -p /var/lib/sophia/valkey-sessions
+#                         sudo chcon -t container_file_t /var/lib/sophia/valkey-sessions
+# PV et PVC désignés l'un l'autre (claimRef / volumeName) : aucune autre PVC ne peut le prendre.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-valkey-sessions
+  labels: { app: valkey-sessions }
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: /var/lib/sophia/valkey-sessions
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: [master-0] }   # nom du nœud
+  claimRef:
+    namespace: sophia-identity
+    name: valkey-sessions-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: valkey-sessions-data
+  namespace: sophia-identity
+  labels: { app: valkey-sessions }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-valkey-sessions
+  resources:
+    requests: { storage: 1Gi }

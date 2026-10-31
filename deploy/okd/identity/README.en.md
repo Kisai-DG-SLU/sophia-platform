@@ -18,6 +18,7 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 | `03-keycloak.yaml` | Keycloak instance (with the ingress list of the network policy the operator creates) and Route |
 | `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*); audience mappers of the token relayed by the interface |
 | `ajouter-mappeur-audience.py` | adds to the interface's client an audience mapper towards a service that receives the relayed token (below); read-only with `--dry-run`, replayable |
+| [`sessions/`](sessions/README.en.md) | Valkey reserved for the oauth2-proxy sessions: one ACL user per application, AOF persistence, no network egress |
 
 ## Procedure
 

@@ -43,6 +43,12 @@ http {
     # nginx écrit dans un fichier temporaire : chemins explicites dans deploy/logs (accessible
     # en écriture en dev comme en prod), sinon le nginx de pixi répond 500.
     client_body_buffer_size 128k;
+    # En-têtes : 8k par ligne par défaut. Un ancien cookie de session entier (_sophia), laissé à côté de
+    # ses morceaux (_sophia_0, _sophia_1…), faisait dépasser la ligne Cookie : 400. Les morceaux restent
+    # dans les navigateurs jusqu'à leur expiration, même avec les sessions côté serveur. 32k : le routeur
+    # d'OKD laisse passer environ 24 Ko d'en-têtes ; nginx ne doit pas être le plus étroit. Tampons pris à
+    # la demande, seulement pour une requête qui dépasse client_header_buffer_size (1k).
+    large_client_header_buffers 4 32k;
     client_body_temp_path /mnt/prod/deploy/logs/tmp-body;
     proxy_temp_path /mnt/prod/deploy/logs/tmp-proxy;
 
