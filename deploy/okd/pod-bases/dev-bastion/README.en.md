@@ -7,6 +7,7 @@ The dev bastion provides secure SSH access into the sandbox namespace.
 - `dev-gateway.yaml` — Deployment running an OpenSSH server (port 2222) with strict key-based authentication; `sophia-dev` priority class
 - `scc-dev-gateway.yaml` — SCC specific to the gateway (a copy of `anyuid` plus the single `SYS_CHROOT` capability, which sshd needs for privilege separation), bound to its account only, requested through the `openshift.io/required-scc` annotation
 - `dev-infra-headless.yaml` — Headless service for DNS-based pod discovery
+- `dev-gateway-service.yaml` — two Services: `dev-gateway` as ClusterIP only (no NodePort, which would be served on the local network) and `dev-gateway-vpn`, an externalIP on the VPN address, port reserved to the administration range by the filter ([`../../host/wireguard/`](../../host/wireguard/README.en.md), section 7)
 - `gateway-strict-isolation.yaml` — NetworkPolicy limiting the gateway to DNS and workspace access only
 
 ## Namespace security
@@ -27,9 +28,11 @@ Removing the `privileged` SCC: back up the bindings outside the repository, appl
 | `${SANDBOX_NAMESPACE}` | development namespace | `sandbox` |
 | `${GATEWAY_SERVICE_ACCOUNT}` | gateway account, the only one bound to the SCC | `dev-gateway-sa` |
 | `${INTERNAL_REGISTRY}` | cluster internal registry | `image-registry.openshift-image-registry.svc:5000` |
+| `${VPN_SERVER_IP}` | server address on the VPN, externalIP of `dev-gateway-vpn` | `a.b.c.1` |
+| `${DEV_GATEWAY_VPN_PORT}` | the gateway's SSH port on that address, distinct from Forgejo's ports | — |
 
 ## Usage
 
 1. Apply `scc-dev-gateway.yaml`, then deploy the gateway and related resources
-2. SSH into the gateway using your configured key: `ssh -p 2222 app-user@<gateway-ip>`
+2. SSH into the gateway using your configured key, through the VPN: `ssh -p ${DEV_GATEWAY_VPN_PORT} app-user@${VPN_SERVER_IP}`
 3. From the gateway, connect to dev workspaces within the cluster

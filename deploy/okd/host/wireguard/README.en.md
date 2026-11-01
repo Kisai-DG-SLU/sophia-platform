@@ -16,6 +16,8 @@ No value from the reference installation is given here: pick your own.
 | `${LAN_NETWORK}` | the node's local network, never routed into the VPN | — |
 | `${GIT_SSH_PORT}`, `${GIT_HTTP_PORT}` | Forgejo ports exposed on the externalIP | — |
 | `${JVB_UDP_PORT}` | UDP port of video call media, exposed on the same externalIP (section 6) | — |
+| `${DEV_GATEWAY_VPN_PORT}` | SSH port of the dev gateway on the same externalIP, reserved to administration (section 7) | — |
+| `${LAN_NODE_IP}` | the node's address on the local network: out-of-VPN administration fallback (section 7) | — |
 
 Any address outside `${VPN_ADMIN_RANGE}` is a **user** device: HTTP/HTTPS only.
 
@@ -23,7 +25,7 @@ Any address outside `${VPN_ADMIN_RANGE}` is a **user** device: HTTP/HTTPS only.
 
 | File | Role |
 |---|---|
-| `wg-filter.nft` | template of the `inet sophia_wg` nftables table, independent from OVN-Kubernetes: **administration** → whole node + Forgejo; **users** → 80/443 only; **nothing is forwarded** to the local network, pods or Services, except Forgejo for administration |
+| `wg-filter.nft` | template of the `inet sophia_wg` nftables table, independent from OVN-Kubernetes: **administration** → whole node + Forgejo; **users** → 80/443 only; **nothing is forwarded** to the local network, pods or Services, except Forgejo for administration (and the rules added in sections 6 and 7) |
 | `sophia-wg-filter.service` | loads the filter at boot, before the network, then runs the safeguard |
 | `wg-filter-check.sh` | **safeguard**: re-reads the whole ruleset with OVN-Kubernetes' nft; unreadable → deletes the table and raises a journal alert (the cluster comes first, the VPN is **never** cut) |
 | `test-garde-fou-metrique.sh` | local bench, **Linux only**: compares the old and new safeguard with fake `crictl`, `podman`, `nft` and `logger` |
@@ -169,14 +171,67 @@ ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept c
 
 Add `$JVB_UDP_PORT` to `envsubst`'s explicit list, then load the filter as in section 3: `nft -c` check, **3-minute automatic switch**, which reloads the previous filter (or removes the table), safeguard at 0, new administration session, then stop the switch. The bridge's replies to devices go through `ct state established,related`.
 
-**This rule's counter is not a check**: it stayed at zero during a call whose media was established. externalIP traffic is translated by OVN-Kubernetes (shared gateway) and most likely does not go through this chain; its exact path through the filter is being measured. What counts as proof:
+**This rule's counter is not a check**: it stayed at zero during a call whose media was established. The path has since been measured (section 7.1): redirected traffic does go through the `forward` chain and the rule counts its packets, but a zero counter does not prove there is no media, and a rising counter does not prove media flows. What counts as proof:
 
 - the media bridge's debug state (participants `iceConnected`, packets received and sent);
 - the node's connection-tracking table (`/proc/net/nf_conntrack`): one entry per device towards `${VPN_SERVER_IP}:${JVB_UDP_PORT}`, without `[UNREPLIED]`.
 
 On the cluster side, the bridge pod sees a source rewritten by the host masquerade: its NetworkPolicy admits the `host-network` group on that port (see the [recipe](../../office/README.en.md#persistent-chat-and-video-calls)). iOS devices need their own profile (section 2).
 
+## 7. Exposure outside the VPN: what the filter review measured and fixed
+
+A review of the filter asked two questions: can a VPN device reach, through an externalIP, a service the filter denies it? And is any service reachable without going through the VPN? Read-only measurements on the node (`nft list ruleset`, `ip route get`, `ovs-ofctl dump-flows br-ex`, filter counters), then two changes.
+
+### 7.1 Measured: the filter sees redirected traffic, with the Service port
+
+With OVN-Kubernetes' shared gateway, an externalIP's DNAT is done **by the kernel, in prerouting** (table `ip nat`, chain `OVN-KUBE-EXTERNALIP`), hence **before routing**. The translated packet is then routed towards `br-ex`: it is forwarded, and goes through the `forward` chain of `inet sophia_wg`. During a video call, the media rule counts its packets, and the "nothing forwarded" drops rise for whatever is not admitted.
+
+Consequences:
+
+- **no bypass through the VPN**: a user device reaches neither Forgejo nor any other service published on `${VPN_SERVER_IP}` outside a rule; a filter placed in prerouting is not needed;
+- **the port seen by `forward` is the Service port after DNAT**, neither the device's nor the pod's: a rule is written on the Service port (`port`), which must differ for each Service published on the same address.
+
+### 7.2 Pitfall fixed: a NodePort is served on the local network
+
+A NodePort is translated for **every local address of the node** (`fib daddr type local`), hence also for its local-network address. The filter's `forward` chain only looks at what comes in through `wg0`: a NodePort escapes "access through the VPN only". This was the case of the development SSH gateway.
+
+Fix: the NodePort is replaced by **a Service with an externalIP on `${VPN_SERVER_IP}`**, like Forgejo and the video calls ([`../../pod-bases/dev-bastion/dev-gateway-service.yaml`](../../pod-bases/dev-bastion/dev-gateway-service.yaml)):
+
+- two Services: `dev-gateway`, ClusterIP only, and `dev-gateway-vpn`, which carries the externalIP. An externalIP applies to **all** ports of a Service, and the pod's SSH port may already be taken on `${VPN_SERVER_IP}` by Forgejo: two translations for the same address and port, one would win at random;
+- the port of `dev-gateway-vpn` is **reserved to the administration range** by one more rule, before the `counter drop` of `forward`:
+
+```
+ip saddr ${VPN_ADMIN_RANGE} ct original ip daddr ${VPN_SERVER_IP} tcp dport ${DEV_GATEWAY_VPN_PORT} counter accept comment "administration: dev gateway"
+```
+
+Order: the filter first (its rule is moot until the Service exists), loaded as in section 3, under the automatic switch; then the Services (`oc diff`, `apply --dry-run=server`, apply). Checks: SSH to the gateway through the VPN from an administration device, and the rule's counter rising (here it does prove the path); from the local network, `nc -vz ${LAN_NODE_IP} <former NodePort>` answers `Connection refused`.
+
+**Inventory to run on any installation**: `oc get svc -A --field-selector spec.type=NodePort` and `LoadBalancer` Services. Each one is served on the local network.
+
+### 7.3 externalIP admission limited to the VPN address
+
+By default (`network.config` `cluster`, `spec.externalIP.policy: {}`), **any address** is admitted as an externalIP: an account that is admin of its own namespace only could publish a Service on a local-network address. Admission is limited to the VPN address:
+
+```bash
+oc patch network.config cluster --type=merge -p '{"spec":{"externalIP":{"policy":{"allowedCIDRs":["${VPN_SERVER_IP}/32"]}}}}' --dry-run=server -o jsonpath='{.spec.externalIP}'
+```
+
+then the same patch without `--dry-run`. Rollback: `allowedCIDRs: null`, never `policy: null` (which would deny every externalIP, Forgejo included).
+
+Two caveats:
+
+- **a `cluster-admin` account is not subject to this admission**. A test under your own admin account, with a test Service on a local-network address, is therefore admitted and proves nothing. The test runs under a limited account, with `--dry-run=server`: `oc apply --dry-run=server --as=system:serviceaccount:<namespace>:<admin account of that namespace> -f <test service>`, expecting `Forbidden`; existing Services (Forgejo, video, gateway) stay admitted. What remains outside the restriction: accounts bound to `cluster-admin`, to be kept few;
+- the change produces **a new kube-apiserver revision**. On a single node, the API stops answering for a few minutes: `oc` fails, and so does every tool depending on it (agents, consoles). Pods, the VPN, SSH, Forgejo and video calls keep running. Before this change: warn that control will be lost, give the rollback and the section 7.4 fallback in advance, and pick a quiet moment.
+
+### 7.4 Administration fallback over the local network, outside the VPN
+
+The VPN is the only administration path. If it goes down, `${VPN_SERVER_IP}` (the `wg0` address) may vanish: targeting it from the local network is useless. The fallback targets **the node directly**, on `${LAN_NODE_IP}`, over key-based SSH: the node's sshd listens on every address, and the `inet sophia_wg` table only filters `wg0`. From the node, one hops to the dev gateway's ClusterIP or to any internal service.
+
+It is a deliberate, narrow exception: the home local network, key-based SSH, to the node only. It is tested **before** any change to the filter, the Services or the API (VPN off on the test device, connection to the node, hop to the gateway), and is never removed without another fallback in place.
+
 ## Open points
 
 - Cleaner later: ship these files through a `MachineConfig`, like the rest of the node configuration. On a single node, applying a MachineConfig **reboots the node**: to be planned.
+- The dev gateway's NetworkPolicy admits its SSH port from the whole cluster: to be tightened.
+- OVS can also deliver `${VPN_SERVER_IP}` arriving on the local-network card, if a machine on that network routes this address to the node. Low exposure, untested, counters at zero.
 - The safeguard alerts in the node journal and as a metric (section 5); its `warning` and `critical` alerts go to the administrator outside the platform, through the Alertmanager's general route ([`../../monitoring/`](../../monitoring/)); the "incident" workflow remains planned.

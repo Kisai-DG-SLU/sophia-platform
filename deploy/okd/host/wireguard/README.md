@@ -16,6 +16,8 @@ Aucune valeur de l'installation de référence n'est donnée ici : choisissez le
 | `${LAN_NETWORK}` | réseau local du nœud, à ne jamais router dans le VPN | — |
 | `${GIT_SSH_PORT}`, `${GIT_HTTP_PORT}` | ports de Forgejo exposés sur l'externalIP | — |
 | `${JVB_UDP_PORT}` | port UDP du média de la visio, exposé sur la même externalIP (section 6) | — |
+| `${DEV_GATEWAY_VPN_PORT}` | port SSH de la passerelle de dev sur la même externalIP, réservé à l'administration (section 7) | — |
+| `${LAN_NODE_IP}` | adresse du nœud sur le réseau local : secours d'administration hors VPN (section 7) | — |
 
 Toute adresse hors de `${VPN_ADMIN_RANGE}` est un appareil **utilisateur** : HTTP/HTTPS seulement.
 
@@ -23,7 +25,7 @@ Toute adresse hors de `${VPN_ADMIN_RANGE}` est un appareil **utilisateur** : HTT
 
 | Fichier | Rôle |
 |---|---|
-| `wg-filter.nft` | gabarit de la table nftables `inet sophia_wg`, indépendante d'OVN-Kubernetes : **administration** → tout le nœud + Forgejo ; **utilisateurs** → 80/443 seulement ; **rien n'est relayé** vers le réseau local, les pods ou les Services, hors Forgejo pour l'administration |
+| `wg-filter.nft` | gabarit de la table nftables `inet sophia_wg`, indépendante d'OVN-Kubernetes : **administration** → tout le nœud + Forgejo ; **utilisateurs** → 80/443 seulement ; **rien n'est relayé** vers le réseau local, les pods ou les Services, hors Forgejo pour l'administration (et les règles ajoutées aux sections 6 et 7) |
 | `sophia-wg-filter.service` | charge le filtre au démarrage, avant le réseau, puis lance le garde-fou |
 | `wg-filter-check.sh` | **garde-fou** : relit tout le ruleset avec le nft d'OVN-Kubernetes ; illisible → supprime la table et alerte dans le journal (le cluster prime, le VPN n'est **jamais** coupé) |
 | `sophia-wg-filter-check.{service,timer}` | relance le garde-fou 3 min après le démarrage puis toutes les 15 min (mises à jour d'OKD) |
@@ -169,14 +171,67 @@ ct original ip daddr ${VPN_SERVER_IP} udp dport ${JVB_UDP_PORT} counter accept c
 
 Ajouter `$JVB_UDP_PORT` à la liste explicite d'`envsubst`, puis charger le filtre comme à la section 3 : contrôle `nft -c`, **interrupteur automatique de 3 minutes**, qui recharge l'ancien filtre (ou retire la table), garde-fou à 0, nouvelle session d'administration, puis arrêt de l'interrupteur. Les réponses du pont vers les appareils passent par `ct state established,related`.
 
-**Le compteur de cette règle n'est pas un contrôle** : il est resté à zéro pendant une visio dont le média était établi. Le trafic de l'externalIP est traduit par OVN-Kubernetes (passerelle partagée) et ne traverse vraisemblablement pas cette chaîne ; son chemin exact dans le filtre est en cours de mesure. Ce qui fait foi :
+**Le compteur de cette règle n'est pas un contrôle** : il est resté à zéro pendant une visio dont le média était établi. Le chemin a depuis été mesuré (section 7.1) : le trafic redirigé traverse bien la chaîne `forward` et la règle compte ses paquets, mais un compteur à zéro ne prouve pas l'absence de média, et un compteur qui monte ne prouve pas qu'il passe. Ce qui fait foi :
 
 - l'état de débogage du pont média (participants `iceConnected`, paquets reçus et émis) ;
 - la table de suivi des connexions du nœud (`/proc/net/nf_conntrack`) : une entrée par appareil vers `${VPN_SERVER_IP}:${JVB_UDP_PORT}`, sans `[UNREPLIED]`.
 
 Côté cluster, le pod du pont voit une source réécrite par la masquerade de l'hôte : sa NetworkPolicy admet le groupe `host-network` sur ce port (voir la [recette](../../office/README.md#chat-permanent-et-visio)). Les appareils iOS ont besoin de leur profil propre (section 2).
 
+## 7. Exposition hors VPN : ce que la revue du filtre a mesuré et corrigé
+
+Une revue du filtre a posé deux questions : un appareil du VPN peut-il joindre, par une externalIP, un service que le filtre lui refuse ? Et un service est-il joignable sans passer par le VPN ? Mesures en lecture seule sur le nœud (`nft list ruleset`, `ip route get`, `ovs-ofctl dump-flows br-ex`, compteurs du filtre), puis deux gestes.
+
+### 7.1 Mesuré : le filtre voit le trafic redirigé, avec le port du Service
+
+Avec la passerelle partagée d'OVN-Kubernetes, le DNAT d'une externalIP est fait **par le noyau, en prérouting** (table `ip nat`, chaîne `OVN-KUBE-EXTERNALIP`), donc **avant le routage**. Le paquet traduit est ensuite routé vers `br-ex` : il est relayé, et traverse la chaîne `forward` de `inet sophia_wg`. Pendant une visio, la règle du média compte ses paquets, et les refus de « rien de relayé » montent pour ce qui n'est pas admis.
+
+Conséquences :
+
+- **pas de contournement par le VPN** : un appareil utilisateur ne joint ni Forgejo ni un autre service publié sur `${VPN_SERVER_IP}` hors règle ; un filtre placé en prérouting n'est pas nécessaire ;
+- **le port vu par `forward` est celui du Service après DNAT**, pas celui de l'appareil ni du pod : une règle se rédige sur le port du Service (`port`), qui doit être différent pour chaque Service publié sur la même adresse.
+
+### 7.2 Piège corrigé : un NodePort est servi sur le réseau local
+
+Un NodePort est traduit pour **toute adresse locale du nœud** (`fib daddr type local`), donc aussi pour son adresse sur le réseau local. La chaîne `forward` du filtre ne regarde que ce qui entre par `wg0` : un NodePort échappe à « accès par le VPN seulement ». C'était le cas de la passerelle SSH de développement.
+
+Correctif : le NodePort est remplacé par **un Service à externalIP sur `${VPN_SERVER_IP}`**, comme Forgejo et la visio ([`../../pod-bases/dev-bastion/dev-gateway-service.yaml`](../../pod-bases/dev-bastion/dev-gateway-service.yaml)) :
+
+- deux Services : `dev-gateway`, en ClusterIP seule, et `dev-gateway-vpn`, qui porte l'externalIP. Une externalIP vaut pour **tous** les ports d'un Service, et le port SSH du pod est peut-être déjà pris sur `${VPN_SERVER_IP}` par Forgejo : deux traductions pour la même adresse et le même port, l'une gagnerait au hasard ;
+- le port de `dev-gateway-vpn` est **réservé à la plage d'administration** par une règle de plus, avant le `counter drop` de `forward` :
+
+```
+ip saddr ${VPN_ADMIN_RANGE} ct original ip daddr ${VPN_SERVER_IP} tcp dport ${DEV_GATEWAY_VPN_PORT} counter accept comment "administration : passerelle de dev"
+```
+
+Ordre : le filtre d'abord (sa règle est sans objet tant que le Service n'existe pas), chargé comme à la section 3, sous interrupteur automatique ; puis les Services (`oc diff`, `apply --dry-run=server`, application). Contrôles : SSH vers la passerelle par le VPN depuis un poste d'administration, et le compteur de la règle qui monte (ici, il prouve le chemin) ; depuis le réseau local, `nc -vz ${LAN_NODE_IP} <ancien NodePort>` répond `Connection refused`.
+
+**Inventaire à faire sur toute installation** : `oc get svc -A --field-selector spec.type=NodePort` et les Services `LoadBalancer`. Chacun est servi sur le réseau local.
+
+### 7.3 Admission des externalIPs limitée à l'adresse du VPN
+
+Par défaut (`network.config` `cluster`, `spec.externalIP.policy: {}`), **toute adresse** est admise comme externalIP : un compte administrateur de son seul namespace pourrait publier un Service sur une adresse du réseau local. On limite l'admission à l'adresse du VPN :
+
+```bash
+oc patch network.config cluster --type=merge -p '{"spec":{"externalIP":{"policy":{"allowedCIDRs":["${VPN_SERVER_IP}/32"]}}}}' --dry-run=server -o jsonpath='{.spec.externalIP}'
+```
+
+puis le même patch sans `--dry-run`. Retour arrière : `allowedCIDRs: null`, jamais `policy: null` (qui refuserait toute externalIP, Forgejo compris).
+
+Deux nuances :
+
+- **un compte `cluster-admin` n'est pas soumis à cette admission**. Un essai sous son propre compte admin, avec un Service d'essai sur une adresse du réseau local, est donc admis et ne prouve rien. L'essai se fait sous un compte limité, en `--dry-run=server` : `oc apply --dry-run=server --as=system:serviceaccount:<namespace>:<compte admin de ce namespace> -f <service d'essai>`, refus `Forbidden` attendu ; les Services existants (Forgejo, visio, passerelle) restent admis. Ce qui reste hors restriction : les comptes liés à `cluster-admin`, à garder rares ;
+- le changement produit **une nouvelle révision du kube-apiserver**. Sur un nœud unique, l'API ne répond plus pendant quelques minutes : `oc` échoue, et tout outil qui en dépend aussi (agents, consoles). Les pods, le VPN, SSH, Forgejo et la visio continuent. Avant ce geste : prévenir qu'on perd la main, donner d'avance le retour arrière et le secours de la section 7.4, et choisir un moment calme.
+
+### 7.4 Secours d'administration par le réseau local, hors VPN
+
+Le VPN est le seul chemin d'administration. S'il tombe, `${VPN_SERVER_IP}` (l'adresse de `wg0`) peut disparaître : la viser depuis le réseau local ne sert à rien. Le secours vise **le nœud directement**, sur `${LAN_NODE_IP}`, en SSH par clé : sshd du nœud écoute sur toutes les adresses, et la table `inet sophia_wg` ne filtre que `wg0`. Depuis le nœud, on rebondit vers la ClusterIP de la passerelle de dev ou vers tout service interne.
+
+C'est une exception voulue et étroite : le réseau local de la maison, SSH par clé, vers le nœud seul. Elle s'éprouve **avant** tout geste sur le filtre, les Services ou l'API (VPN coupé sur le poste d'essai, connexion au nœud, rebond vers la passerelle), et ne se retire jamais sans un autre secours en place.
+
 ## Points ouverts
 
 - Plus propre à terme : livrer ces fichiers par une `MachineConfig`, comme le reste de la configuration du nœud. Sur un nœud unique, appliquer une MachineConfig **redémarre le nœud** : à planifier.
+- La NetworkPolicy de la passerelle de dev admet son port SSH depuis tout le cluster : à resserrer.
+- OVS sait aussi livrer `${VPN_SERVER_IP}` arrivée par la carte du réseau local, si une machine de ce réseau route cette adresse vers le nœud. Exposition faible, non éprouvée, compteurs à zéro.
 - Le garde-fou alerte dans le journal du nœud et en métrique (section 5) ; ses alertes `warning` et `critical` partent vers l'administrateur hors de la plateforme, par la route générale de l'Alertmanager ([`../../monitoring/`](../../monitoring/)) ; le workflow « incident » reste prévu.
