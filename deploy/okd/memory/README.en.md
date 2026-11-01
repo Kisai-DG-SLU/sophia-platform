@@ -140,7 +140,7 @@ With the service, the memory zone closes: API key on the vector database, teleme
 
 - **A "Memory" page** to deposit documents, **a whole folder** at once when the device allows it. On iOS, choosing a folder is only possible from iOS 18.4: on an older tablet, several files are picked at once, otherwise one file at a time.
 - **The list to validate** is on the same page, with an alert in "What's new?".
-- The page is being designed on the interface side; without it, the service can be installed, but nobody can deposit yet.
+- The page is **coded and proven on the bench** against a fake memory service, not in service yet: it switches on with the service (see the [cockpit](../apps/chat-interface/README.en.md)). Level chosen from the service's closed list, nothing preselected; one document per request; for the validator, other people's personal and intimate documents reduced to author, level, date and size; validation through a one-tap confirmation.
 
 ### Next
 
