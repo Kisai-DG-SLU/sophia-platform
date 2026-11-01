@@ -1,12 +1,13 @@
 # Module Communication — documentation
 
-État : **en service, en recette**. Le chat (Matrix) et la visio tournent dans l'installation de référence, contrôlés en lecture, et s'affichent dans le cockpit de l'interface. La **première visio avec image** entre un ordinateur et la tablette ancienne a eu lieu dans le cockpit, par le VPN, après trois correctifs en chaîne (voir [Média de la visio](#média-de-la-visio--trois-causes-en-chaîne)). **La messagerie change de logiciel** : après un essai sur la vraie tablette, le foyer a retenu **Converse.js et Prosody (XMPP) à la place de Matrix** ; la version définitive est en conception (voir [Messagerie : de Matrix à XMPP](#messagerie--de-matrix-à-xmpp)). La recette avec tous les appareils du foyer reste à faire (voir [Recette à faire](#recette-à-faire)).
+État : **en service, en recette**. Le chat (Matrix) et la visio tournent dans l'installation de référence, contrôlés en lecture, et s'affichent dans le cockpit de l'interface. La **première visio avec image** entre un ordinateur et la tablette ancienne a eu lieu dans le cockpit, par le VPN, après trois correctifs en chaîne (voir [Média de la visio](#média-de-la-visio--trois-causes-en-chaîne)). **La messagerie a changé de logiciel** : après un essai sur la vraie tablette, le foyer a retenu **Converse.js et Prosody (XMPP) à la place de Matrix**. La version définitive est **en service**, dans le cockpit, avec « dis à » (Sophia envoie un message au nom de la personne) ; Matrix reste lisible jusqu'à la fin de la recette (voir [Messagerie : de Matrix à XMPP](#messagerie--de-matrix-à-xmpp)). La **recette avec tous les appareils du foyer est en cours** (voir [Recette à faire](#recette-à-faire)).
 
 ## Ce que fait le module
 
-- **Chat permanent** : des salons et des discussions directes entre les membres du foyer, dans le navigateur et dans le cockpit. Les messages et les fichiers restent sur le serveur de la maison. Aujourd'hui Matrix (Element Web, clients Matrix sur téléphone), bientôt remplacé par Converse.js et Prosody.
+- **Chat permanent** : des salons et des discussions directes entre les membres du foyer, dans le navigateur et dans le cockpit. Les messages et les fichiers restent sur le serveur de la maison. Converse.js et Prosody (XMPP) depuis la version définitive ; Matrix (Element) reste lisible jusqu'à la fin de la recette, puis il est démonté.
+- **« Dis à »** : on demande à Sophia d'écrire à un membre de la famille ou au salon Famille ; après confirmation, le message part dans la messagerie, au nom de la personne, avec la mention « via Sophia ».
 - **Visio** : une salle de visio s'ouvre dans le cockpit ou par un lien ; seuls les comptes admis du foyer la rejoignent.
-- **Notifications** sur Android, par un relais local, sans service de notification d'un tiers.
+- **Notifications** sur Android, par un relais local (ntfy), sans service de notification d'un tiers et sans contenu : « Nouveau message », ni texte ni expéditeur.
 - **Dans le cockpit** : Messages et Visio s'affichent au centre du [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » compte les messages non lus de chacun (en service, vérifié) ; un volet « Demander à Sophia » y est offert, sans lire les messages.
 
 ## Architecture
@@ -22,6 +23,10 @@ navigateur seulement (VPN) ──► routeur d'entrée ──► web Jitsi ─�
 média (UDP, VPN seulement) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 
 serveur de l'interface ──► Synapse, port HTTP (module de résumé) ──► clés publiques du realm (par le routeur)
+
+navigateur, cockpit (VPN) ──► routeur d'entrée ──► web : oauth2-proxy + nginx (Converse.js) ──► Prosody (WebSocket, fichiers)
+                                                                                    └──► passerelle de push ──► ntfy
+serveur de l'interface ──► relais « dis à » (une route, un port) ──► Prosody (module HTTP) ──► userinfo du fournisseur d'identité
 ```
 
 | Élément | Choix | Raison |
@@ -88,9 +93,43 @@ Synapse n'accepte que les jetons de MAS : le serveur de l'interface ne peut pas 
 - **aucun annuaire** : on ne voit un membre de la famille qu'après l'avoir ajouté par son adresse ;
 - lien vers la visio depuis une discussion : le greffon prévu ne marche pas avec la version 14 du client.
 
-**Version définitive, en conception.** Choix ouverts pour le foyer : contacts de la famille d'office (synchronisés depuis les groupes du fournisseur d'identité, liste écrite à la main, ou rien) ; salon « Famille » créé d'office ; reprise ou non de l'historique de Matrix ; notifications Android par ntfy (passerelle XEP-0357) ; visio lancée depuis une discussion et salle ouverte par la tuile. Déjà fixé : volume local persistant, pas de chiffrement de bout en bout (ni OMEMO), pastille sur la tablette sans notification page fermée. Le **démontage de Matrix** (Synapse, MAS, Element, module de résumé) suivra la bascule.
+#### Messagerie définitive (en service)
 
-### Visio : Jitsi Meet
+Dans le namespace de la messagerie, à côté de Matrix, jusqu'à la fin de la recette :
+
+| Élément | Choix | Raison |
+|---|---|---|
+| Prosody | 13.0.7, image figée par empreinte ; données sur un **volume local persistant** (`Retain`) ; archives des salons gardées | la messagerie est la mémoire écrite du foyer |
+| Comptes | identité tirée de l'userinfo du jeton (OAUTHBEARER, `preferred_username`), jamais d'un mot de passe ; un module de Prosody refuse à la connexion **tout compte hors des groupes du foyer**, en plus de l'oauth2-proxy de la page | le contrôle par groupe ne dépend pas d'une seule couche |
+| Ouvertures | ni serveur à serveur, ni inscription, ni client en TCP : le WebSocket seul, derrière oauth2-proxy ; NetworkPolicy fermées, Prosody joignable du seul pod web (et du relais « dis à ») | rien n'entre ni ne sort hors du chemin prévu |
+| Web | nginx (Converse.js 14, servi par l'image, empreinte vérifiée ; greffons du foyer) et oauth2-proxy ; politique de sécurité du contenu stricte, affichable dans le **seul cockpit** ; fichiers partagés servis en `sandbox` et `nosniff` | aucune ressource tierce ; un fichier reçu ne peut pas s'exécuter dans la page |
+| Contacts | **rien d'office** : chacun ajoute ses contacts par leur adresse, ou passe par le salon Famille | choix du foyer |
+| Salon « Famille » | créé d'office pour toute la maison, invités exclus ; **propriétaires : les adultes** ; membre d'office, sans départ volontaire ; un enfant peut créer d'autres salons ; les membres absents ne sont visibles que des propriétaires | un lieu commun garanti, administré par les adultes |
+| Historique de Matrix | **non repris** ; Element reste lisible jusqu'à la fin de la recette | une reprise coûtait plus qu'elle ne rapportait |
+| Notifications | Android : passerelle de push (XEP-0357) dans le pod de Prosody, vers ntfy ; « Nouveau message », **ni texte ni expéditeur**, lien vers le cockpit ; un sujet par personne, tiré d'une clé secrète, montré à elle seule. Tablette iOS : pastille dans le cockpit, une fois Messages ouvert | aucun contenu ne quitte la messagerie ; pas de service tiers |
+| Visio depuis une discussion | bouton qui ouvre la **tuile Visio du cockpit** sur la salle de la discussion ; nom de salle par règle fixe (salon Famille → `famille`, autre salon → tiré de son adresse, discussion à deux → tiré de la paire d'identifiants, condensée) ; la tuile Visio ouvre `famille` par défaut | la visio individuelle passe par la discussion à deux |
+| Ressources | web en stratégie `Recreate`, limites dans le quota du namespace | un quota serré ne doit pas bloquer une mise à jour |
+
+**Mise en service** : prérequis (volume, client OIDC et Secret, entrée réseau du fournisseur d'identité), contrôle des groupes du foyer, Secret de la passerelle, images, réglage de ntfy, essai à blanc, application, contrôles HTTP (`/sante` 200 ; jeton, push et WebSocket en 401 sans session ; déconnexion en 302 avec `Clear-Site-Data`), premier essai hors du cockpit, puis tuile du cockpit. Banc local par le chemin de production : 25 étapes.
+
+**Départ d'un membre** : le retirer des groupes du foyer (oauth2-proxy et Prosody refusent toute nouvelle connexion), puis du salon Famille (`/revoke`), puis supprimer son compte Prosody, qui garde sinon son ancien statut jusqu'à sa prochaine connexion.
+
+#### « Dis à » : Sophia écrit au nom de la personne
+
+Dans la discussion avec Sophia, « dis à papa que… » ou « dis à tout le monde que… » : Sophia propose le message, la personne confirme, et le message part **dans la messagerie**, au nom de la personne, vers la discussion à deux ou le salon Famille. Il remplace l'ancien dépôt de messages du chat, retiré.
+
+| Élément | Choix | Raison |
+|---|---|---|
+| Envoi | un **module HTTP de Prosody** (`POST`, corps de 4 Ko au plus) | le message est un vrai message XMPP, archivé et notifié comme les autres |
+| Identité | le chat relaie le **jeton d'accès de la personne** ; Prosody le vérifie par l'userinfo, puis exige le bon client émetteur (`azp`), un groupe du foyer et le **même nom** que le compte ; l'expéditeur est **le compte du jeton**, jamais un champ du corps | personne ne peut écrire au nom d'un autre, pas même le chat |
+| Isolement | un **relais** dans le pod de la passerelle n'ouvre au chat qu'**une route et un port** ; le chat n'atteint jamais le port HTTP de Prosody (WebSocket, fichiers) | Prosody ne sait pas réserver un chemin à une source |
+| Affichage | mention « **via Sophia** » sous le message (greffon de Converse.js) ; **pas modifiable** (« Éditer » ôté), mais **retirable** par son expéditeur | on sait ce que Sophia a écrit, et on peut le reprendre |
+| Limites | **30 messages par jour** et par personne ; journal sans texte | pas d'emballement |
+| Sans réglage | sans l'adresse du relais dans le manifeste du chat, « dis à » répond qu'il n'est pas encore ouvert | mise en service en deux temps sans erreur visible |
+
+Choix d'usage : l'analyse de l'intention par le modèle, la confirmation, l'envoi par une règle ; une réponse autre que « oui » n'envoie rien.
+
+### Visio : Jitsi Meet### Visio : Jitsi Meet
 
 Jitsi Meet a remplacé la visio de La Suite numérique, d'abord prévue : son interface ne démarre pas sur les tablettes anciennes du foyer.
 
@@ -136,22 +175,25 @@ Résultat : **première visio avec image** entre l'ordinateur et la tablette anc
 
 | Appareil | Chat | Visio |
 |---|---|---|
-| Ordinateur | navigateur | navigateur, dans le cockpit : **image et son établis** |
-| Android | Element X, notifications par ntfy ; Element Web dans le cockpit | navigateur, dans le cockpit : à éprouver (le profil VPN par défaut devrait suffire) |
-| Tablette ancienne (iOS 15) | Element classique ; Converse.js éprouvé (essai) | navigateur, dans le cockpit : **image et son établis**, avec le profil VPN iOS |
+| Ordinateur | Converse.js dans le cockpit | navigateur, dans le cockpit : **image et son établis** |
+| Android | Converse.js dans le cockpit, notifications par l'application ntfy | navigateur, dans le cockpit : à éprouver (le profil VPN par défaut devrait suffire) |
+| Tablette ancienne (iOS 15) | Converse.js dans le cockpit, pastille sans notification page fermée | navigateur, dans le cockpit : **image et son établis**, avec le profil VPN iOS |
 
-La **première connexion** au chat Matrix passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. Dans le cockpit, la page de connexion de MAS est refusée en cadre : si la session Matrix a expiré, « Se reconnecter » ouvre Element dans un onglet, puis on revient au cockpit.
+Tant que Matrix reste lisible : la **première connexion** au chat Matrix passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. Dans le cockpit, la page de connexion de MAS est refusée en cadre : si la session Matrix a expiré, « Se reconnecter » ouvre Element dans un onglet, puis on revient au cockpit.
 
-**Element Web n'est pas pris en charge par Safari 15** : sur la tablette ancienne, le module Messages du cockpit ne marche pas tel quel. C'est l'une des raisons du passage à Converse.js, qui y fonctionne.
+**Element Web n'est pas pris en charge par Safari 15** : c'est l'une des raisons du passage à Converse.js, qui y fonctionne. La pastille des non-lus n'apparaît qu'une fois Messages ouvert : la messagerie n'est pas chargée en arrière-plan à l'ouverture du cockpit, pour ménager la mémoire de la tablette ancienne.
 
 ## Confidentialité et limites
 
 - **Maison seule** : chat et visio ne se joignent que par le VPN.
 - **Pas de chiffrement de bout en bout**, ni dans le chat ni dans la visio : l'administrateur du système peut lire les salons. Aucun salon n'est donc « intime ».
 - **Médias du chat sans sauvegarde.**
+- **Salles de visio non privées entre membres du foyer** : le jeton de visio vaut pour toute salle, et le nom d'une salle à deux se recalcule ; un troisième membre du foyer pourrait y entrer, et serait vu. Les personnes hors du foyer sont refusées. Fermer cette limite demande des jetons limités à une salle : plus tard, à la demande.
+- **Présence en veille** : après la fermeture de la page, la session reste en veille jusqu'à 72 h pour les notifications ; la personne paraît présente dans les salons pendant ce temps. Choix assumé du foyer.
+- **Notifications** : qui connaîtrait le sujet ntfy d'une personne pourrait lui envoyer de fausses alertes ou voir quand elle en reçoit, jamais un contenu ; le sujet n'est montré qu'à elle.
 - **Visio par le navigateur seulement** : l'application mobile de Jitsi, qui envoyait des mesures d'usage à un service tiers, n'est plus utilisée.
 - **Résumé des non-lus** : la route n'expose que des comptes, jamais un texte ni un expéditeur, et seulement à la personne elle-même, par son jeton.
-- **Déconnexion** : se déconnecter du cockpit ferme aussi les sessions des modules d'une liste fermée, dont la messagerie d'essai ; la visio ne garde pas de session. Element garde son jeton dans le navigateur, hors de portée du cockpit : limite connue, levée avec le retrait de Matrix.
+- **Déconnexion** : se déconnecter du cockpit ferme aussi les sessions des modules d'une liste fermée, messagerie comprise ; la déconnexion de la messagerie **efface les données du navigateur** (`Clear-Site-Data`, et une page sans session pour la tablette ancienne). Element garde son jeton dans le navigateur, hors de portée du cockpit : limite connue, levée avec le retrait de Matrix.
 - **Pas d'agent** dans les salons pour l'instant ; le chat ne reçoit pas les alertes de la plateforme (elles ont leur propre canal, voir [Observabilité](../../concepts/10-observabilite.md)).
 - **Adaptateur** : un appareil du VPN peut épuiser sa réserve d'états en mémoire et bloquer les connexions à la visio pendant 10 minutes.
 
@@ -160,13 +202,14 @@ La **première connexion** au chat Matrix passe par deux pages de MAS : la liais
 - visio à trois appareils : chacun voit les deux autres, sortie puis retour sans recharger, partage d'écran depuis un ordinateur ;
 - chaque appareil du foyer passé par la page de diagnostic des candidats, à la maison puis sur le réseau mobile (Android compris) ; la page est retirée ensuite ;
 - invité refusé (chat et visio), compte protégé admis ;
-- messagerie définitive (Converse.js et Prosody) sur chaque appareil, puis démontage de Matrix ;
-- Element X avec ntfy sur Android, tant que Matrix reste en service ;
+- messagerie définitive sur chaque appareil (en cours) : ajout d'un contact par son adresse, salon Famille, notification Android sans contenu, visio depuis une discussion, déconnexion ; puis démontage de Matrix ;
+- « dis à » depuis chaque appareil : envoi à deux et à tout le monde, mention « via Sophia », pas d'« Éditer », une réponse autre que « oui » n'envoie rien ;
 - résumé des non-lus avec un vrai jeton relayé, dans « Quoi de neuf ? ».
 
 ## Prévu
 
-- **Messagerie définitive** sur XMPP, après les choix du foyer ; puis retrait de Matrix.
+- **Retrait de Matrix** (Synapse, MAS, Element, module de résumé) à la fin de la recette.
+- **Boutons de visio directs** vers chaque membre, et salles privées par des jetons limités à une salle : plus tard, à la demande du foyer.
 - **Courrier unifié** : décidé, **reporté** derrière les autres projets ; rien n'est ouvert au foyer.
 - **Accès par le cockpit seulement**, une fois le cockpit validé sur tous les appareils : une page de l'application ouverte directement sera renvoyée vers le cockpit ; un accès direct reste à l'administrateur, pour le dépannage.
 - **Lancer une visio depuis la discussion de Sophia**, et Sophia dans les salons : plus tard, avec les agents.
@@ -184,3 +227,5 @@ La **première connexion** au chat Matrix passe par deux pages de MAS : la liais
 - Une archive faite sur un Mac à partir de fichiers téléchargés porte des attributs étendus (`com.apple.provenance`) que le build binaire d'OKD ne sait pas lire : `COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata`, puis contrôler l'archive avant le build.
 - Une condition de flux d'authentification niée se règle par une clé de négation propre à la condition : à vérifier en essai, invité compris.
 - Un `add_header` dans une `location` de nginx annule ceux du niveau supérieur : l'en-tête `frame-ancestors` d'Element est répété dans chaque location.
+- Un banc qui monte sa propre configuration ne prouve pas celle du déploiement : un module présent au banc manquait au ConfigMap généré par le rendu de production. Le banc monte désormais les ConfigMaps **du rendu de production**.
+- Un serveur qui ne sait pas réserver une route à une source se protège par un **relais minimal** devant lui (une route, un port, une taille), pas par une règle réseau sur son port partagé.

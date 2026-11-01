@@ -1,12 +1,13 @@
 # Communication Module — documentation
 
-Status: **in service, in acceptance testing**. The chat (Matrix) and video calls run in the reference installation, checked read-only, and are displayed in the interface's cockpit. The **first video call with picture** between a computer and the older tablet took place in the cockpit, through the VPN, after three fixes in a row (see [Video media](#video-media-three-causes-in-a-row)). **Messaging is changing software**: after a test on the real tablet, the household chose **Converse.js and Prosody (XMPP) instead of Matrix**; the final version is being designed (see [Messaging: from Matrix to XMPP](#messaging-from-matrix-to-xmpp)). Acceptance testing with every household device is still to do (see [Acceptance testing to do](#acceptance-testing-to-do)).
+Status: **in service, in acceptance testing**. The chat (Matrix) and video calls run in the reference installation, checked read-only, and are displayed in the interface's cockpit. The **first video call with picture** between a computer and the older tablet took place in the cockpit, through the VPN, after three fixes in a row (see [Video media](#video-media-three-causes-in-a-row)). **Messaging has changed software**: after a test on the real tablet, the household chose **Converse.js and Prosody (XMPP) instead of Matrix**. The final version is **in service**, in the cockpit, with "tell" (Sophia sends a message on the person's behalf); Matrix stays readable until the end of acceptance testing (see [Messaging: from Matrix to XMPP](#messaging-from-matrix-to-xmpp)). **Acceptance testing with every household device is under way** (see [Acceptance testing to do](#acceptance-testing-to-do)).
 
 ## What the module does
 
-- **Persistent chat**: rooms and direct conversations between household members, in the browser and in the cockpit. Messages and files stay on the home server. Matrix today (Element Web, Matrix clients on phones), soon replaced by Converse.js and Prosody.
+- **Persistent chat**: rooms and direct conversations between household members, in the browser and in the cockpit. Messages and files stay on the home server. Converse.js and Prosody (XMPP) since the final version; Matrix (Element) stays readable until the end of acceptance testing, then it is dismantled.
+- **"Tell"**: one asks Sophia to write to a family member or to the Family room; after confirmation, the message goes out in the messaging service, on the person's behalf, marked "via Sophia".
 - **Video calls**: a video room opens in the cockpit or through a link; only the household's admitted accounts can join it.
-- **Notifications** on Android, through a local relay, without any third-party notification service.
+- **Notifications** on Android, through a local relay (ntfy), without any third-party notification service and without content: "New message", neither text nor sender.
 - **In the cockpit**: Messages and Video are displayed in the centre of the [interface's cockpit](../../../deploy/okd/apps/chat-interface/README.en.md), and the "What's new?" panel counts each person's unread messages (in service, verified); an "Ask Sophia" panel is offered there, without reading the messages.
 
 ## Architecture
@@ -22,6 +23,10 @@ browser only (VPN) ──► ingress router ──► Jitsi web ──► Prosod
 media (UDP, VPN only) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 
 interface server ──► Synapse, HTTP port (summary module) ──► realm public keys (through the router)
+
+browser, cockpit (VPN) ──► ingress router ──► web: oauth2-proxy + nginx (Converse.js) ──► Prosody (WebSocket, files)
+                                                                            └──► push gateway ──► ntfy
+interface server ──► "tell" relay (one route, one port) ──► Prosody (HTTP module) ──► identity provider userinfo
 ```
 
 | Element | Choice | Reason |
@@ -88,9 +93,43 @@ Status: module loaded, route answering 401 without a token; interface egress to 
 - **no directory**: a family member only shows up after being added by address;
 - link to a video call from a conversation: the planned plugin does not work with version 14 of the client.
 
-**Final version, being designed.** Open choices for the household: family contacts by default (synchronised from the identity provider's groups, a hand-written list, or nothing); a "Family" room created by default; taking over Matrix history or not; Android notifications through ntfy (XEP-0357 gateway); starting a call from a conversation and the room opened by the tile. Already settled: persistent local volume, no end-to-end encryption (no OMEMO), a badge on the tablet without notifications when the page is closed. **Dismantling Matrix** (Synapse, MAS, Element, summary module) will follow the switch.
+#### Final messaging (in service)
 
-### Video calls: Jitsi Meet
+In the messaging namespace, next to Matrix, until the end of acceptance testing:
+
+| Element | Choice | Reason |
+|---|---|---|
+| Prosody | 13.0.7, image pinned by digest; data on a **persistent local volume** (`Retain`); room archives kept | messaging is the household's written memory |
+| Accounts | identity taken from the token's userinfo (OAUTHBEARER, `preferred_username`), never from a password; a Prosody module refuses at sign-in **any account outside the household groups**, on top of the page's oauth2-proxy | group control does not rest on a single layer |
+| Openings | no server-to-server, no registration, no TCP client: the WebSocket only, behind oauth2-proxy; closed NetworkPolicies, Prosody reachable from the web pod only (and from the "tell" relay) | nothing gets in or out outside the intended path |
+| Web | nginx (Converse.js 14, served by the image, digest checked; household plugins) and oauth2-proxy; strict content security policy, framable **by the cockpit only**; shared files served with `sandbox` and `nosniff` | no third-party resource; a received file cannot run in the page |
+| Contacts | **nothing by default**: everyone adds their contacts by address, or goes through the Family room | household's choice |
+| "Family" room | created by default for the whole home, guests excluded; **owners: the adults**; membership by default, no voluntary leaving; a child may create other rooms; absent members are visible to owners only | a guaranteed common place, run by the adults |
+| Matrix history | **not migrated**; Element stays readable until the end of acceptance testing | migrating cost more than it brought |
+| Notifications | Android: push gateway (XEP-0357) in the Prosody pod, towards ntfy; "New message", **neither text nor sender**, a link to the cockpit; one topic per person, derived from a secret key, shown to that person only. iOS tablet: badge in the cockpit, once Messages has been opened | no content leaves the messaging service; no third-party service |
+| Video from a conversation | a button opens the **cockpit's Video tile** on the conversation's room; room name by a fixed rule (Family room → `famille`, other room → derived from its address, one-to-one conversation → derived from the pair of identifiers, hashed); the Video tile opens `famille` by default | one-to-one calls go through the one-to-one conversation |
+| Resources | web with the `Recreate` strategy, limits within the namespace quota | a tight quota must not block an update |
+
+**Going live**: prerequisites (volume, OIDC client and Secret, identity provider network ingress), check of the household groups, gateway Secret, images, ntfy setting, dry run, apply, HTTP checks (`/sante` 200; token, push and WebSocket 401 without a session; sign-out 302 with `Clear-Site-Data`), first test outside the cockpit, then the cockpit tile. Local bench through the production path: 25 steps.
+
+**A member leaving**: remove them from the household groups (oauth2-proxy and Prosody refuse any new sign-in), then from the Family room (`/revoke`), then delete their Prosody account, which otherwise keeps its former status until its next sign-in.
+
+#### "Tell": Sophia writes on the person's behalf
+
+In the conversation with Sophia, "tell dad that…" or "tell everyone that…": Sophia drafts the message, the person confirms, and the message goes **into the messaging service**, on the person's behalf, to the one-to-one conversation or the Family room. It replaces the chat's former message drop, now removed.
+
+| Element | Choice | Reason |
+|---|---|---|
+| Sending | a **Prosody HTTP module** (`POST`, body of 4 KB at most) | the message is a real XMPP message, archived and notified like the others |
+| Identity | the chat relays the **person's access token**; Prosody checks it through userinfo, then requires the right issuing client (`azp`), a household group and the **same name** as the account; the sender is **the token's account**, never a body field | nobody can write on someone else's behalf, not even the chat |
+| Isolation | a **relay** in the gateway pod opens **one route and one port** to the chat; the chat never reaches Prosody's HTTP port (WebSocket, files) | Prosody cannot reserve a path to a source |
+| Display | "**via Sophia**" under the message (Converse.js plugin); **not editable** ("Edit" removed), but **retractable** by its sender | everyone knows what Sophia wrote, and it can be taken back |
+| Limits | **30 messages a day** per person; log without text | no runaway |
+| Unset | without the relay address in the chat manifest, "tell" answers that it is not open yet | a two-step go-live with no visible error |
+
+Usage choices: the model analyses the intent, the person confirms, a rule sends; any answer other than "yes" sends nothing.
+
+### Video calls: Jitsi Meet### Video calls: Jitsi Meet
 
 Jitsi Meet replaced La Suite numérique's video service, planned first: its interface does not start on the household's older tablets.
 
@@ -136,22 +175,25 @@ Result: **first video call with picture** between the computer and the older tab
 
 | Device | Chat | Video |
 |---|---|---|
-| Computer | browser | browser, in the cockpit: **picture and sound established** |
-| Android | Element X, notifications through ntfy; Element Web in the cockpit | browser, in the cockpit: to be proven (the default VPN profile should be enough) |
-| Older tablet (iOS 15) | Element Classic; Converse.js proven (test) | browser, in the cockpit: **picture and sound established**, with the iOS VPN profile |
+| Computer | Converse.js in the cockpit | browser, in the cockpit: **picture and sound established** |
+| Android | Converse.js in the cockpit, notifications through the ntfy app | browser, in the cockpit: to be proven (the default VPN profile should be enough) |
+| Older tablet (iOS 15) | Converse.js in the cockpit, badge without notifications when the page is closed | browser, in the cockpit: **picture and sound established**, with the iOS VPN profile |
 
-The **first sign-in** to the Matrix chat goes through two MAS pages: account linking, then application authorisation. In the cockpit, the MAS sign-in page is refused in a frame: if the Matrix session has expired, "Sign in again" opens Element in a tab, then one comes back to the cockpit.
+While Matrix stays readable: the **first sign-in** to the Matrix chat goes through two MAS pages: account linking, then application authorisation. In the cockpit, the MAS sign-in page is refused in a frame: if the Matrix session has expired, "Sign in again" opens Element in a tab, then one comes back to the cockpit.
 
-**Element Web is not supported by Safari 15**: on the older tablet, the cockpit's Messages module does not work as is. This is one of the reasons for moving to Converse.js, which does.
+**Element Web is not supported by Safari 15**: this is one of the reasons for moving to Converse.js, which works there. The unread badge only appears once Messages has been opened: messaging is not loaded in the background when the cockpit opens, to spare the older tablet's memory.
 
 ## Privacy and limits
 
 - **Home only**: chat and video are reached through the VPN only.
 - **No end-to-end encryption**, neither in the chat nor in video calls: the system administrator can read the rooms. No room is therefore "private".
 - **Chat media without backup.**
+- **Video rooms not private between household members**: the video token is valid for any room, and a one-to-one room name can be recomputed; a third household member could join it, and would be seen. People outside the household are refused. Closing this limit needs tokens restricted to one room: later, on request.
+- **Idle presence**: after the page is closed, the session stays idle for up to 72 h for notifications; the person appears present in rooms meanwhile. A choice the household accepts.
+- **Notifications**: someone who knew a person's ntfy topic could send them fake alerts or see when they get one, never any content; the topic is shown to that person only.
 - **Video through the browser only**: Jitsi's mobile app, which sent usage metrics to a third-party service, is no longer used.
 - **Unread summary**: the route only exposes counts, never a text or a sender, and only to the person themselves, through their token.
-- **Sign-out**: signing out of the cockpit also closes the sessions of the modules on a closed list, the test messaging included; video keeps no session. Element keeps its token in the browser, out of the cockpit's reach: a known limit, lifted when Matrix is removed.
+- **Sign-out**: signing out of the cockpit also closes the sessions of the modules on a closed list, messaging included; signing out of messaging **clears the browser's data** (`Clear-Site-Data`, and a session-less page for the older tablet). Element keeps its token in the browser, out of the cockpit's reach: a known limit, lifted when Matrix is removed.
 - **No agent** in the rooms for now; the chat does not receive the platform's alerts (they have their own channel, see [Observability](../../concepts/10-observabilite.en.md)).
 - **Adapter**: a VPN device can exhaust its in-memory state pool and block sign-ins to the video service for 10 minutes.
 
@@ -160,13 +202,14 @@ The **first sign-in** to the Matrix chat goes through two MAS pages: account lin
 - a call with three devices: each sees the other two, leaving then coming back without reloading, screen sharing from a computer;
 - every household device run through the candidate diagnostic page, at home then on the mobile network (Android included); the page is then removed;
 - guest refused (chat and video), protected account admitted;
-- final messaging (Converse.js and Prosody) on each device, then Matrix dismantled;
-- Element X with ntfy on Android, as long as Matrix stays in service;
+- final messaging on each device (under way): adding a contact by address, Family room, Android notification without content, video from a conversation, sign-out; then Matrix dismantled;
+- "tell" from each device: one-to-one and to everyone, "via Sophia" mark, no "Edit", any answer other than "yes" sends nothing;
 - unread summary with a real relayed token, in "What's new?".
 
 ## Planned
 
-- **Final messaging** on XMPP, after the household's choices; then Matrix removed.
+- **Removing Matrix** (Synapse, MAS, Element, summary module) at the end of acceptance testing.
+- **Direct video buttons** to each member, and private rooms through tokens restricted to one room: later, at the household's request.
 - **Unified mail**: decided, **postponed** behind the other projects; nothing is open to the household.
 - **Access through the cockpit only**, once the cockpit is validated on every device: an application page opened directly will be sent back to the cockpit; direct access stays with the administrator, for troubleshooting.
 - **Starting a call from Sophia's chat**, and Sophia in the rooms: later, with the agents.
@@ -184,3 +227,5 @@ The **first sign-in** to the Matrix chat goes through two MAS pages: account lin
 - An archive made on a Mac from downloaded files carries extended attributes (`com.apple.provenance`) that OKD's binary build cannot read: `COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata`, then check the archive before the build.
 - A negated authentication-flow condition is set through a negation key specific to the condition: to be checked by testing, guest included.
 - An `add_header` in an nginx `location` cancels those of the upper level: Element's `frame-ancestors` header is repeated in every location.
+- A bench that mounts its own configuration does not prove the deployed one: a module present on the bench was missing from the ConfigMap generated by the production render. The bench now mounts the ConfigMaps **from the production render**.
+- A server that cannot reserve a route to a source is protected by a **minimal relay** in front of it (one route, one port, one size), not by a network rule on its shared port.

@@ -124,7 +124,7 @@ Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 | sophia-interface | the chat interface, now the cockpit, out of the deployment agent's reach; its egress towards applications is explicit |
 | sophia-workflow | the visualisation tool, same reason |
 | sophia-workspace | the office suite: files and online editing |
-| sophia-messagerie | the household's permanent chat (Matrix), in service, in acceptance testing; displayed in the cockpit; Matrix will be replaced by XMPP (Converse.js and Prosody) |
+| sophia-messagerie | the household's permanent chat: XMPP (Converse.js and Prosody), in service, in acceptance testing, displayed in the cockpit, with "tell"; Matrix readable until the end of acceptance testing, then dismantled |
 | sophia-visio | video conferencing (Jitsi Meet) through the browser only, in service, in acceptance testing; displayed in the cockpit |
 | sophia-postes | one browser workstation per child, switched on on demand and off when idle by a gatekeeper; displayed in the cockpit |
 | build namespaces | building sensitive tools, with no agent account |

@@ -84,7 +84,7 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 
 **En service, en recette**
 
-- Chat permanent du foyer et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre. Première visio avec image entre un ordinateur et une tablette ancienne, par le VPN. La messagerie passe de Matrix à XMPP (Converse.js et Prosody), éprouvé sur la tablette ancienne ; version définitive en conception.
+- Chat permanent du foyer et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre. Première visio avec image entre un ordinateur et une tablette ancienne, par le VPN. La messagerie est passée de Matrix à XMPP (Converse.js et Prosody), éprouvé sur la tablette ancienne ; version définitive en service, avec « dis à » : Sophia écrit dans la messagerie au nom de la personne, après confirmation.
 - Un poste au navigateur par enfant, affiché dans le cockpit des tablettes anciennes : un portier aiguille par la session, allume le poste à la demande et l'éteint au repos.
 - Se déconnecter du cockpit ferme aussi les sessions des modules.
 - Cockpit : ouverture de la bonne page par Sophia sans clic, « ouvre le document X », « Demander à Sophia » dans chaque application, « Quoi de neuf ? » nourri par les résumés déterministes des applications et Sophia qui écrit dans le document ouvert (tous deux vérifiés).
