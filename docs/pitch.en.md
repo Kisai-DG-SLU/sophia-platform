@@ -95,7 +95,7 @@ SophIA is an experimental architecture under construction. We separate what work
 - The interface as a requester of the dispatcher.
 - Cockpit: local geocoding of saved addresses, access through the cockpit only.
 - Development clusters: one ephemeral virtual cluster per project (decided, to be built).
-- Memory, resumed as a priority: memory service coded, reviewed and ready to install (validation by a single person, isolated file extraction), the cockpit's "Memory" page, then the ingestion pipeline; graph dimension blocked.
+- Memory, resumed as a priority: memory service coded, reviewed and ready to install (validation by a single person, isolated file extraction), the cockpit's "Memory" page coded and proven on the bench, then the ingestion pipeline; graph dimension blocked.
 - Grey zone: study in progress (visual mock-ups of each person's projects, following the agents).
 - Vulnerability watch, compliance (GDPR, AI Act, ISO 27001); scheduled backups **postponed**, no backup medium yet.
 

@@ -140,7 +140,7 @@ Avec le service, la zone mémoire se ferme : clé d'API sur la base vectorielle,
 
 - **Une page « Mémoire »** pour déposer des documents, **tout un dossier** d'un coup quand l'appareil le permet. Sur iOS, choisir un dossier n'est possible qu'à partir d'iOS 18.4 : sur une tablette plus ancienne, on prend plusieurs fichiers d'un coup, sinon un fichier à la fois.
 - **La liste à valider** est sur la même page, avec une alerte dans « Quoi de neuf ? ».
-- La page est en conception chez l'interface ; sans elle, le service peut être installé, mais personne ne peut encore déposer.
+- La page est **codée et éprouvée au banc** contre un faux service mémoire, pas encore en service : elle s'active avec le service (voir le [cockpit](../apps/chat-interface/README.md#page--mémoire--codée-éprouvée-au-banc-pas-encore-en-service)). Niveau choisi dans la liste fermée du service, sans présélection ; un document par requête ; pour le valideur, le personnel et l'intime des autres réduits à l'auteur, au niveau, à la date et au poids ; validation par une confirmation d'un toucher.
 
 ### Ensuite
 

@@ -173,6 +173,21 @@ L'application de fichiers ouvre l'éditeur dans un nouvel onglet. Dans le cockpi
 
 État : en service, vérifié par l'administrateur sur le vrai chemin : appels aux quatre routes de résumé (cuisine, visualisation, messagerie, fichiers), aucune source absente ; résumé de l'école et nouveautés du contenu calculés par le chat, en recette.
 
+### Page « Mémoire » (codée, éprouvée au banc, pas encore en service)
+
+Une page du cockpit pour verser des documents dans la mémoire du foyer, et pour les valider. Elle attend le [service mémoire](../../memory/README.md#le-service-mémoire--conçu-prêt-à-installer-pas-encore-en-service) : sans son adresse (`SOPHIA_MEMOIRE_URL`), ni tuile ni routes (404).
+
+- **Accès** : tuile « Mémoire » pour les groupes du foyer qui peuvent verser, pas pour les invités ; page servie par le chat lui-même, écrite pour tourner sur la tablette ancienne.
+- **Déposer** : des fichiers (sélection multiple), **un dossier entier** sur un ordinateur (le bouton n'apparaît que sur un moteur qui sait le choisir : sur iOS, pas avant 18.4), ou une note. Les fichiers cachés et les types hors liste sont écartés avant l'envoi, avec un compte (« 12 fichiers à envoyer, 3 ignorés »).
+- **Niveau de confidentialité** : choisi dans une **liste fermée donnée par le service** (les niveaux que la personne peut verser), **sans présélection** ; l'envoi reste grisé tant qu'aucun niveau n'est choisi. Jamais deviné par le modèle.
+- **Envoi** : **un document par requête**, avec une progression en deux temps (envoi, puis lecture par le service) ; un échec n'arrête pas les autres ; les refus sont traduits depuis un **motif fermé** (type, taille, illisible, vide, trop long…), jamais un texte du service ; un service occupé est réessayé une fois après 30 s, puis le document est proposé « à renvoyer plus tard ».
+- **Mes dépôts** : les documents de la personne, regroupés par dépôt (date, niveau, nombre), avec leur état (en attente, validé, refusé). Un document refusé n'a plus de nom : la page n'en garde aucun.
+- **À valider** : visible du **seul valideur**, désigné par le service (le cockpit ne connaît aucun identifiant). Pour le personnel et l'intime des autres, la ligne ne montre que **l'auteur, le niveau, la date et le poids**, sans nom ni extrait : un nom de fichier révèle déjà le contenu. Valider ou refuser un document ou un dépôt entier, avec **une confirmation d'un toucher** ; aucune réponse libre, aucun modèle.
+- **« Quoi de neuf ? »** : pour le valideur, une ligne « N documents attendent ta validation », qui ouvre la page ; service en panne, pas de ligne.
+- **Le chat ne fait que relayer**, avec le jeton de la personne, posé par nginx sur ces seules routes : extraction, découpage et validation sont dans le service mémoire. Avant le relais : identifiants en UUID, niveau dans la liste fermée, chemin relatif assaini (ni `..`, ni chemin absolu, ni caractère de contrôle ou bidirectionnel), **type par la signature** des premiers octets, taille ; sur un envoi, l'origine exacte du chat et un en-tête propre (un site tiers ne peut pas déposer avec le cookie de la personne). Fichier relayé en flux, jamais tout en mémoire ; note relayée telle quelle. Seuls les champs du contrat repassent vers la page.
+- **Journal** : route, statut et nombres ; **jamais un nom de fichier**, un chemin, un extrait ni le jeton.
+- **Banc** : tests du relais (signatures, chemins hostiles, taille, origine, jeton, journal) et essai de la page dans un navigateur contre un faux service mémoire. Reste, à la mise en service : la sélection multiple sur la tablette ancienne et la page réelle.
+
 ### Accès par le cockpit seul (prévu)
 
 Dernière étape, après la recette sur tous les appareils : une page d'application ouverte en entier est renvoyée vers le cockpit, sur le bon module. Deux couches : `frame-ancestors` (déjà posé), puis le renvoi, côté serveur par l'en-tête de destination de la requête, et côté page par un script pour les navigateurs anciens qui n'envoient pas cet en-tête. Exception pour l'administrateur, pour le dépannage. C'est une règle d'usage, pas une barrière de sécurité : chaque application garde sa connexion. Non concernés : les applications natives, les routes techniques (résumés, outils), la page de connexion.
