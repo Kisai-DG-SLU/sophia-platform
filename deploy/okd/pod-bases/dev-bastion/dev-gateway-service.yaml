@@ -1,0 +1,39 @@
+# Services de la passerelle de dev : SSH sur le VPN seulement (voir ../../host/wireguard/README.md, section 7).
+#
+# - dev-gateway : ClusterIP seule, sans NodePort. Un NodePort est traduit pour toute adresse locale du nœud,
+#   donc servi aussi sur le réseau local ; la ClusterIP reste le point d'arrivée du secours d'administration
+#   (rebond par le nœud depuis le réseau local).
+# - dev-gateway-vpn : externalIP ${VPN_SERVER_IP}, comme Forgejo et la visio. Service à part : une externalIP
+#   vaut pour tous les ports du Service, et ${VPN_SERVER_IP}:2222 peut déjà être pris (Forgejo SSH) ; deux
+#   traductions pour la même adresse et le même port, l'une gagnerait au hasard.
+#   Après le DNAT, la chaîne forward du filtre voit le port du Service (${DEV_GATEWAY_VPN_PORT}), pas 2222.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-gateway
+  namespace: ${SANDBOX_NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: dev-gateway
+  ports:
+    - port: 2222
+      protocol: TCP
+      targetPort: 2222
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-gateway-vpn
+  namespace: ${SANDBOX_NAMESPACE}
+spec:
+  type: ClusterIP
+  externalIPs:
+    - ${VPN_SERVER_IP}
+  selector:
+    app: dev-gateway
+  ports:
+    - name: ssh
+      port: ${DEV_GATEWAY_VPN_PORT}
+      protocol: TCP
+      targetPort: 2222
