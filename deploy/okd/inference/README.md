@@ -14,7 +14,7 @@ Un modèle de langage qui lit aussi les images, servi par le GPU du serveur, une
 | Image | construite dans le cluster, CUDA compatible avec le pilote du nœud | l'image officielle visait une version de CUDA plus récente que le pilote |
 | Accès au GPU | conteneur privilégié, bibliothèque du pilote (`libcuda.so.1`) montée depuis l'hôte, **sans** ressource `nvidia.com/gpu` | sur ce nœud, le crochet du *container toolkit* de l'opérateur NVIDIA échoue ; le *device plugin* est désactivé |
 | Reconnaissance vocale | **Parakeet TDT 0.6B v3** (ONNX int8), CPU | ≈ 5 % d'erreurs en français, 0,4 à 0,6 s par phrase |
-| Synthèse vocale | **Pocket TTS** (modèle français, int8), CPU, 2 fils | premier son en 75 ms, 4,6 fois plus vite que le temps réel ; le GPU reste au texte. Sous la limite de 4 CPU, 120 caractères en 1,4 à 1,5 s avec 2 fils, contre 1,7 à 1,8 s avec 4 |
+| Synthèse vocale | **Pocket TTS** de Kyutai (modèle français, poids sans clonage, en float32), CPU, 2 fils | premier son en 75 ms, 4,6 fois plus vite que le temps réel en int8 ; le GPU reste au texte. Sous la limite de 4 CPU, 120 caractères en 1,4 à 1,5 s avec 2 fils, contre 1,7 à 1,8 s avec 4 (int8). Le float32, retenu à l'écoute (moins de mots avalés), est environ 1,5 fois plus lent |
 | Génération d'images | **stable-diffusion.cpp**, SDXL-Turbo en 1 étape + décodeur TAESDXL, CPU, 512 × 512 | une dizaine de secondes par image sans GPU ; la carte reste au texte. **Licence de SDXL-Turbo : usage non commercial** — à remplacer par un modèle à licence ouverte pour un usage commercial |
 | Contrôle des images | classifieur d'images (Apache 2.0) après chaque génération | un contrôle déterministe autour de la sortie du modèle, en plus des règles appliquées avant |
 
@@ -75,7 +75,13 @@ Synthèse (en service) :
 
 Côté interface, la réponse est lue **pendant qu'elle s'écrit** : par groupes de phrases (le premier dès une quarantaine de caractères, puis 80 à 150), enchaînés sans trou, avec un délai qui tient compte de la file d'attente ; un groupe en retard est relancé ou réuni au suivant, et n'est sauté que sur une erreur du service, jamais en silence. En service, vérifié sur une longue réponse (la voix part avant la fin du texte). Pas encore fait : le chat demande chaque groupe d'un bloc et ne consomme pas encore le PCM en flux ; le relais du flux par le routeur de modèles reste à éprouver par le vrai chemin (sans relais, le PCM arrive entier, comme avant).
 
-Voix : celles du catalogue du modèle, ou une voix convertie depuis un enregistrement sous licence libre (`export-voices.sh`, sur le nœud, avec la version « clonage » du modèle). Jamais la voix d'une personne sans son accord.
+Voix : celles du catalogue du modèle, ou une voix propre au foyer, tirée d'un court extrait (`export-voices.sh`, sur le nœud, avec la version « clonage » du modèle, dans un conteneur jetable ; l'extrait n'entre dans aucun dépôt et il est effacé du nœud après le calcul ; seule l'empreinte de voix reste, à côté des autres). **Jamais la voix d'une personne sans son accord** ; la voix par défaut de l'installation de référence est celle d'un membre consentant de la famille.
+
+**Une empreinte de voix est liée à la révision des poids qui l'a calculée.** Les poids sans clonage existent en plusieurs révisions, aux poids différents, et une même voix n'a pas la même empreinte d'une révision à l'autre. Une voix calculée avec les poids « clonage » d'une version de Pocket TTS doit être lue par les **poids sans clonage jumeaux** de la même version, pas par une autre révision : sinon, elle devient inaudible (bruits), alors que la phrase d'essai du calcul est parfaite. Les poids, le tokeniseur, les voix du catalogue et les voix propres d'une même révision vivent donc sous **une même racine** (`VOICE_MODELS`, `TTS_CONFIG`) ; l'ancienne racine reste en place pour le retour arrière.
+
+**Banc d'écoute avant toute mise en service d'une voix**, sur le nœud, **dans les conditions du service** (mêmes poids, même version, hors ligne, modèles en lecture seule), en int8 et en float32, avec une voix du catalogue pour témoin : une phrase d'essai produite par d'autres poids ne prouve rien. Le banc a écarté deux fausses pistes (longueur de l'extrait, int8) avant de trouver la révision.
+
+Crédit : Pocket TTS, de **Kyutai** ; poids sous licence **CC BY 4.0**, code sous MIT. Le clonage est interdit sans consentement explicite de la personne.
 
 ## Fichiers
 

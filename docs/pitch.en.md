@@ -84,7 +84,7 @@ SophIA is an experimental architecture under construction. We separate what work
 
 **In service, in acceptance testing**
 
-- The household's permanent chat and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it. First video call with picture between a computer and an older tablet, through the VPN. Messaging moves from Matrix to XMPP (Converse.js and Prosody), proven on the older tablet; final version being designed.
+- The household's permanent chat and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it. First video call with picture between a computer and an older tablet, through the VPN. Messaging has moved from Matrix to XMPP (Converse.js and Prosody), proven on the older tablet; final version in service, with "tell": Sophia writes in the messaging service on the person's behalf, after confirmation.
 - One browser workstation per child, displayed in the cockpit of older tablets: a gatekeeper routes by session, switches the workstation on on demand and off when idle.
 - Signing out of the cockpit also closes the modules' sessions.
 - Cockpit: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries and Sophia writing into the open document (both verified).

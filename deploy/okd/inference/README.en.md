@@ -14,7 +14,7 @@ A language model that also reads images, served by the server's GPU, a voice (re
 | Image | built in the cluster, CUDA compatible with the node's driver | the official image targeted a newer CUDA than the driver |
 | GPU access | privileged container, driver library (`libcuda.so.1`) mounted from the host, **without** a `nvidia.com/gpu` resource | on this node the NVIDIA operator's container-toolkit hook fails; the device plugin is disabled |
 | Speech recognition | **Parakeet TDT 0.6B v3** (ONNX int8), CPU | ≈ 5 % French error rate, 0.4 to 0.6 s per sentence |
-| Speech synthesis | **Pocket TTS** (French model, int8), CPU, 2 threads | first sound in 75 ms, 4.6× faster than real time; the GPU stays with text. Under the 4-CPU limit, 120 characters in 1.4 to 1.5 s with 2 threads, against 1.7 to 1.8 s with 4 |
+| Speech synthesis | Kyutai's **Pocket TTS** (French model, weights without cloning, in float32), CPU, 2 threads | first sound in 75 ms, 4.6× faster than real time in int8; the GPU stays with text. Under the 4-CPU limit, 120 characters in 1.4 to 1.5 s with 2 threads, against 1.7 to 1.8 s with 4 (int8). float32, chosen by ear (fewer swallowed words), is about 1.5 times slower |
 | Image generation | **stable-diffusion.cpp**, 1-step SDXL-Turbo + TAESDXL decoder, CPU, 512 × 512 | about ten seconds per image without a GPU; the card stays with text. **SDXL-Turbo licence: non-commercial use** — replace it with an openly licensed model for commercial use |
 | Image check | image classifier (Apache 2.0) after each generation | a deterministic check around the model's output, on top of the rules applied before |
 
@@ -75,7 +75,13 @@ Synthesis (in service):
 
 In the interface, the reply is read **while it is being written**: in groups of sentences (the first from about forty characters, then 80 to 150), chained without gaps, with a timeout that accounts for the queue; a late group is retried or merged into the next one, and is only skipped on a service error, never silently. In service, verified on a long reply (the voice starts before the text ends). Not done yet: the chat requests each group in one block and does not consume streamed PCM yet; relaying the stream through the model router remains to be proven on the real path (without relaying, the PCM arrives whole, as before).
 
-Voices: the model's catalogue, or a voice converted from a freely licensed recording (`export-voices.sh`, on the node, with the model's "cloning" variant). Never a person's voice without their consent.
+Voices: the model's catalogue, or a household voice derived from a short sample (`export-voices.sh`, on the node, with the model's "cloning" variant, in a throwaway container; the sample goes into no repository and is deleted from the node after the computation; only the voice embedding remains, next to the others). **Never a person's voice without their consent**; the reference installation's default voice is that of a consenting member of the family.
+
+**A voice embedding is tied to the weights revision that computed it.** The weights without cloning exist in several revisions, with different weights, and the same voice does not have the same embedding from one revision to another. A voice computed with the "cloning" weights of a Pocket TTS version must be read by the **twin weights without cloning** of the same version, not by another revision: otherwise it becomes unintelligible (noise), while the computation's test sentence is perfect. Weights, tokenizer, catalogue voices and household voices of one revision therefore live under **one root** (`VOICE_MODELS`, `TTS_CONFIG`); the former root stays in place for rollback.
+
+**Listening bench before any voice goes live**, on the node, **under the service's conditions** (same weights, same version, offline, models read-only), in int8 and in float32, with a catalogue voice as a control: a test sentence produced by other weights proves nothing. The bench ruled out two false leads (sample length, int8) before finding the revision.
+
+Credit: Pocket TTS, by **Kyutai**; weights under **CC BY 4.0**, code under MIT. Cloning is forbidden without the person's explicit consent.
 
 ## Files
 
