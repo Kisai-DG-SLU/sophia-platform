@@ -33,7 +33,7 @@ Port 8080, sans authentification : le service ne doit être joignable que depuis
 |---|---|
 | `00-namespace-guardrails.yaml` | quota du namespace sur les limits (8 CPU, 16 Gi, 10 pods) et valeurs par défaut des conteneurs |
 | `01-embedding-deployment.yaml` | Deployment du service ; valeurs par défaut entre `${…:-…}` |
-| `01-memory-metadata.sql` | schéma `sophia.memory_metadata` : métadonnées de chaque souvenir (propriétaire, type, projet, confidentialité, provenance, validation), à côté du point dans la base vectorielle |
+| `01-memory-metadata.sql` | schéma `sophia.memory_metadata` : métadonnées de chaque souvenir (propriétaire, type, projet, confidentialité, provenance, validation), à côté du point dans la base vectorielle. **Sans usage** depuis le service mémoire, dont le registre a son propre schéma ; à retirer ou à réaligner |
 | `qdrant-schema.py` | collection et index de payload de la base vectorielle ; idempotent, ne supprime ni ne modifie rien |
 
 ## Variables
@@ -92,56 +92,27 @@ L'ingestion et le service mémoire appellent l'embedding par l'alias **`sophia-e
 | Brique | État |
 |---|---|
 | Embedding (bge-m3, CPU) et alias `sophia-embedder` | **en service** |
-| Collection vectorielle et ses 17 index | **en service**, vide : rien n'est encore ingéré |
-| Base vectorielle sur son volume dédié | **en service** : déplacée quand la collection était encore vide (copie contrôlée octet pour octet, ancien répertoire gardé une semaine pour un retour arrière) |
+| Collection vectorielle et ses 17 index | **en service**, plus les index du registre (document, lot, rang, version) ; vide jusqu'au premier dépôt |
+| Base vectorielle sur son volume dédié | **en service**, avec une clé d'API : déplacée quand la collection était encore vide (copie contrôlée octet pour octet, ancien répertoire gardé une semaine pour un retour arrière) |
 | Quota et valeurs par défaut du namespace | **en service** |
 | Graphe (Neo4j) | **à 0 réplique** : il n'a jamais démarré. Il reviendra avec une image officielle figée par empreinte et un mot de passe dans un Secret, jamais dans le manifeste |
-| Ingestion | **suspendue** (CronJob `suspend: true`), à reconstruire : build reproductible et image figée, lecture des documents dans le stockage objet, aucun mot de passe dans une URL, écriture par le service mémoire |
-| Service mémoire | **prêt à installer** : code éprouvé au banc et relu, procédure relue ; pas encore appliqué (voir ci-dessous) |
-| Réseau du namespace | **cible, prête** : la base vectorielle répond aujourd'hui sans clé, et le namespace n'a pas encore de NetworkPolicy ; la fermeture (clé, refus par défaut, une règle par flux, EgressFirewall) fait partie de l'installation du service mémoire |
+| Ingestion | **suspendue** (CronJob `suspend: true`), à reconstruire : build reproductible et image figée, lecture des documents dans le stockage objet, aucun mot de passe dans une URL, écriture par le service mémoire ; elle écrivait dans la base vectorielle en direct, ce que la zone fermée refuse désormais |
+| Service mémoire | **en service** : originaux et textes dans un seau S3 versionné, registre dans PostgreSQL, textes validés dans la forge, audit en base, extraction isolée ([`memoire/`](memoire/README.md)) |
+| Réseau du namespace | **en service** : refus par défaut en entrée et en sortie, une règle par flux, EgressFirewall limité aux réseaux internes, posés avec le service mémoire |
 
-## Le service mémoire : conçu, prêt à installer, pas encore en service
+## Le service mémoire
 
-La mémoire est un **service**, comme le modèle : appelé par l'interface et par les agents selon leurs droits, et **seul rédacteur**. Son code est écrit et éprouvé au banc (105 tests), relu trois fois ; sa procédure d'installation est prête et relue. **Rien n'est appliqué sur le cluster** : aucun document n'est encore dans la mémoire, et la discussion répond toujours que la mémoire n'est pas disponible.
+La mémoire est un **service**, comme le modèle : appelé par l'interface et par les agents selon leurs droits, et **seul rédacteur**. Il est **en service** dans l'installation de référence ; son contrat, ses règles et sa mise en service sont dans [`memoire/`](memoire/README.md) :
+- **où vit quoi** : originaux et textes extraits dans un seau S3 versionné, `attente/` effaçable et `valide/` protégé ; registre des documents et des versions dans PostgreSQL ; textes validés dans la forge, un dépôt par niveau ; base vectorielle réduite à un index reconstructible ;
+- **versions** : un document est une personne et son chemin ; une nouvelle version attend, la version validée précédente reste cherchable ;
+- **validation** par une seule personne désignée, documents personnels et intimes des autres réduits à l'auteur, au niveau, à la date et au poids ;
+- **droits par niveau** posés par le service, et leurs limites (administrateurs des lieux, miroir) ;
+- **audit en base** par un rôle qui ne peut qu'ajouter ;
+- **extraction isolée** dans un pod sans secret, sans jeton et sans réseau ;
+- la **fermeture de la zone** et une **mise en service générique**, avec ses épreuves.
 
-### Ce qu'il fait
-
-| Route | Rôle |
-|---|---|
-| `rechercher` | rend les morceaux **validés**, non expirés, lisibles par l'appelant |
-| `proposer` | dépose un document court |
-| `moi` | niveaux permis à l'appelant, s'il valide, bornes |
-| `depots`, `depots/{id}/fichiers`, `depots/{id}/notes` | dépôt groupé : un dépôt reçoit plusieurs fichiers ou notes, un par requête (le fichier en corps brut, sans multipart) |
-| `mes_depots` | ce que la personne a déposé, avec son état (en attente, validé, refusé) |
-| `a_valider`, `a_valider/compte`, `valider` | la liste à valider, son compte pour « Quoi de neuf ? », la validation ou le refus d'un document ou d'un dépôt entier |
-
-Un document est découpé en morceaux (2 000 caractères, recouvrement de 200) et vectorisé par l'alias `sophia-embedder` du routeur, donc **dans le cluster**. L'analyse est synchrone (quelques minutes au pire) : le relais du chat attend en conséquence.
-
-### Règles
-
-- **Identité prouvée**, jamais déclarée par le modèle : jeton OIDC relayé pour une personne, jeton de compte de service pour un agent.
-- **Niveaux de confidentialité** : `public`, `famille`, `personnel`, `intime`, `admin`. `personnel` et `intime` ne sont lisibles que par leur auteur ; l'administration lit `admin` en plus des niveaux communs ; un invité ne lit que `public`. Les agents sont limités à `public` tant que l'interface ne leur transmet pas l'identité de la personne. Le filtre de droits est **ajouté par le service** à toute requête ; le modèle ne peut pas l'élargir.
-- **Validation par une seule personne** (décision du foyer, pour le moment) : un document versé dans la mémoire n'est utilisé qu'une fois **validé par l'administrateur du foyer**, désigné par son identifiant technique dans un réglage, et non par un groupe : un autre membre du groupe d'administration ne valide rien. Ce que cette personne verse est validé d'office. Le service refuse de démarrer si le réglage manque ou n'a pas la forme attendue. Ce qui vient du web passera par le [Tribunal Sémantique](../../../docs/concepts/05-tribunal-semantique.md).
-- **Confidentialité devant le valideur** : pour les documents `personnel` et `intime` des autres, la liste à valider ne montre que l'auteur, le niveau, la date et le poids : ni nom de fichier, ni extrait, ni contenu ; le valideur peut valider ou refuser, sans pouvoir lire ensuite. **Limite** : cette règle protège l'interface, pas l'administration technique ; le journal d'audit relie un dépôt à son auteur (sans contenu ni nom de fichier).
-- **Confiance** : 0 tant qu'un document n'est pas validé (et au refus), 1 une fois validé ; seul l'état de validation décide de l'usage.
-- **Refus** : les vecteurs sont supprimés, et la fiche ne garde ni nom ni vecteur du document. Les originaux ne sont pas gardés.
-- **Bornes** : taille par fichier et par dépôt, nombre de documents en attente et gardés par personne, longueur de texte par document, deux envois et deux extractions à la fois (au-delà, « occupé »).
-- **Journal** : chaque écriture et chaque refus, avec identifiants, poids et nombre de morceaux ; jamais de contenu, de chemin ni de nom.
-
-### Extraction isolée
-
-Lire un PDF ou un document bureautique, c'est exécuter un analyseur sur un fichier inconnu. La première version le faisait dans un sous-processus du service : la relecture a montré qu'il pouvait lire l'environnement de son parent (`/proc/<parent>/environ`), donc les clés de la base vectorielle et du routeur, et le jeton du pod. **L'extraction tourne donc dans un pod à part**, de la même image, **sans Secret, sans jeton de compte de service, sans sortie réseau** et sans espace de processus partagé ; le service lui envoie les octets. Dans ce pod, chaque fichier est lu par un sous-processus borné (mémoire, temps de calcul, durée), sans écriture de fichier ni création de processus ; le type est déduit des octets, jamais du nom ; documents bureautiques lus sans DTD ; archives bornées en nombre d'entrées. Formats : texte, Markdown, PDF avec du texte, documents bureautiques ; les images viendront plus tard. Une épreuve d'isolement, lancée depuis le pod d'extraction, fait partie de l'installation.
-
-### Réseau de la zone
-
-Avec le service, la zone mémoire se ferme : clé d'API sur la base vectorielle, télémétrie coupée ; refus par défaut en entrée **et** en sortie, puis une règle par flux (base vectorielle ouverte au seul service mémoire, embedding au seul routeur, service mémoire au chat, extraction au seul service mémoire) ; EgressFirewall limité aux réseaux internes. Le service utilise sa propre clé du routeur, limitée à l'alias d'embedding.
-
-### Côté cockpit (décisions du foyer)
-
-- **Une page « Mémoire »** pour déposer des documents, **tout un dossier** d'un coup quand l'appareil le permet. Sur iOS, choisir un dossier n'est possible qu'à partir d'iOS 18.4 : sur une tablette plus ancienne, on prend plusieurs fichiers d'un coup, sinon un fichier à la fois.
-- **La liste à valider** est sur la même page, avec une alerte dans « Quoi de neuf ? ».
-- La page est **codée et éprouvée au banc** contre un faux service mémoire, pas encore en service : elle s'active avec le service (voir le [cockpit](../apps/chat-interface/README.md#page--mémoire--codée-éprouvée-au-banc-pas-encore-en-service)). Niveau choisi dans la liste fermée du service, sans présélection ; un document par requête ; pour le valideur, le personnel et l'intime des autres réduits à l'auteur, au niveau, à la date et au poids ; validation par une confirmation d'un toucher.
+La page « Mémoire » du cockpit, qui verse, range en versions et valide, est décrite avec le [cockpit](../apps/chat-interface/README.md#page--mémoire-).
 
 ### Ensuite
 
-Installation du service et fermeture de la zone ; page « Mémoire » ; reconstruction de l'ingestion (lecture dans le stockage objet avec l'auteur de chaque document, écriture par `proposer`) ; façade MCP pour les agents ; le graphe.
+Reconstruction de l'index par un outil d'administration ; façade MCP pour les agents et outil mémoire du chat ; reconstruction de l'ingestion (lecture dans le stockage objet avec l'auteur de chaque document, écriture par `proposer`) ; le graphe.

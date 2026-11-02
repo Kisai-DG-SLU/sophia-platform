@@ -95,7 +95,7 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - L'interface comme demandeur du répartiteur.
 - Cockpit : géocodage local des adresses enregistrées, accès par le cockpit seul.
 - Clusters de développement : un cluster virtuel éphémère par projet (décidé, à construire).
-- Mémoire, reprise en priorité : service mémoire codé, relu et prêt à installer (validation par une seule personne, extraction des fichiers isolée), page « Mémoire » du cockpit codée et éprouvée au banc, puis pipeline d'ingestion ; dimension graphe bloquée.
+- Mémoire, reprise en priorité : service mémoire en service (originaux dans un seau versionné, textes validés dans la forge, validation par une seule personne, extraction des fichiers isolée), page « Mémoire » du cockpit déployée, puis façade des agents et pipeline d'ingestion ; dimension graphe bloquée.
 - Zone grise : étude en cours (maquettes visuelles des projets de chacun, suivi des agents).
 - Veille des failles, conformité (RGPD, AI Act, ISO 27001) ; sauvegardes planifiées **reportées**, faute de support.
 
@@ -104,7 +104,7 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Planificateur des objectifs ouverts.
 - Workflow « incident » ; supervision, déploiement et maintenance derrière le répartiteur.
 - Tribunal Sémantique, Ghost Search, filtre DLP.
-- Niveaux de confidentialité de la mémoire.
+- Niveaux de confidentialité de la mémoire pour les agents.
 - Paquets de déploiement reproductibles et multi-locataires.
 
 Le détail est dans la [feuille de route](roadmap.md).

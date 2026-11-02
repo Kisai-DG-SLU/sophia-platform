@@ -54,7 +54,7 @@ Each directory describes one component: its choices and their reasons, its templ
 | [`okd/monitoring/`](okd/monitoring/) | minimal observability: metrics, alert rules, node exporter |
 | [`okd/core/`](okd/core/) | model router, relational database, event bus, durable workflows, dispatcher |
 | [`okd/inference/`](okd/inference/) | local models: text and vision on GPU, voice and images on CPU |
-| [`okd/memory/`](okd/memory/) | embedding and the vector memory schema |
+| [`okd/memory/`](okd/memory/) | embedding and the vector memory schema; [memory service](okd/memory/memoire/README.en.md) (versions, validation, rights, audit, isolated extraction) |
 | [`okd/storage/`](okd/storage/) | shared S3 object storage |
 | [`okd/office/`](okd/office/) | office suite: each person's files and document editing (La Suite Drive, Collabora) |
 | [`okd/identity/`](okd/identity/), [`okd/ingress/`](okd/ingress/) | identity and SSO, certificates |

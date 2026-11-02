@@ -38,7 +38,7 @@ Each namespace belongs to a security zone. Communication is restricted by Kubern
 | Builds | `sophia-skills-build` | building MCP tools | **in place**: no agent account; egress bounded by an EgressFirewall to the internal registry, cluster services, the cluster API and the Python package index |
 | Object storage | `sophia-storage` | shared S3 | **in place**: default deny on ingress **and** egress (DNS only); one identity per application, limited to its bucket; no anonymous access |
 | Agents | agents namespace | pantheon | **in place**: agents' ingress open to the dispatcher only; one service account and one UID per pod; one model-router key per agent. **Target**: Internet egress, uncontrolled today, to be inventoried then closed by an EgressFirewall, first in observation mode |
-| Memory | `sophia-memory` | vector database, embedding, graph | **target, ready**: default ingress and egress deny, the vector database key and an EgressFirewall are part of the memory service installation, ready and not yet applied ([`deploy/okd/memory/`](../deploy/okd/memory/README.en.md)); the zone is not isolated yet, and the vector database answers without a key (empty collection, ingestion suspended) |
+| Memory | `sophia-memory` | memory service, extraction, vector database, embedding, graph | **in place**: default ingress and egress deny, one rule per flow, EgressFirewall limited to internal networks; key on the vector database, open to the memory service only; file extraction in a pod with no secret, no token and no network, isolation proof passed; audit by a role that can only append ([`deploy/okd/memory/memoire/`](../deploy/okd/memory/memoire/README.en.md)). Limit: the administrators of the forge, the database and the storage read what the service protects, and the external mirror of validated texts copies every level |
 | Development | `sophia-sandbox` | development environments; planned: one virtual cluster per project | **in place**: no privileged SCC left, a privileged pod is refused there; the SSH gateway has its own SCC (the fixed-UID one, plus `SYS_CHROOT` only). **Target**: an admin network policy over the whole namespace and admission of internal-registry images only |
 
 Templates: `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` and the model router's ingress rule, `deploy/okd/core/litellm/network-policy.yaml`.
@@ -59,7 +59,7 @@ Some namespaces are isolated from external networks, to eliminate the risk of ex
 |---|---|
 | sophia-inference | **in place**: deny all, ingress from the model router and the image tool only, no egress |
 | sophia-skills | **in place**: no egress besides DNS and image models |
-| sophia-memory | **target**: neither default deny nor bounded egress today |
+| sophia-memory | **in place**: default deny, egress to the memory's internal services only; extraction with no egress at all |
 
 ---
 
@@ -129,7 +129,7 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 
 - leak filter (DLP) before any output to an external model;
 - Semantic Tribunal before storing anything from the web;
-- default deny in `sophia-memory`; admin network policy and image admission in `sophia-sandbox`;
+- admin network policy and image admission in `sophia-sandbox`;
 - egress control for the agents namespace;
 - access to the applications through the cockpit only, with an exception for the administrator;
 - update and vulnerability watch for pinned images (local scanner, update requests opened without automatic merge, report to the administrator);
