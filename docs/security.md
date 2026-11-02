@@ -38,7 +38,7 @@ Chaque namespace appartient à une zone de sécurité. Les communications sont r
 | Builds | `sophia-skills-build` | construction des outils MCP | **en place** : aucun compte d'agent ; sortie bornée par un EgressFirewall au registre interne, aux services du cluster, à l'API du cluster et au dépôt de paquets Python |
 | Stockage objet | `sophia-storage` | S3 commun | **en place** : refus par défaut en entrée **et** en sortie (DNS seul) ; une identité par application, limitée à son seau ; aucun accès anonyme |
 | Agents | namespace des agents | panthéon | **en place** : entrée des agents ouverte au seul répartiteur ; un compte de service et un UID par pod ; une clé du routeur de modèles par agent. **Cible** : les sorties vers Internet, aujourd'hui sans contrôle, à inventorier puis fermer par un EgressFirewall, d'abord en observation |
-| Mémoire | `sophia-memory` | base vectorielle, embedding, graphe | **cible, prête** : refus par défaut en entrée et en sortie, clé de la base vectorielle et EgressFirewall font partie de l'installation du service mémoire, prête et pas encore appliquée ([`deploy/okd/memory/`](../deploy/okd/memory/README.md)) ; la zone n'est pas encore isolée, et la base vectorielle répond sans clé (collection vide, ingestion suspendue) |
+| Mémoire | `sophia-memory` | service mémoire, extraction, base vectorielle, embedding, graphe | **en place** : refus par défaut en entrée et en sortie, une règle par flux, EgressFirewall limité aux réseaux internes ; clé sur la base vectorielle, ouverte au seul service mémoire ; extraction des fichiers dans un pod sans secret, sans jeton et sans réseau, épreuve d'isolement conforme ; audit par un rôle qui ne peut qu'ajouter ([`deploy/okd/memory/memoire/`](../deploy/okd/memory/memoire/README.md)). Limite : les administrateurs de la forge, de la base et du stockage lisent ce que le service protège, et le miroir externe des textes validés copie tous les niveaux |
 | Développement | `sophia-sandbox` | environnements de développement ; prévu : un cluster virtuel par projet | **en place** : plus aucune SCC privilégiée, un pod privilégié y est refusé ; la passerelle SSH a une SCC propre (celle des UID fixes, plus le seul `SYS_CHROOT`). **Cible** : règle réseau d'administration sur tout le namespace et admission des seules images du registre interne |
 
 Gabarits : `deploy/okd/apps/00-default-deny.yaml`, `deploy/okd/core/network/default-deny-ingress.yaml` et la règle d'entrée du routeur de modèles, `deploy/okd/core/litellm/network-policy.yaml`.
@@ -59,7 +59,7 @@ Certains namespaces sont isolés des réseaux externes, afin d'éliminer tout ri
 |---|---|
 | sophia-inference | **en place** : tout refusé, entrée depuis le routeur de modèles et l'outil d'images seulement, aucune sortie |
 | sophia-skills | **en place** : aucune sortie hors DNS et modèles d'image |
-| sophia-memory | **cible** : ni refus par défaut, ni sortie bornée aujourd'hui |
+| sophia-memory | **en place** : refus par défaut, sorties vers les seuls services internes de la mémoire ; extraction sans aucune sortie |
 
 ---
 
@@ -129,7 +129,7 @@ Les données persistantes (bases vectorielles, bases relationnelles, dépôts) s
 
 - filtre anti-fuite (DLP) avant toute sortie vers un modèle extérieur ;
 - Tribunal Sémantique avant toute mémorisation venue du web ;
-- refus par défaut dans `sophia-memory` ; règle réseau d'administration et admission des images dans `sophia-sandbox` ;
+- règle réseau d'administration et admission des images dans `sophia-sandbox` ;
 - contrôle des sorties du namespace des agents ;
 - accès aux applications par le cockpit seul, exception pour l'administrateur ;
 - veille des mises à jour et des failles des images figées (scanner local, demandes de mise à jour ouvertes sans fusion automatique, rapport à l'administrateur) ;

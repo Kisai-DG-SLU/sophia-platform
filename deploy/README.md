@@ -46,7 +46,7 @@ Chaque dossier décrit un composant : ses choix et leurs raisons, ses gabarits (
 | [`okd/monitoring/`](okd/monitoring/) | observabilité minimale : métriques, règles d'alerte, exporteur du nœud |
 | [`okd/core/`](okd/core/) | routeur de modèles, base relationnelle, bus d'événements, workflows durables, répartiteur |
 | [`okd/inference/`](okd/inference/) | modèles locaux : texte et vision sur GPU, voix et images sur CPU |
-| [`okd/memory/`](okd/memory/) | embedding et schéma de la mémoire vectorielle |
+| [`okd/memory/`](okd/memory/) | embedding et schéma de la mémoire vectorielle ; [service mémoire](okd/memory/memoire/README.md) (versions, validation, droits, audit, extraction isolée) |
 | [`okd/storage/`](okd/storage/) | stockage objet S3 commun |
 | [`okd/office/`](okd/office/) | bureautique : fichiers de chacun et édition des documents (La Suite Drive, Collabora) |
 | [`okd/identity/`](okd/identity/), [`okd/ingress/`](okd/ingress/) | identité et SSO, certificats |

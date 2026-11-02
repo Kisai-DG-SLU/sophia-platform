@@ -72,8 +72,8 @@ The result is assembled into a single enriched and validated context before bein
 
 RAG 5D relies on several components:
 
-- vector memory (`sophia-memory`) for dimensions 1 and 2
-- Git repository (`sophia-git`) for dimension 3
+- the memory service (`sophia-memory`), only writer: the vector database for dimension 1, a PostgreSQL registry of documents and versions for dimension 2, with the originals in a versioned S3 bucket
+- the Git forge (`sophia-git`) for dimension 3: one repository per confidentiality level, one commit per validated version
 - the project Brain for dimensions 4 and 5
 
 The Tribunal Semantique validates information before it enters the system. The Sas Paranoiaque feeds the pipeline with raw data.
@@ -86,11 +86,11 @@ The Tribunal Semantique validates information before it enters the system. The S
 |---|---|
 | Embedding (bge-m3, 1,024 dimensions, CPU), through the router's `sophia-embedder` alias | in service |
 | Vector collection and its schema: 18 tags in French (owner, type, project, confidentiality, provenance, validation…), 17 metadata indexes, `source` not indexed; idempotent script, without deletion | in service, empty |
-| **Memory service**: REST with an MCP façade; proven identity (service account token or OIDC); rights filter set by the service, never by the caller; writes "pending" with a confidence set by rule; validation by a single designated person (the household's administrator), other people's personal and intimate documents reduced to author, level, date and size; grouped deposit from a "Memory" page in the cockpit (coded and proven on the bench); file extraction in a pod without secrets or network; audit log | coded and reviewed, ready to install, **not yet in service** |
+| **Memory service** ([recipe](../../deploy/okd/memory/memoire/README.en.md)): proven identity (OIDC token, then a service account token for agents); rights filter set by the service, never by the caller; originals and texts in a versioned S3 bucket (`attente/` erasable, `valide/` protected even against the service), registry of documents and versions in PostgreSQL, validated texts in the forge (one repository per level, one commit per validated version), vector database reduced to a rebuildable index; a new version waits, the previous one stays searchable; validation by a single designated person (the household's administrator), other people's personal and intimate documents reduced to author, level, date and size; file extraction in a pod without secrets or network; audit in the database by a role that can only append | **in service**; the cockpit's "Memory" page deployed, end-to-end check in progress; agents' MCP façade to come |
 | Graph database (dimension 5) | image pinned, at 0 replicas for now |
 | Ingestion | suspended, to be rebuilt (its image could not be rebuilt) |
-| S3 object storage for source files | in service for the platform ([`deploy/okd/storage/`](../../deploy/okd/storage/)); memory has no identity or bucket there yet |
-| Default deny in the memory zone | target, ready with the memory service installation: the vector database currently answers without a key ([security](../security.en.md)) |
+| S3 object storage for source files | in service ([`deploy/okd/storage/`](../../deploy/okd/storage/)); memory has its identity and its versioned, never-purged bucket there |
+| Default deny in the memory zone | in service, with the vector database key ([security](../security.en.md)) |
 
 Recipe: [`deploy/okd/memory/`](../../deploy/okd/memory/).
 

@@ -72,8 +72,8 @@ Le résultat est assemblé en un contexte unique, enrichi et validé, avant d'ê
 
 Le RAG 5D s'appuie sur plusieurs composants :
 
-- la mémoire vectorielle (`sophia-memory`) pour les dimensions 1 et 2
-- le dépôt Git (`sophia-git`) pour la dimension 3
+- le service mémoire (`sophia-memory`), seul rédacteur : la base vectorielle pour la dimension 1, un registre PostgreSQL des documents et des versions pour la dimension 2, avec les originaux dans un seau S3 versionné
+- la forge Git (`sophia-git`) pour la dimension 3 : un dépôt par niveau de confidentialité, un commit par version validée
 - le Brain du projet pour les dimensions 4 et 5
 
 Le Tribunal Sémantique valide les informations avant leur entrée dans le système. Le Sas Paranoïaque alimente le pipeline en données brutes.
@@ -86,11 +86,11 @@ Le Tribunal Sémantique valide les informations avant leur entrée dans le syst�
 |---|---|
 | Embedding (bge-m3, 1 024 dimensions, CPU), par l'alias `sophia-embedder` du routeur | en service |
 | Collection vectorielle et son schéma : 18 étiquettes en français (propriétaire, type, projet, confidentialité, provenance, validation…), 17 index de métadonnées, `source` non indexée ; script idempotent, sans suppression | en service, vide |
-| **Service mémoire** : REST avec une façade MCP ; identité prouvée (jeton de compte de service ou OIDC) ; filtre de droits posé par le service, jamais par l'appelant ; écriture « en attente » avec une confiance fixée par règle ; validation par une seule personne désignée (l'administrateur du foyer), documents personnels et intimes des autres réduits à l'auteur, au niveau, à la date et au poids ; dépôt groupé depuis une page « Mémoire » du cockpit (codée et éprouvée au banc) ; extraction des fichiers dans un pod sans secret ni réseau ; journal d'audit | codé et relu, prêt à installer, **pas encore en service** |
+| **Service mémoire** ([recette](../../deploy/okd/memory/memoire/README.md)) : identité prouvée (jeton OIDC, puis jeton de compte de service pour les agents) ; filtre de droits posé par le service, jamais par l'appelant ; originaux et textes dans un seau S3 versionné (`attente/` effaçable, `valide/` protégé même contre le service), registre des documents et des versions dans PostgreSQL, textes validés dans la forge (un dépôt par niveau, un commit par version validée), base vectorielle réduite à un index reconstructible ; une nouvelle version attend, la précédente reste cherchable ; validation par une seule personne désignée (l'administrateur du foyer), documents personnels et intimes des autres réduits à l'auteur, au niveau, à la date et au poids ; extraction des fichiers dans un pod sans secret ni réseau ; audit en base par un rôle qui ne peut qu'ajouter | **en service** ; page « Mémoire » du cockpit déployée, contrôle de bout en bout en cours ; façade MCP des agents à venir |
 | Base graphe (dimension 5) | image figée, à 0 réplique en attendant |
 | Ingestion | suspendue, à reconstruire (son image ne se reconstruisait pas) |
-| Stockage objet S3 pour les fichiers sources | en service pour la plateforme ([`deploy/okd/storage/`](../../deploy/okd/storage/)) ; la mémoire n'y a pas encore son identité ni son seau |
-| Refus par défaut dans la zone mémoire | cible, prête avec l'installation du service mémoire : la base vectorielle répond aujourd'hui sans clé ([sécurité](../security.md)) |
+| Stockage objet S3 pour les fichiers sources | en service ([`deploy/okd/storage/`](../../deploy/okd/storage/)) ; la mémoire y a son identité et son seau versionné, sans purge |
+| Refus par défaut dans la zone mémoire | en service, avec la clé de la base vectorielle ([sécurité](../security.md)) |
 
 Recette : [`deploy/okd/memory/`](../../deploy/okd/memory/).
 
