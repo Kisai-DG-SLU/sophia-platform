@@ -72,7 +72,7 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Inférence locale sur le GPU du serveur (texte et vision), voix et images sur CPU, sans accès réseau ; modèle local par défaut de l'interface et des modules.
 - Routeur de modèles unifié : local et distant derrière les mêmes alias.
 - Interface de discussion dans son namespace, connectée au routeur et à des outils locaux (géographie, images, fichiers de la personne), sans aucune clé dans le navigateur ni dépendance externe (polices et bibliothèques embarquées) ; modèle imposé par le serveur selon le rôle, une clé du routeur par usage ; thèmes visuels au choix ; réponse lue à voix haute pendant qu'elle s'écrit.
-- Cockpit : la discussion devient la coquille de toutes les interactions, avec un accueil pour parler à Sophia (avatar en hologramme qui montre la réflexion, l'outil appelé et la parole) et les applications de cuisine, d'école et de visualisation affichées au centre, chacune sous sa propre connexion ; un lieu tiré par le modèle n'est retenu que s'il a été dit.
+- Dashboard : la discussion devient la coquille de toutes les interactions, avec un accueil pour parler à Sophia (avatar en hologramme qui montre la réflexion, l'outil appelé et la parole) et les applications de cuisine, d'école et de visualisation affichées au centre, chacune sous sa propre connexion ; un lieu tiré par le modèle n'est retenu que s'il a été dit.
 - Bureautique (fichiers et édition en ligne) ; la discussion retrouve, ouvre et lit les documents de la personne sous son identité, le contenu ne partant qu'au modèle local.
 - Base relationnelle commune en PostgreSQL 18, sur un volume dédié.
 - Acquisition web isolée par le sas, première brique du Sas Paranoïaque.
@@ -84,19 +84,19 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 
 **En service, en recette**
 
-- Chat permanent du foyer et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le cockpit, comme la bureautique et le document qu'on y ouvre. Première visio avec image entre un ordinateur et une tablette ancienne, par le VPN. La messagerie est passée de Matrix à XMPP (Converse.js et Prosody), éprouvé sur la tablette ancienne ; version définitive en service, avec « dis à » : Sophia écrit dans la messagerie au nom de la personne, après confirmation.
-- Un poste au navigateur par enfant, affiché dans le cockpit des tablettes anciennes : un portier aiguille par la session, allume le poste à la demande et l'éteint au repos.
-- Se déconnecter du cockpit ferme aussi les sessions des modules.
-- Cockpit : ouverture de la bonne page par Sophia sans clic, « ouvre le document X », « Demander à Sophia » dans chaque application, « Quoi de neuf ? » nourri par les résumés déterministes des applications et Sophia qui écrit dans le document ouvert (tous deux vérifiés).
+- Chat permanent du foyer et visio (Jitsi Meet, par le navigateur seulement), chacun dans son namespace, réservés aux comptes du foyer, le média de la visio joignable par le VPN seulement ; affichés dans le dashboard, comme la bureautique et le document qu'on y ouvre. Première visio avec image entre un ordinateur et une tablette ancienne, par le VPN. La messagerie est passée de Matrix à XMPP (Converse.js et Prosody), éprouvé sur la tablette ancienne ; version définitive en service, avec « dis à » : Sophia écrit dans la messagerie au nom de la personne, après confirmation.
+- Un poste au navigateur par enfant, affiché dans le dashboard des tablettes anciennes : un portier aiguille par la session, allume le poste à la demande et l'éteint au repos.
+- Se déconnecter du dashboard ferme aussi les sessions des modules.
+- Dashboard : ouverture de la bonne page par Sophia sans clic, « ouvre le document X », « Demander à Sophia » dans chaque application, « Quoi de neuf ? » nourri par les résumés déterministes des applications et Sophia qui écrit dans le document ouvert (tous deux vérifiés).
 - Lieux du foyer et lieux personnels dans le profil ; la météo ne reçoit que le centre de la commune, et un cache de secours garde la prévision des communes enregistrées (vérifié).
 
 **En cours**
 
 - L'interface comme demandeur du répartiteur.
-- Cockpit : géocodage local des adresses enregistrées, accès par le cockpit seul.
+- Dashboard : géocodage local des adresses enregistrées, accès par le dashboard seul.
 - Clusters de développement : un cluster virtuel éphémère par projet (décidé, à construire).
-- Mémoire, reprise en priorité : service mémoire en service (originaux dans un seau versionné, textes validés dans la forge, validation par une seule personne, extraction des fichiers isolée), page « Mémoire » du cockpit déployée, puis façade des agents et pipeline d'ingestion ; dimension graphe bloquée.
-- Zone grise : étude en cours (maquettes visuelles des projets de chacun, suivi des agents).
+- Mémoire, reprise en priorité : service mémoire en service (originaux dans un seau versionné, textes validés dans la forge, validation par une seule personne, extraction des fichiers isolée), page « Mémoire » du dashboard déployée, puis façade des agents et pipeline d'ingestion ; dimension graphe bloquée.
+- Développement assisté (vibe coding) : étude en cours (maquettes visuelles des projets de chacun, suivi des agents).
 - Veille des failles, conformité (RGPD, AI Act, ISO 27001) ; sauvegardes planifiées **reportées**, faute de support.
 
 **Prévu**

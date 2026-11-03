@@ -51,7 +51,7 @@ SOPHIA is built on a Kubernetes platform (OKD / OpenShift). Core services are is
 
 # Two Layers
 
-- **Top layer: the interface.** It carries user identity, guards, short answers and human approvals. For a simple request, it understands the request in constrained output, and the server builds the tool call (in service). For what it cannot do alone, it becomes a **requester** of the dispatcher (planned). It is also the **cockpit**: the shell that displays each application in the centre, under its own sign-in, and gathers their deterministic summaries; the whole page remains the chat's, applications are only frames from a closed list (in progress, see [chat interface](../deploy/okd/apps/chat-interface/README.en.md)).
+- **Top layer: the interface.** It carries user identity, guards, short answers and human approvals. For a simple request, it understands the request in constrained output, and the server builds the tool call (in service). For what it cannot do alone, it becomes a **requester** of the dispatcher (planned). It is also the **dashboard**: the shell that displays each application in the centre, under its own sign-in, and gathers their deterministic summaries; the whole page remains the chat's, applications are only frames from a closed list (in progress, see [chat interface](../deploy/okd/apps/chat-interface/README.en.md)).
 - **Bottom layer: the agents.** They are **executors**, reached by the dispatcher only. They never talk to each other.
 - **Shared services**: the language model and memory are called by both layers, each with its own rights.
 
@@ -121,12 +121,12 @@ Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 | sophia-sandbox | development environments, without privilege on the node; planned: one ephemeral virtual cluster per project |
 | sophia-test | CI/CD validation |
 | sophia-apps | modules |
-| sophia-interface | the chat interface, now the cockpit, out of the deployment agent's reach; its egress towards applications is explicit |
+| sophia-interface | the chat interface, now the dashboard, out of the deployment agent's reach; its egress towards applications is explicit |
 | sophia-workflow | the visualisation tool, same reason |
 | sophia-workspace | the office suite: files and online editing |
-| sophia-messagerie | the household's permanent chat: XMPP (Converse.js and Prosody), in service, in acceptance testing, displayed in the cockpit, with "tell"; Matrix readable until the end of acceptance testing, then dismantled |
-| sophia-visio | video conferencing (Jitsi Meet) through the browser only, in service, in acceptance testing; displayed in the cockpit |
-| sophia-postes | one browser workstation per child, switched on on demand and off when idle by a gatekeeper; displayed in the cockpit |
+| sophia-messagerie | the household's permanent chat: XMPP (Converse.js and Prosody), in service, in acceptance testing, displayed in the dashboard, with "tell"; Matrix readable until the end of acceptance testing, then dismantled |
+| sophia-visio | video conferencing (Jitsi Meet) through the browser only, in service, in acceptance testing; displayed in the dashboard |
+| sophia-postes | one browser workstation per child, switched on on demand and off when idle by a gatekeeper; displayed in the dashboard |
 | build namespaces | building sensitive tools, with no agent account |
 | prod-* | tenant workloads |
 
@@ -162,4 +162,4 @@ These mechanisms work with any model, from the smallest (a few billion parameter
 
 # Status
 
-The architecture is experimental. Infrastructure, model routing, local inference (agents included), identity, the dispatcher and its workflows, metrics and alerts (filtered, sent to the administrator outside the platform), CPU priorities, object storage and the cockpit shell are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).
+The architecture is experimental. Infrastructure, model routing, local inference (agents included), identity, the dispatcher and its workflows, metrics and alerts (filtered, sent to the administrator outside the platform), CPU priorities, object storage and the dashboard shell are in service; the status of each function is detailed in the [functional scope](functional-scope.en.md) and the [roadmap](roadmap.en.md).

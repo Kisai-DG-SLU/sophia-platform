@@ -72,7 +72,7 @@ SophIA is an experimental architecture under construction. We separate what work
 - Local inference on the server's GPU (text and vision), voice and images on CPU, without network access; local model by default for the interface and modules.
 - Unified model router: local and remote behind the same aliases.
 - Chat interface in its own namespace, connected to the router and to local tools (geography, images, the person's files), with no key in the browser and no external dependency (fonts and libraries embedded); model enforced by the server per role, one router key per use; visual themes to choose; replies read aloud while they are being written.
-- Cockpit: the chat becomes the shell for every interaction, with a home screen to talk to Sophia (an avatar shown as a hologram that displays thinking, the tool being called and speech) and the cooking, school and visualisation applications displayed in the centre, each under its own sign-in; a place extracted by the model is kept only if it was said.
+- Dashboard: the chat becomes the shell for every interaction, with a home screen to talk to Sophia (an avatar shown as a hologram that displays thinking, the tool being called and speech) and the cooking, school and visualisation applications displayed in the centre, each under its own sign-in; a place extracted by the model is kept only if it was said.
 - Office suite (files and online editing); the chat finds, opens and reads the person's documents under their identity, the content going to the local model only.
 - Shared relational database on PostgreSQL 18, on a dedicated volume.
 - Isolated web acquisition through the airlock, first brick of the Paranoid Airlock.
@@ -84,19 +84,19 @@ SophIA is an experimental architecture under construction. We separate what work
 
 **In service, in acceptance testing**
 
-- The household's permanent chat and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the cockpit, like the office suite and the document opened in it. First video call with picture between a computer and an older tablet, through the VPN. Messaging has moved from Matrix to XMPP (Converse.js and Prosody), proven on the older tablet; final version in service, with "tell": Sophia writes in the messaging service on the person's behalf, after confirmation.
-- One browser workstation per child, displayed in the cockpit of older tablets: a gatekeeper routes by session, switches the workstation on on demand and off when idle.
-- Signing out of the cockpit also closes the modules' sessions.
-- Cockpit: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries and Sophia writing into the open document (both verified).
+- The household's permanent chat and video calls (Jitsi Meet, through the browser only), each in its own namespace, restricted to household accounts, video media reachable through the VPN only; displayed in the dashboard, like the office suite and the document opened in it. First video call with picture between a computer and an older tablet, through the VPN. Messaging has moved from Matrix to XMPP (Converse.js and Prosody), proven on the older tablet; final version in service, with "tell": Sophia writes in the messaging service on the person's behalf, after confirmation.
+- One browser workstation per child, displayed in the dashboard of older tablets: a gatekeeper routes by session, switches the workstation on on demand and off when idle.
+- Signing out of the dashboard also closes the modules' sessions.
+- Dashboard: Sophia opening the right page without a click, "open document X", "Ask Sophia" in each application, "What's new?" fed by the applications' deterministic summaries and Sophia writing into the open document (both verified).
 - Household and personal places in the profile; weather only receives the municipality's centre, and a fallback cache keeps the forecast for the saved municipalities (verified).
 
 **In progress**
 
 - The interface as a requester of the dispatcher.
-- Cockpit: local geocoding of saved addresses, access through the cockpit only.
+- Dashboard: local geocoding of saved addresses, access through the dashboard only.
 - Development clusters: one ephemeral virtual cluster per project (decided, to be built).
-- Memory, resumed as a priority: memory service in service (originals in a versioned bucket, validated texts in the forge, validation by a single person, isolated file extraction), the cockpit's "Memory" page deployed, then the agents' façade and the ingestion pipeline; graph dimension blocked.
-- Grey zone: study in progress (visual mock-ups of each person's projects, following the agents).
+- Memory, resumed as a priority: memory service in service (originals in a versioned bucket, validated texts in the forge, validation by a single person, isolated file extraction), the dashboard's "Memory" page deployed, then the agents' façade and the ingestion pipeline; graph dimension blocked.
+- Assisted development (vibe coding): study in progress (visual mock-ups of each person's projects, following the agents).
 - Vulnerability watch, compliance (GDPR, AI Act, ISO 27001); scheduled backups **postponed**, no backup medium yet.
 
 **Planned**

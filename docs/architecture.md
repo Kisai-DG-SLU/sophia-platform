@@ -51,7 +51,7 @@ SophIA repose sur une plateforme Kubernetes (OKD / OpenShift). Les services cent
 
 ## Deux couches
 
-- **Couche haute : l'interface.** Elle porte l'identité des utilisateurs, les gardes, les réponses courtes et les validations humaines. Pour une demande simple, elle comprend la demande en sortie contrainte, et le serveur fabrique l'appel d'outil (en service). Pour ce qu'elle ne sait pas faire seule, elle devient **demandeur** du répartiteur (prévu). Elle est aussi le **cockpit** : la coquille qui affiche chaque application au centre, sous sa propre connexion, et qui rassemble leurs résumés déterministes ; la page entière reste celle de la discussion, les applications ne sont que des cadres d'une liste fermée (en cours, voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md)).
+- **Couche haute : l'interface.** Elle porte l'identité des utilisateurs, les gardes, les réponses courtes et les validations humaines. Pour une demande simple, elle comprend la demande en sortie contrainte, et le serveur fabrique l'appel d'outil (en service). Pour ce qu'elle ne sait pas faire seule, elle devient **demandeur** du répartiteur (prévu). Elle est aussi le **dashboard** : la coquille qui affiche chaque application au centre, sous sa propre connexion, et qui rassemble leurs résumés déterministes ; la page entière reste celle de la discussion, les applications ne sont que des cadres d'une liste fermée (en cours, voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md)).
 - **Couche basse : les agents.** Ce sont des **exécutants**, joints par le seul répartiteur. Ils ne se parlent jamais.
 - **Services partagés** : le modèle de langage et la mémoire sont appelés par les deux couches, chacune avec ses propres droits.
 
@@ -121,12 +121,12 @@ Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 | sophia-sandbox | environnements de développement, sans privilège sur le nœud ; prévu : un cluster virtuel éphémère par projet |
 | sophia-test | validation CI/CD |
 | sophia-apps | modules |
-| sophia-interface | l'interface de discussion, devenue le cockpit, hors de la portée de l'agent de déploiement ; ses sorties vers les applications sont explicites |
+| sophia-interface | l'interface de discussion, devenue le dashboard, hors de la portée de l'agent de déploiement ; ses sorties vers les applications sont explicites |
 | sophia-workflow | l'outil de visualisation, même raison |
 | sophia-workspace | la bureautique : fichiers et édition en ligne |
-| sophia-messagerie | chat permanent du foyer : XMPP (Converse.js et Prosody), en service, en recette, affiché dans le cockpit, avec « dis à » ; Matrix lisible jusqu'à la fin de la recette, puis démonté |
-| sophia-visio | visioconférence (Jitsi Meet) par le navigateur seulement, en service, en recette ; affichée dans le cockpit |
-| sophia-postes | un poste au navigateur par enfant, allumé à la demande et éteint au repos par un portier ; affiché dans le cockpit |
+| sophia-messagerie | chat permanent du foyer : XMPP (Converse.js et Prosody), en service, en recette, affiché dans le dashboard, avec « dis à » ; Matrix lisible jusqu'à la fin de la recette, puis démonté |
+| sophia-visio | visioconférence (Jitsi Meet) par le navigateur seulement, en service, en recette ; affichée dans le dashboard |
+| sophia-postes | un poste au navigateur par enfant, allumé à la demande et éteint au repos par un portier ; affiché dans le dashboard |
 | namespaces de build | construction d'outils sensibles, sans compte d'agent |
 | prod-* | charges de travail des locataires |
 
@@ -162,4 +162,4 @@ Ces mécanismes fonctionnent avec n'importe quel modèle, du plus petit (quelque
 
 ## Statut
 
-L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale (agents compris), l'identité, le répartiteur et ses workflows, la métrologie et les alertes (filtrées, envoyées à l'administrateur hors de la plateforme), les priorités CPU, le stockage objet et la coquille du cockpit sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).
+L'architecture est expérimentale. L'infrastructure, le routage des modèles, l'inférence locale (agents compris), l'identité, le répartiteur et ses workflows, la métrologie et les alertes (filtrées, envoyées à l'administrateur hors de la plateforme), les priorités CPU, le stockage objet et la coquille du dashboard sont en service ; l'état de chaque fonction est détaillé dans le [périmètre fonctionnel](functional-scope.md) et la [feuille de route](roadmap.md).

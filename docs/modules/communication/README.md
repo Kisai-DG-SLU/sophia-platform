@@ -4,7 +4,7 @@ Module construit sur SophIA à partir de logiciels libres existants : un chat pe
 
 | | |
 |---|---|
-| État | **en service, en recette** dans l'installation de référence : chat Matrix et visio affichés dans le cockpit ; **première visio avec image** entre un ordinateur et la tablette ancienne, dans le cockpit, par le VPN ; **messagerie XMPP définitive en service** dans le cockpit, avec « dis à » ; Matrix lisible jusqu'à la fin de la recette, puis démonté ; **recette familiale en cours**, sur chaque appareil du foyer ; la visio passe par le navigateur seulement ; recette de déploiement publiée sous forme de procédure, sans les manifestes |
+| État | **en service, en recette** dans l'installation de référence : chat Matrix et visio affichés dans le dashboard ; **première visio avec image** entre un ordinateur et la tablette ancienne, dans le dashboard, par le VPN ; **messagerie XMPP définitive en service** dans le dashboard, avec « dis à » ; Matrix lisible jusqu'à la fin de la recette, puis démonté ; **recette familiale en cours**, sur chaque appareil du foyer ; la visio passe par le navigateur seulement ; recette de déploiement publiée sous forme de procédure, sans les manifestes |
 | Utilisateurs | les groupes du foyer ; les invités sont refusés par le fournisseur d'identité, et par la visio elle-même |
 | Modèle | aucun dans la messagerie : pas d'agent dans les salons ; « dis à » passe par le modèle du chat pour l'intention, puis par une confirmation et une règle pour l'envoi ; le résumé des non-lus est un calcul déterministe |
 | Briques de la plateforme | SSO, PostgreSQL 18 partagé, volume local dédié, classes de priorité et quotas, VPN (média de la visio) |

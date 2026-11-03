@@ -2,7 +2,7 @@
 
 The reference installation's recipe for the [Office](../../../docs/modules/bureautique/documentation.en.md) module: La Suite Drive ("Files", 0.25.3) and Collabora Online (CODE 26.04), in a dedicated namespace. The choices and their reasons are in the module documentation; here, the components, prerequisites, Secrets and procedure. The reference installation's manifests are not published: they follow Drive's upstream manifests, with the settings below, rendered by Kustomize.
 
-Status: in service; this recipe is a procedure, without the reference installation's manifests; detailed acceptance testing (second account, shares, reading from the chat) still to do. Files and Collabora can be displayed in the interface's cockpit: in service, in acceptance testing ([Display in the cockpit](#display-in-the-cockpit)).
+Status: in service; this recipe is a procedure, without the reference installation's manifests; detailed acceptance testing (second account, shares, reading from the chat) still to do. Files and Collabora can be displayed in the interface's dashboard: in service, in acceptance testing ([Display in the dashboard](#display-in-the-dashboard)).
 
 The persistent chat and video calls of the [Communication module](../../../docs/modules/communication/documentation.en.md), installed by the same project in two other namespaces, have their recipe at the end of this page: [Persistent chat and video calls](#persistent-chat-and-video-calls).
 
@@ -56,7 +56,7 @@ Values are produced on the spot (role password, OIDC client secret, S3 keys), ke
 - **Collabora**: `always_save_on_exit=true`, `idle_timeout_secs=1800`, `max_concurrency=2`, `cleanup.limit_dirty_mem_mb=1024`; probe on `/`.
 - **nginx**: `X-Forwarded-*` headers cleared towards S3 (otherwise the signature is checked against the public host); `location ~ ^/cool` after the WebSocket regex; a log format that masks WOPI tokens. The internal server copies the public server's `proxy_set_header` lines, `X-Forwarded-Proto: https` included (otherwise the API, in production, answers 301 to https).
 - **Pods**: `restricted-v2`, class `sophia-workspace-low`, images pinned by digest.
-- **Cockpit**: `fichiers-nginx` and Collabora settings for display in the chat only, at the end of this page.
+- **Dashboard**: `fichiers-nginx` and Collabora settings for display in the chat only, at the end of this page.
 
 ## "External API" overlay (for the "files" MCP tool)
 
@@ -86,7 +86,7 @@ Tool and identity-provider side: [`../skills/`](../skills/README.en.md) and [Ide
 
 Recipe of the [Communication module](../../../docs/modules/communication/documentation.en.md): Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) in `sophia-messagerie`, Jitsi Meet (`stable-11248-2`: web, Prosody, Jicofo, JVB) and an OIDC → token adapter in `sophia-visio`. As for the office suite, this is a procedure, without the reference installation's manifests; the choices and their reasons are in the module documentation.
 
-Status: **in service, in acceptance testing**: chat and video calls installed and checked through the real path (sign-in, room without a padlock, video adapter); **first video call with picture** between a computer and the older tablet, in the cockpit, through the VPN; three-device call, guest refusal, child account and testing each device at the acceptance step. Video calls go **through the browser only** (household decision): Jitsi's mobile app is no longer used. Matrix messaging will be replaced by Converse.js and Prosody ([Communication module](../../../docs/modules/communication/documentation.en.md#messaging-from-matrix-to-xmpp)); its recipe will be published with the final version.
+Status: **in service, in acceptance testing**: chat and video calls installed and checked through the real path (sign-in, room without a padlock, video adapter); **first video call with picture** between a computer and the older tablet, in the dashboard, through the VPN; three-device call, guest refusal, child account and testing each device at the acceptance step. Video calls go **through the browser only** (household decision): Jitsi's mobile app is no longer used. Matrix messaging will be replaced by Converse.js and Prosody ([Communication module](../../../docs/modules/communication/documentation.en.md#messaging-from-matrix-to-xmpp)); its recipe will be published with the final version.
 
 ### Components
 
@@ -155,9 +155,9 @@ Each value is generated on the spot and written through a pipe, without a traili
 
 `oc delete -k` on the chat or the video service: the database, the media volume and the Secrets remain. Bases, databases, OIDC clients and the nftables rule: removed by the administrator, according to their recipes.
 
-## Display in the cockpit
+## Display in the dashboard
 
-The [interface's cockpit](../apps/chat-interface/README.en.md) displays applications in a frame, in the centre. Each application must accept being displayed **by the chat only**, and signal it. Status: in service, in acceptance testing (actual display on each device at the acceptance step).
+The [interface's dashboard](../apps/chat-interface/README.en.md) displays applications in a frame, in the centre. Each application must accept being displayed **by the chat only**, and signal it. Status: in service, in acceptance testing (actual display on each device at the acceptance step).
 
 | Application | Setting |
 |---|---|
@@ -166,9 +166,9 @@ The [interface's cockpit](../apps/chat-interface/README.en.md) displays applicat
 | Desk (Files) | in `fichiers-nginx`, **`location /` only**: `proxy_hide_header X-Frame-Options`, then `frame-ancestors 'self' ${CHAT_ORIGIN}`; the API, administration and media keep their refusal. `Accept-Encoding` cleared towards the frontend, so that `sub_filter` can inject `pret.js` |
 | Collabora | `content_security_policy` variable, which **adds** `${CHAT_ORIGIN}` to the existing list (Files and the WOPI service): `frame-ancestors` checks the whole chain of frames, and the editor nested in Files is nested in the chat too. Neither `net.frame_ancestors` (deprecated) nor `extra_params` (split on spaces) |
 
-**`sophia.pret` signal**: a small script, `pret.js`, served by each application, posts `{type: "sophia.pret", module: "<identifier>"}` to the chat's origin only, and only inside a frame, when the application is ready (Element with a session, Files when `/api/v1.0/users/me/` answers 200). The identifier must be exactly the module's identifier in the cockpit (`messages`, `visio`, `bureau`): any other is ignored, and the cockpit offers its fallback after 8 s.
+**`sophia.pret` signal**: a small script, `pret.js`, served by each application, posts `{type: "sophia.pret", module: "<identifier>"}` to the chat's origin only, and only inside a frame, when the application is ready (Element with a session, Files when `/api/v1.0/users/me/` answers 200). The identifier must be exactly the module's identifier in the dashboard (`messages`, `visio`, `bureau`): any other is ignored, and the dashboard offers its fallback after 8 s.
 
-**Document opened in the cockpit** (in service, in acceptance testing): Files opens the editor with a `window.open` to `/wopi/<id>`, hence in a new tab. In the cockpit, `pret.js` replaces that single call, when the address is exactly `/wopi/<uuid>` on the same origin, with no parameter or fragment, and the direct parent is the chat: it posts `{type: "sophia.ouvrir", module: "bureau", chemin: "/wopi/<uuid>"}` to the chat, which opens the document in its own frame, with a "← Files" button. Any other address, or any other parent, keeps the tab. Files has no "Close" button: going back goes through the cockpit.
+**Document opened in the dashboard** (in service, in acceptance testing): Files opens the editor with a `window.open` to `/wopi/<id>`, hence in a new tab. In the dashboard, `pret.js` replaces that single call, when the address is exactly `/wopi/<uuid>` on the same origin, with no parameter or fragment, and the direct parent is the chat: it posts `{type: "sophia.ouvrir", module: "bureau", chemin: "/wopi/<uuid>"}` to the chat, which opens the document in its own frame, with a "← Files" button. Any other address, or any other parent, keeps the tab. Files has no "Close" button: going back goes through the dashboard.
 
 **Writing into the open document** (in service, verified on the real path; cursor detection corrected, to be checked again): on the `/wopi/<uuid>` page, and only if the direct parent is the chat, `pret.js` also acts as a **relay** between the chat and Collabora (PostMessage API). It only accepts messages from the chat's origin coming from the parent, and those from Collabora (its frame, same origin as Files); the chat posts to it with Files' exact origin.
 
@@ -189,7 +189,7 @@ The [interface's cockpit](../apps/chat-interface/README.en.md) displays applicat
 |---|---|---|
 | `${CHAT_ORIGIN}` | origin of the chat interface, the only page allowed to display these applications | `https://sophia.example.org` |
 
-### Procedure (cockpit)
+### Procedure (dashboard)
 
 Each step is independent, with `oc diff`, `--dry-run=server`, `oc apply`, and its backup:
 

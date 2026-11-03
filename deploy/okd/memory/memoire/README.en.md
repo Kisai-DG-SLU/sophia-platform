@@ -1,8 +1,8 @@
 # Memory service (`sophia-memoire`)
 
-The household's memory is a **service**, like the language model: called by the interface and by the agents, each with its own rights, and the **only writer** of knowledge. It receives documents, extracts their text in an isolated pod, stores them as versions, has them validated by a designated person, then makes them searchable. The knowledge model is described in the [RAG 5D](../../../../docs/concepts/03-rag-5d.en.md) page; the cockpit page that uses it, in the [cockpit](../../apps/chat-interface/README.en.md#memory-page).
+The household's memory is a **service**, like the language model: called by the interface and by the agents, each with its own rights, and the **only writer** of knowledge. It receives documents, extracts their text in an isolated pod, stores them as versions, has them validated by a designated person, then makes them searchable. The knowledge model is described in the [RAG 5D](../../../../docs/concepts/03-rag-5d.en.md) page; the dashboard page that uses it, in the [dashboard](../../apps/chat-interface/README.en.md#memory-page).
 
-**State in the reference installation**: **in service**. All the rollout steps below have been done, with both their proofs passing (bucket policy, extraction isolation). The cockpit's "Memory" page is deployed; the first real deposit comes with its end-to-end check. The service code is not provided; this document gives its contract, its rules and its recipe.
+**State in the reference installation**: **in service**. All the rollout steps below have been done, with both their proofs passing (bucket policy, extraction isolation). The dashboard's "Memory" page is deployed; the first real deposit comes with its end-to-end check. The service code is not provided; this document gives its contract, its rules and its recipe.
 
 ## What lives where (RAG 5D)
 
@@ -170,7 +170,7 @@ The administrator applies one step at a time; each check is read before the next
 | 5 ter | Embedding still reachable by the router | 200 |
 | 6 | **Extraction isolation proof** (see above) | all addresses unreachable; "conforme" |
 
-Then: the backup copy of the S3 configuration is deleted; the chat receives the service's address and its egress to it (see the [cockpit](../../apps/chat-interface/README.en.md#memory-page)).
+Then: the backup copy of the S3 configuration is deleted; the chat receives the service's address and its egress to it (see the [dashboard](../../apps/chat-interface/README.en.md#memory-page)).
 
 **At the first real deposit**, the administrator reads, without content, path or person identifier: the last audit lines (`tentative`, then `ecrit`), the registry (`en_attente`, original and text present, no commit); after validation, the decision's audit, the registry (`valide`, original present, text in the forge, a commit identifier), the commit `document <id>, version 1` in the level's repository, and the last mirror push.
 
