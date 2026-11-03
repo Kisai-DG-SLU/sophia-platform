@@ -3,7 +3,7 @@
 ## Ce que fait le module
 
 - **Ranger et partager** : chaque personne a son espace de fichiers, avec dossiers, aperçus et historique des versions. Tout est **privé par défaut** ; un partage (lecteur ou éditeur) demande un geste explicite, et un lien reste « restreint » tant qu'on ne l'ouvre pas.
-- **Éditer** : les documents bureautiques (texte, tableur, présentation, OpenDocument et formats Microsoft) s'ouvrent dans Collabora, à plusieurs à la fois. Fichiers ouvre l'éditeur dans **un nouvel onglet** ; dans le cockpit de l'interface, le document s'ouvre dans son propre cadre (ci-dessous).
+- **Éditer** : les documents bureautiques (texte, tableur, présentation, OpenDocument et formats Microsoft) s'ouvrent dans Collabora, à plusieurs à la fois. Fichiers ouvre l'éditeur dans **un nouvel onglet** ; dans le dashboard de l'interface, le document s'ouvre dans son propre cadre (ci-dessous).
 - **Depuis la discussion** : Sophia retrouve un fichier de la personne par son nom, puis propose de l'ouvrir (dans Collabora pour un document modifiable, dans Fichiers sinon) et de voir le dossier qui le contient. Elle peut aussi lire et résumer le contenu d'un document, avec un modèle local seulement.
 
 ## Architecture
@@ -42,14 +42,14 @@ Collabora ──► API WOPI de Fichiers (TLS interne), DNS ; rien d'autre
 
 Leçon : un relais se teste par de vraies requêtes contre de faux services, en-têtes compris, pas seulement par `nginx -t`.
 
-## Dans le cockpit
+## Dans le dashboard
 
-Le [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md) affiche Fichiers au centre, sous le nom « Bureau ». État : en service, en recette sur chaque appareil.
+Le [dashboard de l'interface](../../../deploy/okd/apps/chat-interface/README.md) affiche Fichiers au centre, sous le nom « Bureau ». État : en service, en recette sur chaque appareil.
 
-- **Affichable par le seul chat** : `frame-ancestors 'self'` plus l'origine du chat sur les pages de Fichiers ; l'API, l'administration et les médias gardent leur refus d'être affichés en cadre. Collabora ajoute l'origine du chat à sa propre liste : `frame-ancestors` contrôle toute la chaîne des cadres, et l'éditeur est imbriqué. Réglages : [`deploy/okd/office/`](../../../deploy/okd/office/README.md#affichage-dans-le-cockpit).
-- **Signal `sophia.pret`** : Fichiers prévient le cockpit qu'il est prêt quand la session de la personne répond ; sans signal au bout de 8 s, le cockpit propose « Ouvrir à part » et « Se reconnecter ».
-- **Un document s'ouvre dans le cockpit** (en service, en recette) : le petit script injecté dans Fichiers remplace la seule ouverture d'onglet vers l'éditeur (`/wopi/<uuid>`, même origine, sans paramètre) par un message `sophia.ouvrir` au chat ; le chat vérifie la source (le cadre du Bureau), l'origine et la forme fermée du chemin, reconstruit l'adresse sur l'origine du module, et ouvre le document dans son propre cadre, avec un bouton « ← Fichiers ». Le document compte dans la limite de deux cadres vivants.
-- **Tablette ancienne** : Fichiers exige un moteur récent. Pour un enfant, la tuile « Bureau » ouvre son [poste au navigateur](#poste-au-navigateur-par-enfant) ; pour les autres comptes, le cockpit affiche une explication à la place du cadre.
+- **Affichable par le seul chat** : `frame-ancestors 'self'` plus l'origine du chat sur les pages de Fichiers ; l'API, l'administration et les médias gardent leur refus d'être affichés en cadre. Collabora ajoute l'origine du chat à sa propre liste : `frame-ancestors` contrôle toute la chaîne des cadres, et l'éditeur est imbriqué. Réglages : [`deploy/okd/office/`](../../../deploy/okd/office/README.md#affichage-dans-le-dashboard).
+- **Signal `sophia.pret`** : Fichiers prévient le dashboard qu'il est prêt quand la session de la personne répond ; sans signal au bout de 8 s, le dashboard propose « Ouvrir à part » et « Se reconnecter ».
+- **Un document s'ouvre dans le dashboard** (en service, en recette) : le petit script injecté dans Fichiers remplace la seule ouverture d'onglet vers l'éditeur (`/wopi/<uuid>`, même origine, sans paramètre) par un message `sophia.ouvrir` au chat ; le chat vérifie la source (le cadre du Bureau), l'origine et la forme fermée du chemin, reconstruit l'adresse sur l'origine du module, et ouvre le document dans son propre cadre, avec un bouton « ← Fichiers ». Le document compte dans la limite de deux cadres vivants.
+- **Tablette ancienne** : Fichiers exige un moteur récent. Pour un enfant, la tuile « Bureau » ouvre son [poste au navigateur](#poste-au-navigateur-par-enfant) ; pour les autres comptes, le dashboard affiche une explication à la place du cadre.
 - **Résumé « Quoi de neuf ? »** : l'outil MCP sert `GET /api/resume` (fichiers partagés avec la personne et modifiés depuis 14 jours), avec le même jeton relayé que ses outils. Appelée par l'interface : en service, vérifiée.
 
 ### « Sophia, ouvre le document X »
@@ -58,8 +58,8 @@ En service, en recette.
 
 - **Analyse par le modèle** : l'intention « fichiers », avec l'action « ouvrir » et les termes de recherche.
 - **Décision par des règles** : le serveur appelle `chercher_fichiers` avec le jeton de la personne et choisit selon le nombre de résultats ; **l'identifiant du document vient du résultat de l'outil, jamais du modèle**, et aucun mot de recherche n'entre dans une adresse.
-- **Exécution** : un événement du serveur vers le cockpit, avec un chemin de forme fermée (identifiant en UUID minuscule), contrôlé côté serveur puis côté navigateur.
-- Un résultat : le document (au téléphone, son **aperçu**) ; plusieurs : une liste cliquable dans le cockpit, ou le dossier commun ; aucun : « Mes fichiers ». Drive n'a pas d'adresse de recherche ni de vue « tous les fichiers » : le cockpit ne peut pas lui faire afficher une liste de résultats.
+- **Exécution** : un événement du serveur vers le dashboard, avec un chemin de forme fermée (identifiant en UUID minuscule), contrôlé côté serveur puis côté navigateur.
+- Un résultat : le document (au téléphone, son **aperçu**) ; plusieurs : une liste cliquable dans le dashboard, ou le dossier commun ; aucun : « Mes fichiers ». Drive n'a pas d'adresse de recherche ni de vue « tous les fichiers » : le dashboard ne peut pas lui faire afficher une liste de résultats.
 
 ### Sophia écrit dans le document ouvert
 
@@ -79,10 +79,10 @@ Par l'API PostMessage de Collabora, relayée par le script injecté sur la page 
 
 ## Poste au navigateur par enfant
 
-**En service, en recette.** Les tablettes anciennes du foyer ne peuvent pas faire tourner Fichiers et Collabora (moteur trop ancien). Pour les enfants, la tuile « Bureau » du cockpit affiche donc un **poste au navigateur** : un navigateur récent qui tourne dans le cluster, ouvert sur Fichiers, et dont la tablette ne reçoit que l'image (VNC dans la page, par noVNC). Un poste par enfant, avec son propre profil de navigateur ; adultes et invités gardent Fichiers au centre du cockpit.
+**En service, en recette.** Les tablettes anciennes du foyer ne peuvent pas faire tourner Fichiers et Collabora (moteur trop ancien). Pour les enfants, la tuile « Bureau » du dashboard affiche donc un **poste au navigateur** : un navigateur récent qui tourne dans le cluster, ouvert sur Fichiers, et dont la tablette ne reçoit que l'image (VNC dans la page, par noVNC). Un poste par enfant, avec son propre profil de navigateur ; adultes et invités gardent Fichiers au centre du dashboard.
 
 ```
-tablette (cockpit, cadre « Bureau ») ──► routeur ──► portier : nginx ─► oauth2-proxy (session, groupe des enfants)
+tablette (dashboard, cadre « Bureau ») ──► routeur ──► portier : nginx ─► oauth2-proxy (session, groupe des enfants)
                                                          │      └─► portier.py (table personne → poste, réveil, extinction)
                                                          └──► poste de l'enfant (noVNC ─► navigateur en kiosque ─► Fichiers)
 ```
@@ -95,11 +95,11 @@ tablette (cockpit, cadre « Bureau ») ──► routeur ──► portier : ngi
 | Aiguillage | nginx à deux étages : le premier vérifie la session et pose l'identifiant de la personne (en-tête **écrasé**, même vide, toute variante ignorée) ; le second, en boucle locale, demande la cible au portier **à chaque requête, WebSocket comprise** | un enfant ne peut pas viser le poste d'un autre |
 | Table | personne → poste, par l'**identifiant technique** du fournisseur d'identité (jamais un nom), dans une ConfigMap posée par l'administrateur ; formes contrôlées, table mal formée refusée au démarrage | aucune donnée nominative dans le cluster |
 | Accès | réservé au groupe des enfants (`--allowed-group`), puis à la table : un adulte ou un invité est refusé deux fois (page de refus, puis 403) | le poste est un outil pour les enfants |
-| Réveil | à la première requête du Bureau, le portier passe le poste à 1 réplica et sert une page d'attente ; la page déclare l'échec à 55 s, avant le délai de 60 s du cockpit, pour qu'il n'y ait qu'un seul déclencheur ; « Réessayer » relance | un poste éteint ne coûte rien |
+| Réveil | à la première requête du Bureau, le portier passe le poste à 1 réplica et sert une page d'attente ; la page déclare l'échec à 55 s, avant le délai de 60 s du dashboard, pour qu'il n'y ait qu'un seul déclencheur ; « Réessayer » relance | un poste éteint ne coûte rien |
 | Extinction au repos | après **30 minutes sans connexion** à l'écran distant ; le portier interroge l'état de chaque poste toutes les 15 s ; le client noVNC ne se reconnecte pas tout seul (sinon le poste ne s'endormirait jamais) | rendre la mémoire et le processeur au reste de la plateforme |
 | Droits du portier | un Role limité aux Deployments des postes (`get`) et à leur sous-ressource `scale` (`get`, `patch`), par nom ; jeton monté dans le seul conteneur du portier | allumer et éteindre, rien d'autre |
-| Signaux au cockpit | `sophia.poste` (`reveil`, `echec`, `veille`, `refuse`), `sophia.connexion_requise`, `sophia.pret`, vers la seule origine du cockpit et seulement dans un cadre ; le cockpit écrit lui-même les textes (« Ton bureau se prépare… », « s'est endormi ») | aucun texte venu de la page n'est affiché |
-| Récupérer un document | le poste signale au portier le document ouvert ; le cockpit propose de le récupérer, sans réveiller un poste éteint ; l'envoi et la récupération passent par l'outil MCP « fichiers » | sans téléchargement dans la tablette |
+| Signaux au dashboard | `sophia.poste` (`reveil`, `echec`, `veille`, `refuse`), `sophia.connexion_requise`, `sophia.pret`, vers la seule origine du dashboard et seulement dans un cadre ; le dashboard écrit lui-même les textes (« Ton bureau se prépare… », « s'est endormi ») | aucun texte venu de la page n'est affiché |
+| Récupérer un document | le poste signale au portier le document ouvert ; le dashboard propose de le récupérer, sans réveiller un poste éteint ; l'envoi et la récupération passent par l'outil MCP « fichiers » | sans téléchargement dans la tablette |
 | Supervision | métriques du portier (poste allumé, échecs de réveil) ; alertes : 3 échecs de réveil en 30 min, un échec de plus de 10 min, métriques absentes | un réveil qui échoue se voit |
 
 **Isolement.** Un poste n'accepte en entrée que le portier, et ne sort que vers le routeur en HTTPS et le DNS : ni un autre poste, ni le portier. Le portier n'accepte que le routeur, le pod du chat et la métrologie (ces deux derniers sur son seul port d'état) ; il ne sort que vers les postes, le seul pod du fournisseur d'identité et l'API du cluster. Le chat lit l'état du poste de la personne sur une route qui vérifie le jeton relayé (audience et client propres, puis userinfo ; même identifiant exigé). La relecture a tenté douze attaques (identifiant forgé, en-tête doublé, WebSocket vers le poste d'un autre enfant, jeton d'adulte modifié ou non signé, routes internes) : toutes refusées. **Limite connue** : un WebSocket déjà ouvert n'est plus recontrôlé, jusqu'à une heure ; pour couper tout de suite, éteindre le poste.
@@ -108,14 +108,14 @@ tablette (cockpit, cadre « Bureau ») ──► routeur ──► portier : ngi
 
 **Session de Fichiers au réveil.** La session de Fichiers dans le navigateur du poste ne tient pas une nuit : au réveil du lendemain, l'enfant tombait sur la page « Se connecter » de Fichiers. Correctif (image du poste reconstruite) : l'accueil du poste passe par la **connexion silencieuse** de Fichiers (`prompt=none`), qui reprend la session du fournisseur d'identité sans mot de passe, et sinon revient à l'accueil de Fichiers comme avant ; pour que cette session tienne d'un jour à l'autre (30 jours), l'enfant coche une fois « Se souvenir de moi » sur la page de connexion du poste. La restauration des onglets est coupée : un seul onglet, l'accueil, au lieu d'un onglet de plus à chaque réveil. Éprouvé au banc : trois démarrages sur le même profil, un seul onglet et la connexion silencieuse à chacun.
 
-**Voile « Ton bureau se prépare » sans fin.** Le cockpit couvre le cadre du Bureau d'un voile pendant le réveil, et le lève sur `sophia.pret`, ou déclare l'échec après 60 s. Un signal `reveil` reçu après un endormissement, un échec ou une image remettait le voile **sans réarmer la minuterie** : le voile restait, alors que le bureau était prêt derrière. Correctif : la minuterie est réarmée à chaque « se prépare » ; au pire, l'enfant voit « n'a pas pu s'allumer » et « Réessayer ». Des traces d'observation, activées par un paramètre de l'adresse, servent à relever les états sur une tablette.
+**Voile « Ton bureau se prépare » sans fin.** Le dashboard couvre le cadre du Bureau d'un voile pendant le réveil, et le lève sur `sophia.pret`, ou déclare l'échec après 60 s. Un signal `reveil` reçu après un endormissement, un échec ou une image remettait le voile **sans réarmer la minuterie** : le voile restait, alors que le bureau était prêt derrière. Correctif : la minuterie est réarmée à chaque « se prépare » ; au pire, l'enfant voit « n'a pas pu s'allumer » et « Réessayer ». Des traces d'observation, activées par un paramètre de l'adresse, servent à relever les états sur une tablette.
 
 **Pièges de la mise en service.**
 
 - **L'EgressFirewall coupait l'API du cluster** : le Service `kubernetes` aboutit à l'adresse du nœud, sur le port de l'API ; la NetworkPolicy l'autorisait, l'EgressFirewall du namespace non. Le portier ne pouvait ni lire, ni allumer, ni éteindre un poste. Correctif : une règle vers les nœuds du plan de contrôle, sur le port de l'API, avant le refus. Le banc n'avait pas d'EgressFirewall : croiser NetworkPolicy **et** EgressFirewall à la relecture.
-- **Une session d'un autre compte restée sur la tablette** faisait voir le portier un adulte, refusé : d'où l'effacement ci-dessus, et la **déconnexion des modules** par le cockpit (voir l'[interface](../../../deploy/okd/apps/chat-interface/README.md#cockpit)).
+- **Une session d'un autre compte restée sur la tablette** faisait voir le portier un adulte, refusé : d'où l'effacement ci-dessus, et la **déconnexion des modules** par le dashboard (voir l'[interface](../../../deploy/okd/apps/chat-interface/README.md#dashboard)).
 
-**État** : en service ; les deux enfants ont leur bureau ; extinctions au repos réelles observées ; premier réveil à froid mesuré : **3 s** jusqu'au poste prêt, image déjà sur le nœud, sans le chargement de noVNC ; correctifs de la connexion à Fichiers et du voile en service, à vérifier sur chaque tablette. Restent à éprouver : la récupération d'un document, l'endormissement puis le réveil sur chaque tablette, et le coût réel de l'affichage à l'échelle 2. **Limite connue** : la page de refus du portier (`sophia.poste` `refuse`) n'est pas encore traitée par le cockpit.
+**État** : en service ; les deux enfants ont leur bureau ; extinctions au repos réelles observées ; premier réveil à froid mesuré : **3 s** jusqu'au poste prêt, image déjà sur le nœud, sans le chargement de noVNC ; correctifs de la connexion à Fichiers et du voile en service, à vérifier sur chaque tablette. Restent à éprouver : la récupération d'un document, l'endormissement puis le réveil sur chaque tablette, et le coût réel de l'affichage à l'échelle 2. **Limite connue** : la page de refus du portier (`sophia.poste` `refuse`) n'est pas encore traitée par le dashboard.
 
 ## Confidentialité
 
@@ -141,7 +141,7 @@ Un serveur MCP en lecture seule ([`deploy/okd/skills/`](../../../deploy/okd/skil
 
 ## Navigateurs
 
-Drive et Collabora utilisent des blocs `static {}` d'ES2022 : il faut au moins **Safari 16.4** (ou un navigateur équivalent). Sur un appareil plus ancien, Fichiers ne démarre pas, et aucun correctif côté serveur n'est raisonnable. Le chat détecte le moteur par un petit script ES2022 (pas par le User-Agent) : sur un moteur trop ancien, les boutons vers Fichiers deviennent un texte inactif qui le dit, et la liste des résultats reste affichée. Dans le cockpit, une explication remplace le cadre du Bureau.
+Drive et Collabora utilisent des blocs `static {}` d'ES2022 : il faut au moins **Safari 16.4** (ou un navigateur équivalent). Sur un appareil plus ancien, Fichiers ne démarre pas, et aucun correctif côté serveur n'est raisonnable. Le chat détecte le moteur par un petit script ES2022 (pas par le User-Agent) : sur un moteur trop ancien, les boutons vers Fichiers deviennent un texte inactif qui le dit, et la liste des résultats reste affichée. Dans le dashboard, une explication remplace le cadre du Bureau.
 
 ## Prévu
 

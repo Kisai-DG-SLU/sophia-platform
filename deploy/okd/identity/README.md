@@ -51,7 +51,7 @@ Quand l'interface de discussion relaie le jeton d'accès de la personne (voir [R
 | Service destinataire | Vérification | Mappeur |
 |---|---|---|
 | serveur MCP qui échange le jeton (fichiers) | signature, puis échange au nom de son client | audience de client (`included.client.audience`) |
-| oauth2-proxy d'une application, pour sa route de résumé du cockpit | `--skip-jwt-bearer-tokens` : vérificateur principal du fournisseur, `client-id` de l'application exigé dans `aud` | audience de client, égale au `client-id` de l'application |
+| oauth2-proxy d'une application, pour sa route de résumé du dashboard | `--skip-jwt-bearer-tokens` : vérificateur principal du fournisseur, `client-id` de l'application exigé dans `aud` | audience de client, égale au `client-id` de l'application |
 | module qui vérifie lui-même la signature, sans client propre (résumé de la messagerie) | signature par les clés du realm, émetteur, audience, client d'origine, groupes | **audience personnalisée** (`included.custom.audience`, option `--personnalisee`) : aucun client Keycloak n'est créé, puisqu'il ne servirait qu'à l'introspection ou à l'échange |
 
 ```bash
@@ -64,7 +64,7 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <audien
 - Il refuse les cas mal assortis : `--personnalisee` pour un nom qui est un client, ou l'inverse.
 - Une nouvelle audience n'arrive qu'au renouvellement du jeton : un 403 juste après, avec un jeton antérieur, est attendu.
 - **Jamais `--extra-jwt-issuers`** côté application : ce réglage lance une découverte OIDC sur l'adresse **publique** du fournisseur, que les pods ne joignent pas. Le vérificateur principal (clés par le Service interne, émetteur public) suffit.
-- Les en-têtes du realm ne changent pas : la page de connexion reste refusée dans un cadre (le cockpit propose « Se reconnecter »).
+- Les en-têtes du realm ne changent pas : la page de connexion reste refusée dans un cadre (le dashboard propose « Se reconnecter »).
 - Ces mappeurs sont dans `04-realm-sophia.yaml` pour une installation neuve ; le script sert à les ajouter à un realm existant, puisque l'import ne s'applique qu'à la création.
 
 État : trois audiences (deux applications, la messagerie) en service, contrôlées par rejeu du script (« existe, non modifié ») et par un jeton invalide refusé en 403 par les deux applications.

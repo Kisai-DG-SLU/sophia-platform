@@ -1,14 +1,14 @@
 # Module Communication — documentation
 
-État : **en service, en recette**. Le chat (Matrix) et la visio tournent dans l'installation de référence, contrôlés en lecture, et s'affichent dans le cockpit de l'interface. La **première visio avec image** entre un ordinateur et la tablette ancienne a eu lieu dans le cockpit, par le VPN, après trois correctifs en chaîne (voir [Média de la visio](#média-de-la-visio--trois-causes-en-chaîne)). **La messagerie a changé de logiciel** : après un essai sur la vraie tablette, le foyer a retenu **Converse.js et Prosody (XMPP) à la place de Matrix**. La version définitive est **en service**, dans le cockpit, avec « dis à » (Sophia envoie un message au nom de la personne) ; Matrix reste lisible jusqu'à la fin de la recette (voir [Messagerie : de Matrix à XMPP](#messagerie--de-matrix-à-xmpp)). La **recette avec tous les appareils du foyer est en cours** (voir [Recette à faire](#recette-à-faire)).
+État : **en service, en recette**. Le chat (Matrix) et la visio tournent dans l'installation de référence, contrôlés en lecture, et s'affichent dans le dashboard de l'interface. La **première visio avec image** entre un ordinateur et la tablette ancienne a eu lieu dans le dashboard, par le VPN, après trois correctifs en chaîne (voir [Média de la visio](#média-de-la-visio--trois-causes-en-chaîne)). **La messagerie a changé de logiciel** : après un essai sur la vraie tablette, le foyer a retenu **Converse.js et Prosody (XMPP) à la place de Matrix**. La version définitive est **en service**, dans le dashboard, avec « dis à » (Sophia envoie un message au nom de la personne) ; Matrix reste lisible jusqu'à la fin de la recette (voir [Messagerie : de Matrix à XMPP](#messagerie--de-matrix-à-xmpp)). La **recette avec tous les appareils du foyer est en cours** (voir [Recette à faire](#recette-à-faire)).
 
 ## Ce que fait le module
 
-- **Chat permanent** : des salons et des discussions directes entre les membres du foyer, dans le navigateur et dans le cockpit. Les messages et les fichiers restent sur le serveur de la maison. Converse.js et Prosody (XMPP) depuis la version définitive ; Matrix (Element) reste lisible jusqu'à la fin de la recette, puis il est démonté.
+- **Chat permanent** : des salons et des discussions directes entre les membres du foyer, dans le navigateur et dans le dashboard. Les messages et les fichiers restent sur le serveur de la maison. Converse.js et Prosody (XMPP) depuis la version définitive ; Matrix (Element) reste lisible jusqu'à la fin de la recette, puis il est démonté.
 - **« Dis à »** : on demande à Sophia d'écrire à un membre de la famille ou au salon Famille ; après confirmation, le message part dans la messagerie, au nom de la personne, avec la mention « via Sophia ».
-- **Visio** : une salle de visio s'ouvre dans le cockpit ou par un lien ; seuls les comptes admis du foyer la rejoignent.
+- **Visio** : une salle de visio s'ouvre dans le dashboard ou par un lien ; seuls les comptes admis du foyer la rejoignent.
 - **Notifications** sur Android, par un relais local (ntfy), sans service de notification d'un tiers et sans contenu : « Nouveau message », ni texte ni expéditeur.
-- **Dans le cockpit** : Messages et Visio s'affichent au centre du [cockpit de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » compte les messages non lus de chacun (en service, vérifié) ; un volet « Demander à Sophia » y est offert, sans lire les messages.
+- **Dans le dashboard** : Messages et Visio s'affichent au centre du [dashboard de l'interface](../../../deploy/okd/apps/chat-interface/README.md), et le volet « Quoi de neuf ? » compte les messages non lus de chacun (en service, vérifié) ; un volet « Demander à Sophia » y est offert, sans lire les messages.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ média (UDP, VPN seulement) ──► ${VPN_IP}:${JVB_UDP_PORT} ──► JVB
 
 serveur de l'interface ──► Synapse, port HTTP (module de résumé) ──► clés publiques du realm (par le routeur)
 
-navigateur, cockpit (VPN) ──► routeur d'entrée ──► web : oauth2-proxy + nginx (Converse.js) ──► Prosody (WebSocket, fichiers)
+navigateur, dashboard (VPN) ──► routeur d'entrée ──► web : oauth2-proxy + nginx (Converse.js) ──► Prosody (WebSocket, fichiers)
                                                                                     └──► passerelle de push ──► ntfy
 serveur de l'interface ──► relais « dis à » (une route, un port) ──► Prosody (module HTTP) ──► userinfo du fournisseur d'identité
 ```
@@ -79,17 +79,17 @@ Synapse n'accepte que les jetons de MAS : le serveur de l'interface ne peut pas 
 | WebSocket et fichiers | `auth_request` d'oauth2-proxy sur `/xmpp-websocket` et `/file_share/` : sans session, 401 | Prosody accepte **tout** jeton valide du realm (l'userinfo ne vérifie ni le client, ni l'audience, ni le groupe) : sans ce contrôle, un jeton d'une autre application ouvrait la messagerie d'essai |
 | Fichiers partagés | `proxy_buffering off` sur `/file_share/` | nginx mettait les fichiers lus en tampon dans un `/tmp` éphémère de 64 Mi : deux lectures d'une vidéo faisaient évincer le pod |
 | Noms de Service | **noms complets** en `.svc.cluster.local` | Prosody résout par libunbound, qui n'applique pas les domaines de recherche : un nom court répondait NXDOMAIN, et l'appel userinfo de Prosody, sans délai réglable, restait suspendu |
-| Tuile du cockpit | visible des seuls membres du groupe d'essai (`SOPHIA_ESSAI_GROUPES`) ; le vrai contrôle reste l'oauth2-proxy de la page | masquer n'est pas un contrôle |
+| Tuile du dashboard | visible des seuls membres du groupe d'essai (`SOPHIA_ESSAI_GROUPES`) ; le vrai contrôle reste l'oauth2-proxy de la page | masquer n'est pas un contrôle |
 
 **Ce qui marche sur la tablette ancienne** : délai d'arrivée, « écrit… », photos dans les deux sens, clavier, rotation, retour après 5 minutes, connexion au-delà de la vie du jeton (renouvelé), discussion directe, salon, retrait d'un membre (`/revoke`).
 
-**Défauts trouvés**, à corriger dans la version définitive (réglage, petit greffon ou retour forcé au cockpit) :
+**Défauts trouvés**, à corriger dans la version définitive (réglage, petit greffon ou retour forcé au dashboard) :
 
 - **pas de barre de mise en forme** : la mise en forme existe (XEP-0393 : `*gras*`, `_italique_`, code entre accents graves), mais se tape à la main ;
 - **membre affiché deux fois** dans un salon : occupant présent et entrée de la liste des membres, non fusionnés ;
 - **salon resté dans la liste** d'un membre retiré : le signet posé à l'entrée dans le salon n'est pas retiré par `/revoke` ;
 - **fenêtre d'invitation non fermée** dans l'autre session du même compte, qui réapparaît comme une nouvelle invitation ;
-- **double session** : l'onglet de connexion charge la messagerie au lieu de renvoyer au cockpit ;
+- **double session** : l'onglet de connexion charge la messagerie au lieu de renvoyer au dashboard ;
 - **aucun annuaire** : on ne voit un membre de la famille qu'après l'avoir ajouté par son adresse ;
 - lien vers la visio depuis une discussion : le greffon prévu ne marche pas avec la version 14 du client.
 
@@ -102,15 +102,15 @@ Dans le namespace de la messagerie, à côté de Matrix, jusqu'à la fin de la r
 | Prosody | 13.0.7, image figée par empreinte ; données sur un **volume local persistant** (`Retain`) ; archives des salons gardées | la messagerie est la mémoire écrite du foyer |
 | Comptes | identité tirée de l'userinfo du jeton (OAUTHBEARER, `preferred_username`), jamais d'un mot de passe ; un module de Prosody refuse à la connexion **tout compte hors des groupes du foyer**, en plus de l'oauth2-proxy de la page | le contrôle par groupe ne dépend pas d'une seule couche |
 | Ouvertures | ni serveur à serveur, ni inscription, ni client en TCP : le WebSocket seul, derrière oauth2-proxy ; NetworkPolicy fermées, Prosody joignable du seul pod web (et du relais « dis à ») | rien n'entre ni ne sort hors du chemin prévu |
-| Web | nginx (Converse.js 14, servi par l'image, empreinte vérifiée ; greffons du foyer) et oauth2-proxy ; politique de sécurité du contenu stricte, affichable dans le **seul cockpit** ; fichiers partagés servis en `sandbox` et `nosniff` | aucune ressource tierce ; un fichier reçu ne peut pas s'exécuter dans la page |
+| Web | nginx (Converse.js 14, servi par l'image, empreinte vérifiée ; greffons du foyer) et oauth2-proxy ; politique de sécurité du contenu stricte, affichable dans le **seul dashboard** ; fichiers partagés servis en `sandbox` et `nosniff` | aucune ressource tierce ; un fichier reçu ne peut pas s'exécuter dans la page |
 | Contacts | **rien d'office** : chacun ajoute ses contacts par leur adresse, ou passe par le salon Famille | choix du foyer |
 | Salon « Famille » | créé d'office pour toute la maison, invités exclus ; **propriétaires : les adultes** ; membre d'office, sans départ volontaire ; un enfant peut créer d'autres salons ; les membres absents ne sont visibles que des propriétaires | un lieu commun garanti, administré par les adultes |
 | Historique de Matrix | **non repris** ; Element reste lisible jusqu'à la fin de la recette | une reprise coûtait plus qu'elle ne rapportait |
-| Notifications | Android : passerelle de push (XEP-0357) dans le pod de Prosody, vers ntfy ; « Nouveau message », **ni texte ni expéditeur**, lien vers le cockpit ; un sujet par personne, tiré d'une clé secrète, montré à elle seule. Tablette iOS : pastille dans le cockpit, une fois Messages ouvert | aucun contenu ne quitte la messagerie ; pas de service tiers |
-| Visio depuis une discussion | bouton qui ouvre la **tuile Visio du cockpit** sur la salle de la discussion ; nom de salle par règle fixe (salon Famille → `famille`, autre salon → tiré de son adresse, discussion à deux → tiré de la paire d'identifiants, condensée) ; la tuile Visio ouvre `famille` par défaut | la visio individuelle passe par la discussion à deux |
+| Notifications | Android : passerelle de push (XEP-0357) dans le pod de Prosody, vers ntfy ; « Nouveau message », **ni texte ni expéditeur**, lien vers le dashboard ; un sujet par personne, tiré d'une clé secrète, montré à elle seule. Tablette iOS : pastille dans le dashboard, une fois Messages ouvert | aucun contenu ne quitte la messagerie ; pas de service tiers |
+| Visio depuis une discussion | bouton qui ouvre la **tuile Visio du dashboard** sur la salle de la discussion ; nom de salle par règle fixe (salon Famille → `famille`, autre salon → tiré de son adresse, discussion à deux → tiré de la paire d'identifiants, condensée) ; la tuile Visio ouvre `famille` par défaut | la visio individuelle passe par la discussion à deux |
 | Ressources | web en stratégie `Recreate`, limites dans le quota du namespace | un quota serré ne doit pas bloquer une mise à jour |
 
-**Mise en service** : prérequis (volume, client OIDC et Secret, entrée réseau du fournisseur d'identité), contrôle des groupes du foyer, Secret de la passerelle, images, réglage de ntfy, essai à blanc, application, contrôles HTTP (`/sante` 200 ; jeton, push et WebSocket en 401 sans session ; déconnexion en 302 avec `Clear-Site-Data`), premier essai hors du cockpit, puis tuile du cockpit. Banc local par le chemin de production : 25 étapes.
+**Mise en service** : prérequis (volume, client OIDC et Secret, entrée réseau du fournisseur d'identité), contrôle des groupes du foyer, Secret de la passerelle, images, réglage de ntfy, essai à blanc, application, contrôles HTTP (`/sante` 200 ; jeton, push et WebSocket en 401 sans session ; déconnexion en 302 avec `Clear-Site-Data`), premier essai hors du dashboard, puis tuile du dashboard. Banc local par le chemin de production : 25 étapes.
 
 **Départ d'un membre** : le retirer des groupes du foyer (oauth2-proxy et Prosody refusent toute nouvelle connexion), puis du salon Famille (`/revoke`), puis supprimer son compte Prosody, qui garde sinon son ancien statut jusqu'à sa prochaine connexion.
 
@@ -133,24 +133,24 @@ Choix d'usage : l'analyse de l'intention par le modèle, la confirmation, l'envo
 
 Jitsi Meet a remplacé la visio de La Suite numérique, d'abord prévue : son interface ne démarre pas sur les tablettes anciennes du foyer.
 
-**La visio passe par le navigateur seulement**, donc par le cockpit de l'interface (décision du foyer) : `DISABLE_DEEP_LINKING` retire la page « Rejoindre dans l'application », et l'application mobile n'est plus utilisée. La visio dans le navigateur de la tablette ancienne **marche** depuis le réglage de son profil VPN (ci-dessous).
+**La visio passe par le navigateur seulement**, donc par le dashboard de l'interface (décision du foyer) : `DISABLE_DEEP_LINKING` retire la page « Rejoindre dans l'application », et l'application mobile n'est plus utilisée. La visio dans le navigateur de la tablette ancienne **marche** depuis le réglage de son profil VPN (ci-dessous).
 
 | Élément | Choix | Raison |
 |---|---|---|
 | Composants | web, Prosody, Jicofo, JVB (le pont média) ; ni base ni cache | le moins de pièces possible |
 | Accès | un **adaptateur** maison (Python, bibliothèque standard seule) fait la connexion OIDC au fournisseur d'identité et rend un **jeton signé de 10 minutes, valable pour une seule salle** ; l'invité est refusé par le fournisseur d'identité, et par l'adaptateur s'il passait ; états liés au navigateur et à usage unique ; le journal de l'adaptateur ne contient ni la chaîne de requête ni de secret | Jitsi n'accepte qu'un jeton : l'adaptateur le délivre aux seuls comptes admis |
-| Connexion dans le cockpit | **en fenêtre** (`tokenAuthInline`, mécanisme natif de Jitsi), voir ci-dessous | le fournisseur d'identité refuse d'être affiché dans un cadre |
+| Connexion dans le dashboard | **en fenêtre** (`tokenAuthInline`, mécanisme natif de Jitsi), voir ci-dessous | le fournisseur d'identité refuse d'être affiché dans un cadre |
 | Média | **un seul port UDP**, exposé par une `externalIP` sur l'adresse VPN du nœud (`${VPN_IP}:${JVB_UDP_PORT}`) ; **pas de NodePort** | le média n'est joignable que par le VPN, jamais depuis le réseau local |
 | Réseau | pair-à-pair et STUN coupés ; requêtes vers des tiers coupées ; **candidats d'adresses privées annoncés** (l'adresse VPN en est une) ; canal de pont par le canal de données SCTP | tout passe par le pont de la maison ; rien ne part vers un service extérieur |
 | Entrée du média | la NetworkPolicy du pont admet le réseau du VPN **et le groupe `host-network`** sur le port UDP | dans la passerelle partagée d'OVN-Kubernetes, le trafic d'une externalIP arrive au pod avec une source réécrite (voir ci-dessous) |
 | UID arbitraire d'OKD | les images Jitsi utilisent s6-overlay, qui refuse un `/run` appartenant à root ; la variable `S6_YES_I_WANT_A_WORLD_WRITABLE_RUN_BECAUSE_KUBERNETES=1` le lui fait accepter | **ni privilège, ni `anyuid`** |
 | Sondes | Jicofo n'écoute son API de santé que sur `127.0.0.1` : sonde en `exec` | l'écoute n'est pas élargie pour la sonde |
 | Chiffrement | pas de chiffrement de bout en bout | le pont de la maison voit le média, comme tout pont de visio |
-| Affichage | affichable par le seul chat de la plateforme (`frame-ancestors` dans `CSP_HEADER`) ; caméra et micro autorisés par l'attribut `allow` du cadre, pour la visio seulement | la visio vit dans le cockpit |
+| Affichage | affichable par le seul chat de la plateforme (`frame-ancestors` dans `CSP_HEADER`) ; caméra et micro autorisés par l'attribut `allow` du cadre, pour la visio seulement | la visio vit dans le dashboard |
 
 #### Connexion en fenêtre
 
-Quand la visio est passée dans un cadre du cockpit, l'entrée en salle a cessé de marcher : la connexion OIDC se faisait dans le cadre, et le fournisseur d'identité refuse d'y être affiché (« contenu bloqué » sur un ordinateur, rien sur la tablette). On avait vérifié l'affichage dans le cadre, pas l'entrée dans une salle. Décision du foyer : la visio reste dans le cockpit, **seule la connexion passe par une fenêtre**, qui revient à la tuile. Jitsi a ce parcours (`tokenAuthInline`) ; rien n'est ajouté au cockpit.
+Quand la visio est passée dans un cadre du dashboard, l'entrée en salle a cessé de marcher : la connexion OIDC se faisait dans le cadre, et le fournisseur d'identité refuse d'y être affiché (« contenu bloqué » sur un ordinateur, rien sur la tablette). On avait vérifié l'affichage dans le cadre, pas l'entrée dans une salle. Décision du foyer : la visio reste dans le dashboard, **seule la connexion passe par une fenêtre**, qui revient à la tuile. Jitsi a ce parcours (`tokenAuthInline`) ; rien n'est ajouté au dashboard.
 
 - Un petit script de configuration, actif **dans un cadre seulement**, active `tokenAuthInline` et ajoute `fenetre=1` à l'adresse de l'adaptateur. Hors cadre, le parcours par redirection reste tel quel.
 - En mode fenêtre, l'adaptateur exige un `nonce` de forme fermée (64 caractères hexadécimaux, contrôle exact de toute la chaîne) et le garde dans l'état.
@@ -167,7 +167,7 @@ La conférence se montait (les participants entraient dans la salle), mais **auc
 2. **La NetworkPolicy refusait le média.** Le trafic de l'externalIP est bien traduit vers le pod, mais, en passerelle partagée d'OVN-Kubernetes, avec une **source réécrite** en `169.254.0.2` (masquerade de l'hôte). La politique n'admettait que le réseau du VPN : tout restait sans réponse (`[UNREPLIED]` dans la table de suivi des connexions du nœud). Correctif : admettre aussi le groupe `policy-group.network.openshift.io/host-network` sur le port UDP, comme la forge l'est par le groupe `ingress`. Conséquence : la NetworkPolicy ne peut pas filtrer ce trafic par appareil. L'ordinateur a alors établi son média.
 3. **La tablette iOS n'envoyait pas son média dans le tunnel.** Son HTTPS passait par le VPN, mais aucun paquet UDP n'arrivait au nœud. Une page de diagnostic (liste des candidats ICE de l'appareil, requêtes STUN vers le pont, cherchées dans la table de suivi des connexions) l'a prouvé : seule l'adresse Wi-Fi figurait parmi les candidats. **Cause** : le WebRTC de WebKit sur iOS (Safari comme Chrome, qui utilise le même moteur) n'énumère que l'interface « par défaut », et libwebrtc la détermine en ouvrant une socket UDP vers `8.8.8.8` (sans rien envoyer). Avec `AllowedIPs` limité au réseau du VPN, cette interface est le Wi-Fi. **Correctif, dans le profil de l'appareil** : `AllowedIPs = ${VPN_NETWORK}, 8.8.8.8/32`. Le VPN devient l'interface « par défaut » pour WebRTC, et le reste d'Internet reste sur le Wi-Fi ou le réseau mobile. Voir le [profil des appareils iOS](../../../deploy/okd/host/wireguard/README.md#appareils-ios--la-visio-et-le-réseau-par-défaut).
 
-Résultat : **première visio avec image** entre l'ordinateur et la tablette ancienne, dans le cockpit, par le VPN ; les deux participants ont ICE et DTLS établis. Les pistes écartées en route : une connexion directe entre appareils (coupée), un relais TURN en TCP (il aurait échoué pour la même raison que l'UDP), l'application mobile, ou un port sur le réseau local (contraires à « tout par le VPN, dans le cockpit »).
+Résultat : **première visio avec image** entre l'ordinateur et la tablette ancienne, dans le dashboard, par le VPN ; les deux participants ont ICE et DTLS établis. Les pistes écartées en route : une connexion directe entre appareils (coupée), un relais TURN en TCP (il aurait échoué pour la même raison que l'UDP), l'application mobile, ou un port sur le réseau local (contraires à « tout par le VPN, dans le dashboard »).
 
 **Ce qui fait foi** : l'état de débogage du pont (`iceConnected`, paquets) et la table de suivi des connexions du nœud. Le compteur de la règle nftables du VPN n'est pas un contrôle : il est resté à zéro pendant une visio réussie.
 
@@ -175,13 +175,13 @@ Résultat : **première visio avec image** entre l'ordinateur et la tablette anc
 
 | Appareil | Chat | Visio |
 |---|---|---|
-| Ordinateur | Converse.js dans le cockpit | navigateur, dans le cockpit : **image et son établis** |
-| Android | Converse.js dans le cockpit, notifications par l'application ntfy | navigateur, dans le cockpit : à éprouver (le profil VPN par défaut devrait suffire) |
-| Tablette ancienne (iOS 15) | Converse.js dans le cockpit, pastille sans notification page fermée | navigateur, dans le cockpit : **image et son établis**, avec le profil VPN iOS |
+| Ordinateur | Converse.js dans le dashboard | navigateur, dans le dashboard : **image et son établis** |
+| Android | Converse.js dans le dashboard, notifications par l'application ntfy | navigateur, dans le dashboard : à éprouver (le profil VPN par défaut devrait suffire) |
+| Tablette ancienne (iOS 15) | Converse.js dans le dashboard, pastille sans notification page fermée | navigateur, dans le dashboard : **image et son établis**, avec le profil VPN iOS |
 
-Tant que Matrix reste lisible : la **première connexion** au chat Matrix passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. Dans le cockpit, la page de connexion de MAS est refusée en cadre : si la session Matrix a expiré, « Se reconnecter » ouvre Element dans un onglet, puis on revient au cockpit.
+Tant que Matrix reste lisible : la **première connexion** au chat Matrix passe par deux pages de MAS : la liaison du compte, puis l'autorisation de l'application. Dans le dashboard, la page de connexion de MAS est refusée en cadre : si la session Matrix a expiré, « Se reconnecter » ouvre Element dans un onglet, puis on revient au dashboard.
 
-**Element Web n'est pas pris en charge par Safari 15** : c'est l'une des raisons du passage à Converse.js, qui y fonctionne. La pastille des non-lus n'apparaît qu'une fois Messages ouvert : la messagerie n'est pas chargée en arrière-plan à l'ouverture du cockpit, pour ménager la mémoire de la tablette ancienne.
+**Element Web n'est pas pris en charge par Safari 15** : c'est l'une des raisons du passage à Converse.js, qui y fonctionne. La pastille des non-lus n'apparaît qu'une fois Messages ouvert : la messagerie n'est pas chargée en arrière-plan à l'ouverture du dashboard, pour ménager la mémoire de la tablette ancienne.
 
 ## Confidentialité et limites
 
@@ -193,7 +193,7 @@ Tant que Matrix reste lisible : la **première connexion** au chat Matrix passe 
 - **Notifications** : qui connaîtrait le sujet ntfy d'une personne pourrait lui envoyer de fausses alertes ou voir quand elle en reçoit, jamais un contenu ; le sujet n'est montré qu'à elle.
 - **Visio par le navigateur seulement** : l'application mobile de Jitsi, qui envoyait des mesures d'usage à un service tiers, n'est plus utilisée.
 - **Résumé des non-lus** : la route n'expose que des comptes, jamais un texte ni un expéditeur, et seulement à la personne elle-même, par son jeton.
-- **Déconnexion** : se déconnecter du cockpit ferme aussi les sessions des modules d'une liste fermée, messagerie comprise ; la déconnexion de la messagerie **efface les données du navigateur** (`Clear-Site-Data`, et une page sans session pour la tablette ancienne). Element garde son jeton dans le navigateur, hors de portée du cockpit : limite connue, levée avec le retrait de Matrix.
+- **Déconnexion** : se déconnecter du dashboard ferme aussi les sessions des modules d'une liste fermée, messagerie comprise ; la déconnexion de la messagerie **efface les données du navigateur** (`Clear-Site-Data`, et une page sans session pour la tablette ancienne). Element garde son jeton dans le navigateur, hors de portée du dashboard : limite connue, levée avec le retrait de Matrix.
 - **Pas d'agent** dans les salons pour l'instant ; le chat ne reçoit pas les alertes de la plateforme (elles ont leur propre canal, voir [Observabilité](../../concepts/10-observabilite.md)).
 - **Adaptateur** : un appareil du VPN peut épuiser sa réserve d'états en mémoire et bloquer les connexions à la visio pendant 10 minutes.
 
@@ -211,7 +211,7 @@ Tant que Matrix reste lisible : la **première connexion** au chat Matrix passe 
 - **Retrait de Matrix** (Synapse, MAS, Element, module de résumé) à la fin de la recette.
 - **Boutons de visio directs** vers chaque membre, et salles privées par des jetons limités à une salle : plus tard, à la demande du foyer.
 - **Courrier unifié** : décidé, **reporté** derrière les autres projets ; rien n'est ouvert au foyer.
-- **Accès par le cockpit seulement**, une fois le cockpit validé sur tous les appareils : une page de l'application ouverte directement sera renvoyée vers le cockpit ; un accès direct reste à l'administrateur, pour le dépannage.
+- **Accès par le dashboard seulement**, une fois le dashboard validé sur tous les appareils : une page de l'application ouverte directement sera renvoyée vers le dashboard ; un accès direct reste à l'administrateur, pour le dépannage.
 - **Lancer une visio depuis la discussion de Sophia**, et Sophia dans les salons : plus tard, avec les agents.
 
 ## Leçons

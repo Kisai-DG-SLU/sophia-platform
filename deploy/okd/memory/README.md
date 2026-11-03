@@ -111,7 +111,7 @@ La mémoire est un **service**, comme le modèle : appelé par l'interface et pa
 - **extraction isolée** dans un pod sans secret, sans jeton et sans réseau ;
 - la **fermeture de la zone** et une **mise en service générique**, avec ses épreuves.
 
-La page « Mémoire » du cockpit, qui verse, range en versions et valide, est décrite avec le [cockpit](../apps/chat-interface/README.md#page--mémoire-).
+La page « Mémoire » du dashboard, qui verse, range en versions et valide, est décrite avec le [dashboard](../apps/chat-interface/README.md#page--mémoire-).
 
 ### Ensuite
 

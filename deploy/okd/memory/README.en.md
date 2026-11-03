@@ -111,7 +111,7 @@ Memory is a **service**, like the model: called by the interface and by agents a
 - **isolated extraction** in a pod with no secret, no token and no network;
 - **closing the zone** and a **generic rollout**, with its proofs.
 
-The cockpit's "Memory" page, which deposits, keeps versions and validates, is described with the [cockpit](../apps/chat-interface/README.en.md#memory-page).
+The dashboard's "Memory" page, which deposits, keeps versions and validates, is described with the [dashboard](../apps/chat-interface/README.en.md#memory-page).
 
 ### Next
 

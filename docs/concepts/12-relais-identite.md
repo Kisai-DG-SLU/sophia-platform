@@ -4,7 +4,7 @@ Cette fiche dit comment l'interface de discussion permet à un outil MCP d'**agi
 
 L'exemple en service est la recherche dans les fichiers de la personne (La Suite Drive) depuis le chat ; le même chemin servira à tout outil qui doit voir « ce que cette personne a le droit de voir ».
 
-Une seconde voie, sans échange de jeton, sert les **routes de résumé** des applications affichées dans le cockpit (« Quoi de neuf ? ») : voir [Vers les routes de résumé](#vers-les-routes-de-résumé).
+Une seconde voie, sans échange de jeton, sert les **routes de résumé** des applications affichées dans le dashboard (« Quoi de neuf ? ») : voir [Vers les routes de résumé](#vers-les-routes-de-résumé).
 
 ---
 
@@ -70,7 +70,7 @@ Pourquoi échanger : le service n'accepte alors que des jetons **émis pour le M
 
 ## Vers les routes de résumé
 
-Le volet « Quoi de neuf ? » du cockpit est calculé par le **serveur du chat**, qui interroge la route de résumé de chaque application (`GET /api/resume`, déterministe, sans modèle) avec le jeton d'accès de la personne en `Authorization: Bearer`. Ici, **pas d'échange** : le jeton est vérifié par le destinataire, qui applique ses propres droits.
+Le volet « Quoi de neuf ? » du dashboard est calculé par le **serveur du chat**, qui interroge la route de résumé de chaque application (`GET /api/resume`, déterministe, sans modèle) avec le jeton d'accès de la personne en `Authorization: Bearer`. Ici, **pas d'échange** : le jeton est vérifié par le destinataire, qui applique ses propres droits.
 
 ```
 API du chat ──Bearer──► oauth2-proxy de l'application ──► application (route de résumé)
@@ -85,7 +85,7 @@ API du chat ──Bearer──► oauth2-proxy de l'application ──► applic
 - L'audience de chaque destinataire est ajoutée au jeton du chat par un **mappeur d'audience** sur le client du chat ; pour un module sans client Keycloak, une audience personnalisée suffit, aucun client n'est créé ([`deploy/okd/identity/`](../../deploy/okd/identity/README.md#audiences-du-jeton-relayé-par-linterface)).
 - Les groupes sont dans le jeton d'accès, **sans chemin** : `--allowed-group` compare la valeur exacte.
 - **Jamais `--extra-jwt-issuers`** : ce réglage lance une découverte OIDC sur l'adresse publique du fournisseur, que les pods ne joignent pas. Le vérificateur principal contrôle déjà émetteur, clés et audience.
-- Le chat appelle le **Service interne** de l'oauth2-proxy de l'application ; une NetworkPolicy à part ouvre cette seule sortie ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/README.md#cockpit)), et l'application ouvre l'entrée correspondante.
+- Le chat appelle le **Service interne** de l'oauth2-proxy de l'application ; une NetworkPolicy à part ouvre cette seule sortie ([`deploy/okd/apps/chat-interface/`](../../deploy/okd/apps/chat-interface/README.md#dashboard)), et l'application ouvre l'entrée correspondante.
 - L'outil MCP des fichiers sert aussi sa route de résumé, avec la même vérification que ses outils.
 - Une application sans données propres (site statique) n'a pas de route : le chat calcule son résumé lui-même, sans jeton.
 - Côté chat : appels en parallèle, 2 s chacun, aux seuls modules du rôle ; une source refusée (401, 403), absente (503), en panne ou trop grosse est omise ; cache de 60 s sans le jeton ; le jeton n'est jamais journalisé, et nginx ne le transmet à l'API que sur la discussion et sur la route de « Quoi de neuf ? ».
@@ -137,7 +137,7 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | Sessions d'oauth2-proxy côté serveur (chat et autres applications derrière oauth2-proxy) | en service |
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
 | Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
-| Routes de résumé du cockpit : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
+| Routes de résumé du dashboard : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
 | Appel des routes de résumé par le chat, avec le jeton de la personne (cuisine, visualisation, messagerie, fichiers) | en service, vérifié par l'administrateur |
 | Validations humaines par le chat, avec le même jeton relayé | prévu (voir [Observabilité](10-observabilite.md)) |
 

@@ -1,8 +1,8 @@
 # Service mémoire (`sophia-memoire`)
 
-La mémoire du foyer est un **service**, comme le modèle de langage : appelé par l'interface et par les agents, chacun avec ses droits, et **seul rédacteur** de la connaissance. Il reçoit les documents, en extrait le texte dans un pod isolé, les range en versions, les fait valider par une personne désignée, puis les rend cherchables. Le modèle de la connaissance est décrit dans la fiche [RAG 5D](../../../../docs/concepts/03-rag-5d.md) ; la page du cockpit qui l'utilise, dans le [cockpit](../../apps/chat-interface/README.md#page--mémoire-).
+La mémoire du foyer est un **service**, comme le modèle de langage : appelé par l'interface et par les agents, chacun avec ses droits, et **seul rédacteur** de la connaissance. Il reçoit les documents, en extrait le texte dans un pod isolé, les range en versions, les fait valider par une personne désignée, puis les rend cherchables. Le modèle de la connaissance est décrit dans la fiche [RAG 5D](../../../../docs/concepts/03-rag-5d.md) ; la page du dashboard qui l'utilise, dans le [dashboard](../../apps/chat-interface/README.md#page--mémoire-).
 
-**État dans l'installation de référence** : **en service**. Les étapes de mise en service ci-dessous ont toutes été faites, avec leurs deux épreuves conformes (politique du seau, isolement de l'extraction). La page « Mémoire » du cockpit est déployée ; le premier dépôt réel vient avec son contrôle de bout en bout. Le code du service n'est pas fourni ; ce document en donne le contrat, les règles et la recette.
+**État dans l'installation de référence** : **en service**. Les étapes de mise en service ci-dessous ont toutes été faites, avec leurs deux épreuves conformes (politique du seau, isolement de l'extraction). La page « Mémoire » du dashboard est déployée ; le premier dépôt réel vient avec son contrôle de bout en bout. Le code du service n'est pas fourni ; ce document en donne le contrat, les règles et la recette.
 
 ## Où vit quoi (RAG 5D)
 
@@ -170,7 +170,7 @@ L'administrateur applique, une étape à la fois ; chaque contrôle est relu ava
 | 5 ter | L'embedding reste joignable par le routeur | 200 |
 | 6 | **Épreuve de l'isolement de l'extraction** (voir plus haut) | toutes les adresses injoignables ; « conforme » |
 
-Ensuite : la copie de sauvegarde de la configuration S3 est supprimée ; le chat reçoit l'adresse du service et sa sortie vers lui (voir le [cockpit](../../apps/chat-interface/README.md#page--mémoire-)).
+Ensuite : la copie de sauvegarde de la configuration S3 est supprimée ; le chat reçoit l'adresse du service et sa sortie vers lui (voir le [dashboard](../../apps/chat-interface/README.md#page--mémoire-)).
 
 **Au premier dépôt réel**, l'administrateur relit, sans contenu, chemin ni identifiant de personne : les dernières lignes d'audit (`tentative`, puis `ecrit`), le registre (`en_attente`, original et texte présents, pas de commit) ; après validation, l'audit de la décision, le registre (`valide`, original présent, texte dans la forge, un identifiant de commit), le commit `document <id>, version 1` dans le dépôt du niveau, et le dernier envoi des miroirs.
 

@@ -88,9 +88,17 @@ Dans SophIA, tout est modelise comme un projet. Un projet represente une unite d
 
 ---
 
-## Cockpit
+## Dashboard
 
-L'interface de discussion devenue la coquille de toutes les interactions : un accueil pour parler a Sophia, un volet des modules permis par le role, chaque application affichee au centre dans un cadre, sous sa propre connexion, et un volet « Quoi de neuf ? » fait de resumes deterministes fournis par les applications. Une application signale au cockpit qu'elle est prete par un message `sophia.pret`. Voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md).
+L'interface de discussion devenue la coquille de toutes les interactions : un accueil pour parler a Sophia, un volet des modules permis par le role, chaque application affichee au centre dans un cadre, sous sa propre connexion, et un volet « Quoi de neuf ? » fait de resumes deterministes fournis par les applications. Une application signale au dashboard qu'elle est prete par un message `sophia.pret`. Voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md).
+
+Le dashboard s'appelle **cockpit dans le code** et dans le libellé de l'application : les noms de fichiers réels le gardent (`sophia-interface-cockpit-egress.yaml`, `/sophia-cockpit/pret.js`). À ne pas confondre avec le tableau de bord du système (module Visualisation), affiché dans le dashboard.
+
+Adaptable à la demande : ses tuiles et ses pages sont des modules ajoutés au fil des besoins ; l'architecture prévoit que Sophia les développe elle-même (prévu).
+
+## Développement assisté (vibe coding)
+
+Espace prévu où chaque membre du foyer suit les projets qu'il a demandés à Sophia, avec leur maquette visuelle (des pages ouvertes dans un onglet) et leur état chez les agents, en lecture seule ; l'administrateur y confie en plus le développement et le déploiement aux agents et programme avec eux. Étude faite ; rien n'est encore construit. Voir la [feuille de route](roadmap.md).
 
 ---
 

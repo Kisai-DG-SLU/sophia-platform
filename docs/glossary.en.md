@@ -126,9 +126,17 @@ A project represents a unit of work that includes:
 
 ---
 
-## Cockpit
+## Dashboard
 
-The chat interface turned into the shell for every interaction: a home screen to talk to Sophia, a drawer of the modules allowed by the role, each application displayed in the centre in a frame, under its own sign-in, and a "What's new?" drawer made of deterministic summaries supplied by the applications. An application tells the cockpit it is ready with a `sophia.pret` message. See [chat interface](../deploy/okd/apps/chat-interface/README.en.md).
+The chat interface turned into the shell for every interaction: a home screen to talk to Sophia, a drawer of the modules allowed by the role, each application displayed in the centre in a frame, under its own sign-in, and a "What's new?" drawer made of deterministic summaries supplied by the applications. An application tells the dashboard it is ready with a `sophia.pret` message. See [chat interface](../deploy/okd/apps/chat-interface/README.en.md).
+
+The dashboard is called **cockpit in the code** and in the application's label: real file names keep it (`sophia-interface-cockpit-egress.yaml`, `/sophia-cockpit/pret.js`). Not to be confused with the system overview (Visualisation module), shown inside the dashboard.
+
+Adaptable on demand: its tiles and pages are modules added as needs arise; the architecture provides for Sophia developing them herself (planned).
+
+## Assisted development (vibe coding)
+
+A planned space where each household member follows the projects they asked Sophia for, with their visual mock-up (pages opened in a tab) and their state with the agents, read-only; the administrator also hands development and deployment to the agents there and programs with them. Study done; nothing is built yet. See the [roadmap](roadmap.en.md).
 
 ---
 

@@ -51,7 +51,7 @@ When the chat interface relays the person's access token (see [Identity relay](.
 | Receiving service | Check | Mapper |
 |---|---|---|
 | MCP server that exchanges the token (files) | signature, then exchange on behalf of its client | client audience (`included.client.audience`) |
-| an application's oauth2-proxy, for its cockpit summary route | `--skip-jwt-bearer-tokens`: the provider's main verifier, the application's `client-id` required in `aud` | client audience, equal to the application's `client-id` |
+| an application's oauth2-proxy, for its dashboard summary route | `--skip-jwt-bearer-tokens`: the provider's main verifier, the application's `client-id` required in `aud` | client audience, equal to the application's `client-id` |
 | a module that checks the signature itself, without a client of its own (messaging summary) | signature with the realm keys, issuer, audience, originating client, groups | **custom audience** (`included.custom.audience`, `--personnalisee` option): no Keycloak client is created, since it would only serve introspection or exchange |
 
 ```bash
@@ -64,7 +64,7 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <free-a
 - It refuses mismatched cases: `--personnalisee` for a name that is a client, or the reverse.
 - A new audience only appears when the token is renewed: a 403 right after, with an older token, is expected.
 - **Never `--extra-jwt-issuers`** on the application side: that setting triggers an OIDC discovery on the provider's **public** address, which pods cannot reach. The main verifier (keys through the internal Service, public issuer) is enough.
-- The realm's headers do not change: the sign-in page is still refused in a frame (the cockpit offers "Sign in again").
+- The realm's headers do not change: the sign-in page is still refused in a frame (the dashboard offers "Sign in again").
 - These mappers are in `04-realm-sophia.yaml` for a fresh install; the script adds them to an existing realm, since the import only applies at creation.
 
 Status: three audiences (two applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by both applications.
