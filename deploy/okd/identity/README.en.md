@@ -67,7 +67,28 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <free-a
 - The realm's headers do not change: the sign-in page is still refused in a frame (the dashboard offers "Sign in again").
 - These mappers are in `04-realm-sophia.yaml` for a fresh install; the script adds them to an existing realm, since the import only applies at creation.
 
-Status: three audiences (two applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by both applications.
+Status: four audiences (three applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by the first two applications; the third (finances), by the dashboard's real call (200, token accepted).
+
+## Account birth dates, read by an application
+
+Each account's birth date lives in the identity provider, entered by the administrator. Each application that needs it (a child's age for their savings, an adult's age band, birthdays later) reads it with **its own read client**, limited to **one group**. No date goes into people's tokens.
+
+1. **`birthdate` attribute** added to the realm's user profile, removing nothing (a profile declared in the import would replace the whole default profile): read and write reserved to the administrator, ISO format enforced (`04/03/2015` is refused with 400). The person does not see it in their account console and cannot write it.
+2. **`birthdate` mapper removed from the `profile` scope, before any entry**: the default scope carries this mapper, and the date went into each person's access token despite the profile's permissions (tested). Without it, it no longer does.
+3. **Entry** in the administration console, account by account; checked by a script that only returns numbers (date present, correct format), never a date.
+4. **Read client** per application: service account only, **no `realm-management` role**, a single **fine-grained permission** `view-members` on the group (realm fine-grained permissions, version 2). It reads the group's members and their date; it gets 403 for an account outside the group, the user list and search, groups, roles, clients and any write. `query-users` is not needed. Its secret goes into a Secret of the application; the group identifier, not secret, into its configuration. One client can read several groups (for example the children and the adults of a finance application).
+
+| Pitfall | Consequence | Remedy |
+|---|---|---|
+| Fine-grained permissions only accept the unanimous strategy (400 for "affirmative") and combine the permissions of one resource unanimously | two permissions on the same group, one per client, block each other: 403 for both | **one "clients" policy per group**, listing its read clients, under **a single permission** per group; a script that finds another permission on the group stops without doing anything |
+| The `birthdate` mapper of `profile` exists by default | the date goes into tokens as soon as it is entered | remove the mapper before the first entry, and check it |
+| Anyone added to the group later | becomes readable by the client | read a group that contains exactly the intended accounts |
+
+- **Application side**: the read client's token stays in memory; only the account identifier and its date are kept, in a memory cache, never in a database or a log; an adult's age is only used as a band. The token is requested through the provider's internal Service, and the administration API accepts it.
+- **Known flaws** of fine-grained permissions version 2 (CVE-2026-14613, groups seen through a role; CVE-2026-14615, sub-groups seen through a parent group): a read client is not exposed, since it has no rights on roles and reads a group without sub-groups.
+- **Rollback**: delete the permission, the policy, then the client and its Secret; remove the attribute from the profile (the values stay stored, to be erased account by account if wanted); recreate the mapper in `profile`. Without a permission, enabled fine-grained permissions grant nothing.
+
+Status: in service. Tested first on a local Keycloak (same image as production, no network), then checked in numbers after installation: all accounts dated in the right format, no `birthdate` mapper in `profile`, two groups readable by the client and four expected refusals for each; first read by the application confirmed in the log.
 
 ## Reserving an application to some groups: persistent chat and video calls
 

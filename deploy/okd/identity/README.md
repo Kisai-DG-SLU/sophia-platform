@@ -67,7 +67,28 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <audien
 - Les en-têtes du realm ne changent pas : la page de connexion reste refusée dans un cadre (le dashboard propose « Se reconnecter »).
 - Ces mappeurs sont dans `04-realm-sophia.yaml` pour une installation neuve ; le script sert à les ajouter à un realm existant, puisque l'import ne s'applique qu'à la création.
 
-État : trois audiences (deux applications, la messagerie) en service, contrôlées par rejeu du script (« existe, non modifié ») et par un jeton invalide refusé en 403 par les deux applications.
+État : quatre audiences (trois applications, la messagerie) en service, contrôlées par rejeu du script (« existe, non modifié ») et par un jeton invalide refusé en 403 par les deux premières applications ; la troisième (finances), par l'appel réel du dashboard (200, jeton accepté).
+
+## Date de naissance des comptes, lue par une application
+
+La date de naissance de chaque compte vit dans le fournisseur d'identité, saisie par l'administrateur. Chaque application qui en a besoin (âge d'un enfant pour son épargne, tranche d'âge d'un adulte, plus tard des anniversaires) la lit avec **son propre client de lecture**, limité à **un groupe**. Aucune date ne part dans les jetons des personnes.
+
+1. **Attribut `birthdate`** ajouté au profil utilisateur du realm, sans rien retirer (un profil déclaré dans l'import remplacerait le profil par défaut entier) : lecture et écriture réservées à l'administrateur, format ISO imposé (`04/03/2015` est refusé en 400). La personne ne le voit pas dans sa console de compte et ne peut pas l'écrire.
+2. **Mappeur `birthdate` retiré de la portée `profile`, avant toute saisie** : la portée par défaut porte ce mappeur, et la date partait dans le jeton d'accès de chaque personne malgré les droits du profil (éprouvé). Sans lui, elle n'y est plus.
+3. **Saisie** dans la console d'administration, compte par compte ; vérification par un script qui ne rend que des nombres (date présente, format correct), jamais une date.
+4. **Client de lecture** par application : compte de service seul, **aucun rôle de `realm-management`**, une seule **permission fine** `view-members` sur le groupe (permissions fines du realm, version 2). Il lit les membres du groupe et leur date ; il reçoit 403 pour un compte hors du groupe, la liste et la recherche des utilisateurs, les groupes, les rôles, les clients et toute écriture. `query-users` n'est pas nécessaire. Son secret va dans un Secret de l'application ; l'identifiant du groupe, non secret, dans sa configuration. Un même client peut lire plusieurs groupes (par exemple les enfants et les adultes d'une application de finances).
+
+| Piège | Conséquence | Parade |
+|---|---|---|
+| Les permissions fines n'acceptent que la stratégie unanime (400 pour « affirmative ») et combinent à l'unanimité les permissions d'une même ressource | deux permissions sur un même groupe, une par client, se bloquent : 403 pour les deux | **une politique « clients » par groupe**, qui liste ses clients de lecture, sous **une seule permission** par groupe ; un script qui trouve une autre permission sur le groupe s'arrête sans rien faire |
+| Le mappeur `birthdate` de `profile` existe par défaut | la date part dans les jetons dès sa saisie | retirer le mappeur avant la première saisie, et le vérifier |
+| Toute personne ajoutée plus tard au groupe | devient lisible par le client | lire un groupe qui contient exactement les comptes voulus |
+
+- **Côté application** : le jeton du client de lecture reste en mémoire ; seuls l'identifiant du compte et sa date sont gardés, en cache mémoire, jamais en base ni dans un journal ; l'âge d'un adulte n'est utilisé qu'en tranche. Le jeton se demande par le Service interne du fournisseur, et l'API d'administration l'accepte.
+- **Failles connues** des permissions fines version 2 (CVE-2026-14613, groupes vus par un rôle ; CVE-2026-14615, sous-groupes vus par un groupe parent) : un client de lecture n'y est pas exposé, puisqu'il n'a aucun droit sur les rôles et lit un groupe sans sous-groupe.
+- **Retour arrière** : supprimer la permission, la politique, puis le client et son Secret ; retirer l'attribut du profil (les valeurs restent stockées, à effacer compte par compte si voulu) ; recréer le mappeur dans `profile`. Sans permission, les permissions fines activées n'accordent rien.
+
+État : en service. Éprouvé d'abord sur un Keycloak local (même image que la production, sans réseau), puis contrôlé en nombres après l'installation : tous les comptes datés au bon format, aucun mappeur `birthdate` dans `profile`, deux groupes lisibles par le client et quatre refus attendus pour chacun ; première lecture par l'application confirmée au journal.
 
 ## Réserver une application à certains groupes : chat permanent et visio
 
