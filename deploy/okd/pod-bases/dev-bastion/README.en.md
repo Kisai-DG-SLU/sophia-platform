@@ -30,6 +30,7 @@ Removing the `privileged` SCC: back up the bindings outside the repository, appl
 | `${INTERNAL_REGISTRY}` | cluster internal registry | `image-registry.openshift-image-registry.svc:5000` |
 | `${VPN_SERVER_IP}` | server address on the VPN, externalIP of `dev-gateway-vpn` | `a.b.c.1` |
 | `${DEV_GATEWAY_VPN_PORT}` | the gateway's SSH port on that address, distinct from Forgejo's ports | — |
+| `${DEV_GATEWAY_CLUSTER_IP}` | fixed ClusterIP of `dev-gateway`, the landing point of the administration fallback through the node | a free address of the Service network |
 
 ## Usage
 
