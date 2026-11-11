@@ -1,5 +1,5 @@
 # Code de Conduite
 
-SOPHIA suit une regle simple :
+SOPHIA suit une règle simple :
 
-Discussions respectueuses et echanges techniques constructifs.
+Discussions respectueuses et échanges techniques constructifs.
