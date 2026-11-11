@@ -38,11 +38,11 @@ printf '#!/bin/bash\necho "logger $*" >> "$TRACE"\n' > "$B/bin/logger"
 chmod +x "$B"/bin/*
 run() {
   local s="$B/$1.$2.$3.sh" t="$B/trace.$1.$2.$3" cache="$B/cache.$1.$2.$3"
-  sed -e "s#CACHE=/var/lib/sophia/ovn-nft-image#CACHE=$cache#" "$B/$1.sh" > "$s"
+  sed -e "s#^CACHE=[^ ]*#CACHE=$cache#" "$B/$1.sh" > "$s"
   case $3 in
-    inscriptible) sed -i.bak "s#METRIQUE=/var/lib/sophia/metrics/wg_filter.prom#METRIQUE=$B/m.$2/wg_filter.prom#" "$s" ;;
-    absent) sed -i.bak "s#METRIQUE=/var/lib/sophia/metrics/wg_filter.prom#METRIQUE=/proc/interdit/wg_filter.prom#" "$s" ;;
-    erreur) mkdir -p "$B/err.$2/wg_filter.prom"; sed -i.bak "s#METRIQUE=/var/lib/sophia/metrics/wg_filter.prom#METRIQUE=$B/err.$2/wg_filter.prom#" "$s" ;;
+    inscriptible) sed -i.bak "s#^METRIQUE=.*#METRIQUE=$B/m.$2/wg_filter.prom#" "$s" ;;
+    absent) sed -i.bak "s#^METRIQUE=.*#METRIQUE=/proc/interdit/wg_filter.prom#" "$s" ;;
+    erreur) mkdir -p "$B/err.$2/wg_filter.prom"; sed -i.bak "s#^METRIQUE=.*#METRIQUE=$B/err.$2/wg_filter.prom#" "$s" ;;
   esac
   case $2 in podman_ok|podman_ko) echo "quay.io/ovn@sha256:abc" > "$cache" ;; esac
   : > "$t"; PATH="$B/bin:/usr/bin:/bin" TRACE="$t" SCEN="$2" bash "$s" 2>/dev/null

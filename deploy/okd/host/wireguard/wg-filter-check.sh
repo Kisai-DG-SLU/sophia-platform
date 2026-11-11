@@ -8,11 +8,12 @@
 #
 # Appelé par sophia-wg-filter.service (après chargement) et sophia-wg-filter-check.timer.
 set -u
-CACHE=/var/lib/sophia/ovn-nft-image   # image OVN de la dernière vérification réussie
+# Gabarit : le répertoire de la plateforme sur /var du nœud se rend par envsubst avant la copie (README, section 3).
+CACHE=${SOPHIA_VAR_DIR}/ovn-nft-image   # image OVN de la dernière vérification réussie
 log() { logger -t sophia-wg-filter -p "daemon.$1" -- "$2"; echo "$2" >&2; }
 # État exposé en métrique (lu par l'exporteur du nœud, ../../monitoring/, alertes du filtre). Écriture
 # atomique ; toute erreur est ignorée : la métrique ne change jamais le comportement du garde-fou.
-METRIQUE=/var/lib/sophia/metrics/wg_filter.prom
+METRIQUE=${SOPHIA_VAR_DIR}/metrics/wg_filter.prom
 metrique() {
     { mkdir -p "${METRIQUE%/*}" &&
       printf '# TYPE sophia_wg_filter_code gauge\nsophia_wg_filter_code %s\n# TYPE sophia_wg_filter_horodatage_secondes gauge\nsophia_wg_filter_horodatage_secondes %s\n' \

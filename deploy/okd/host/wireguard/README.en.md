@@ -17,6 +17,7 @@ No value from the reference installation is given here: pick your own.
 | `${GIT_SSH_PORT}`, `${GIT_HTTP_PORT}` | Forgejo ports exposed on the externalIP | — |
 | `${JVB_UDP_PORT}` | UDP port of video call media, exposed on the same externalIP (section 6) | — |
 | `${DEV_GATEWAY_VPN_PORT}` | SSH port of the dev gateway on the same externalIP, reserved to administration (section 7) | — |
+| `${SOPHIA_VAR_DIR}` | the platform's directory on the node's `/var`, where the safeguard keeps the OVN image it saw and writes its metric (`wg-filter-check.sh`); the same as for [monitoring](../../monitoring/README.en.md) | `/var/lib/sophia` |
 | `${LAN_NODE_IP}` | the node's address on the local network: out-of-VPN administration fallback (section 7) | — |
 
 Any address outside `${VPN_ADMIN_RANGE}` is a **user** device: HTTP/HTTPS only.
@@ -95,15 +96,16 @@ From an **administration** workstation (the session stays open whatever happens)
 
 ```bash
 # render the template (EXPLICIT list: the nft code's "$" are left alone)
-export VPN_SERVER_IP=… VPN_ADMIN_RANGE=… GIT_SSH_PORT=… GIT_HTTP_PORT=…
+export VPN_SERVER_IP=… VPN_ADMIN_RANGE=… GIT_SSH_PORT=… GIT_HTTP_PORT=… SOPHIA_VAR_DIR=…
 envsubst '$VPN_SERVER_IP $VPN_ADMIN_RANGE $GIT_SSH_PORT $GIT_HTTP_PORT' < wg-filter.nft > wg-filter.rendu.nft
 grep -n '\${' wg-filter.rendu.nft && echo "⚠ unrendered variable" || echo "fully rendered"
-# copy to the node: wg-filter.rendu.nft, wg-filter-check.sh, test-nft-ovn.sh, the three systemd units
+envsubst '$SOPHIA_VAR_DIR' < wg-filter-check.sh > wg-filter-check.rendu.sh   # the safeguard is a template too
+# copy to the node: wg-filter.rendu.nft, wg-filter-check.rendu.sh, test-nft-ovn.sh, the three systemd units
 # on the node
 sudo nft list ruleset > ~/backup-nft-$(date +%Y%m%d).txt          # backup
 sudo bash test-nft-ovn.sh                                          # compatibility with OVN's nft
 sudo mkdir -p /etc/sophia
-sudo install -m 644 wg-filter.rendu.nft /etc/sophia/wg-filter.nft && sudo install -m 755 wg-filter-check.sh /etc/sophia/
+sudo install -m 644 wg-filter.rendu.nft /etc/sophia/wg-filter.nft && sudo install -m 755 wg-filter-check.rendu.sh /etc/sophia/wg-filter-check.sh
 sudo nft -c -f /etc/sophia/wg-filter.nft && echo "syntax OK"          # check only, applies nothing
 # dead-man switch: the table is dropped in 3 min unless cancelled (the tunnel is untouched)
 sudo systemd-run --unit=wg-filter-deadman --on-active=180 /usr/sbin/nft delete table inet sophia_wg
@@ -151,7 +153,7 @@ If the safeguard removed the table: the cluster runs but **the VPN is no longer 
 
 ## 5. Safeguard as a metric
 
-On each run, the safeguard writes its code (0 readable, 1 table removed, 2 check impossible) and a timestamp to `/var/lib/sophia/metrics/wg_filter.prom`, read by the node exporter ([`../../monitoring/`](../../monitoring/)). Three alerts follow: filter removed, check impossible, safeguard silent for more than 45 minutes. The write is atomic (temporary file, then `mv`) and **every error is ignored**: the safeguard's decisions, actions and exit codes do not change.
+On each run, the safeguard writes its code (0 readable, 1 table removed, 2 check impossible) and a timestamp to `${SOPHIA_VAR_DIR}/metrics/wg_filter.prom`, read by the node exporter ([`../../monitoring/`](../../monitoring/)). Three alerts follow: filter removed, check impossible, safeguard silent for more than 45 minutes. The write is atomic (temporary file, then `mv`) and **every error is ignored**: the safeguard's decisions, actions and exit codes do not change.
 
 This is the only administration path: a change to the safeguard is installed with the same care as the filter.
 
