@@ -50,6 +50,7 @@ Job d'initialisation ───────────────────�
 | `${S3_HOST}` | nom DNS de l'API S3, résolu vers l'adresse du VPN | `s3.apps.example.org` |
 | `${FILES_ORIGIN}` | origine exacte de l'application de fichiers (CORS) | `https://files.apps.example.org` |
 | `${WORKSPACE_NAMESPACE}` | namespace de l'application de fichiers | `workspace` |
+| `${SOPHIA_MEMORY_NAMESPACE}` | namespace du service mémoire, admis en entrée de la passerelle S3 | `sophia-memory` |
 | `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`) | `node-0` |
 | `${S3_MOUNT_POINT}` | point de montage du volume sur le nœud | `/var/mnt/s3` |
 | `${S3_SIZE}` | taille du PV et de la PVC | `200Gi` |
@@ -105,6 +106,6 @@ Tant que rien ne dépend du stockage : supprimer la Route, le Job et `02-seaweed
 
 ## Suite
 
-- **Nouveau consommateur** (mémoire, modules) : une identité dans `s3-config`, limitée à son seau ; une entrée dans `03-network.yaml` ; une politique de seau comme `ProtegerVersions` si le seau est versionné.
+- **Nouveau consommateur** (modules) : une identité dans `s3-config`, limitée à son seau ; une entrée dans `03-network.yaml` ; une politique de seau comme `ProtegerVersions` si le seau est versionné. Le [service mémoire](../memory/memoire/README.md) suit ce modèle : son identité, son seul pod en entrée, une politique qui lui refuse toute suppression de ce qui est validé.
 - **Plusieurs nœuds** : des `weed volume` ajoutés au maître, ou des composants séparés.
 - **Montée de version** : une nouvelle empreinte dans `02-seaweedfs.yaml`, options relues dans `weed mini -h` de cette version, puis `oc diff` et `apply` ; les données restent compatibles.
