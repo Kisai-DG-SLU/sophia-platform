@@ -34,7 +34,7 @@ Les embeddings permettent aux systèmes de récupérer des informations pertinen
 
 ## Base vectorielle
 
-Base de données conque pour stocker et rechercher efficacement des embeddings.
+Base de données conçue pour stocker et rechercher efficacement des embeddings.
 
 Exemples courants : Qdrant, Weaviate, Milvus.
 
@@ -54,7 +54,7 @@ Les agents peuvent écrire du code, interroger des données, interagir avec des 
 
 Acronyme de **Sovereign Orchestrator Platform for Holistic Intelligence Architecture**.
 
-Architecture expérimentale conque pour orchestrer des systèmes d'IA dans une infrastructure sécurisée et souveraine.
+Architecture expérimentale conçue pour orchestrer des systèmes d'IA dans une infrastructure sécurisée et souveraine.
 
 ---
 
@@ -116,7 +116,7 @@ Ses responsabilités incluent : isolation de l'accès web, nettoyage du contenu,
 
 Mécanisme de validation qui évalue la crédibilité des informations externes avant leur intégration dans la base de connaissance.
 
-Son objectif est de réduire le risque d'ingestion de contenu non fiable ou gener par IA.
+Son objectif est de réduire le risque d'ingestion de contenu non fiable ou généré par IA.
 
 ---
 

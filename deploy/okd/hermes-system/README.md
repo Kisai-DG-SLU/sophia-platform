@@ -53,11 +53,11 @@ Chaque réglage s'essaie d'abord sur un seul agent, redémarré seul, puis sur l
 
 ## Assistant de code persistant (Dionysos)
 
-Dionysos peut héberger un assistant de code (Claude Code) pour l'administration. Son volume `/opt/data` est un `emptyDir` : il survit au redémarrage du noeud, pas à la recréation du pod. Pour que l'assistant, sa configuration et son historique survivent, `02-observer-dionysos.yaml` ajoute :
+Dionysos peut héberger un assistant de code (Claude Code) pour l'administration. Son volume `/opt/data` est un `emptyDir` : il survit au redémarrage du nœud, pas à la recréation du pod. Pour que l'assistant, sa configuration et son historique survivent, `02-observer-dionysos.yaml` ajoute :
 
 | Élément | Rôle |
 |---|---|
-| initContainer `init-claude` | restaure la configuration et l'historique depuis un dépôt Git privé dédié (`${CLAUDE_REPO}`), puis installe l'assistant à la version `${CLAUDE_CODE_VERSION}` si elle manque ; idempotent (rejoue après un redémarrage du noeud sans écraser le travail local) |
+| initContainer `init-claude` | restaure la configuration et l'historique depuis un dépôt Git privé dédié (`${CLAUDE_REPO}`), puis installe l'assistant à la version `${CLAUDE_CODE_VERSION}` si elle manque ; idempotent (rejoue après un redémarrage du nœud sans écraser le travail local) |
 | sidecar natif `claude-sync` | pousse l'historique toutes les `${CLAUDE_SYNC_INTERVAL}` secondes, à chaque fin de session (un hook `SessionEnd` de l'assistant crée `/opt/data/.claude-home/.sync-request`, couvre `/clear` et la sortie) et à l'arrêt du pod (`SIGTERM`, `terminationGracePeriodSeconds: 60`) |
 | conteneur `dionysos` | `CLAUDE_CONFIG_DIR`, `PATH`, `npm_config_*`, `DISABLE_AUTOUPDATER` (version figée par l'initContainer), `CLAUDE_CODE_OAUTH_TOKEN` |
 
