@@ -1,3 +1,4 @@
+# Historique, non maintenu : espace de notebooks du socle de juin 2026, jamais déployé dans l'installation de référence (voir README.md de ce dossier).
 apiVersion: apps/v1
 kind: Deployment
 metadata:

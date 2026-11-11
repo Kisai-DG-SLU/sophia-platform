@@ -1,5 +1,7 @@
 # Sophia Notebook Workspace
 
+> **Historical, not maintained.** Notebook workspace from the June 2026 base, never deployed in the reference installation. It is kept as an example; its manifests have not followed today's rules (namespace, network, identity). Each file carries the same note.
+
 Generic notebook workspace for SophIA.
 
 ## Purpose

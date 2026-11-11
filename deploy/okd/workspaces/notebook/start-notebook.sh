@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Historique, non maintenu : espace de notebooks du socle de juin 2026, jamais déployé dans l'installation de référence (voir README.md de ce dossier).
 set -euo pipefail
 
 export PATH="/tmp/.pixi/bin:${PATH}"

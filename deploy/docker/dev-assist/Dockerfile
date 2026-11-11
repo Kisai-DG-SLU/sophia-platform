@@ -1,3 +1,4 @@
+# Historique, non maintenu : image du socle de juin 2026, ni construite ni déployée dans l'installation de référence (voir deploy/docker/README.md).
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 RUN microdnf install -y dnf && \

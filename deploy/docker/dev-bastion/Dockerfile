@@ -1,3 +1,4 @@
+# Historique, non maintenu : image du socle de juin 2026, ni construite ni déployée dans l'installation de référence (voir deploy/docker/README.md).
 FROM alpine:latest
 RUN apk add --no-cache openssh bash && \
     adduser -D -s /bin/bash ${APP_USER:-app-user} && \

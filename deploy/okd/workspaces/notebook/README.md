@@ -1,5 +1,7 @@
 # Sophia Notebook Workspace
 
+> **Historique, non maintenu.** Espace de notebooks du socle de juin 2026, jamais déployé dans l'installation de référence. Il est gardé comme exemple ; ses manifestes n'ont pas suivi les règles d'aujourd'hui (namespace, réseau, identité). Chaque fichier porte la même mention.
+
 Workspace notebook générique pour SophIA.
 
 ## Objectif
