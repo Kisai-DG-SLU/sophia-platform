@@ -1,37 +1,37 @@
-# SOPHIA : Exemple de Deploiement
+# SOPHIA : Exemple de Déploiement
 
-Ce repertoire contient un exemple de deploiement de l'architecture SophIA (actuellement sur **OKD**, la distribution Kubernetes d'OpenShift).
+Ce répertoire contient un exemple de déploiement de l'architecture SophIA (actuellement sur **OKD**, la distribution Kubernetes d'OpenShift).
 
-La configuration fournie correspond a l'environnement de Proof of Concept utilise lors du developpement initial du projet.
+La configuration fournie correspond à l'environnement de Proof of Concept utilisé lors du développement initial du projet.
 
-Elle demontre comment les differents composants de l'architecture SophIA peuvent etre deployes sur une plateforme Kubernetes.
+Elle démontre comment les différents composants de l'architecture SophIA peuvent être déployés sur une plateforme Kubernetes.
 
 ---
 
 ## Objectif
 
-Ce repertoire a pour but de :
+Ce répertoire a pour but de :
 
-- fournir une disposition de deploiement de reference
-- illustrer comment les composants de la plateforme sont organises
+- fournir une disposition de déploiement de référence
+- illustrer comment les composants de la plateforme sont organisés
 - documenter l'architecture des namespaces
-- permettre l'experimentation et la reproduction locale du systeme
-- dimensionner et preparer le stockage persistant : voir [stockage persistant](stockage-persistant.md)
+- permettre l'expérimentation et la reproduction locale du système
+- dimensionner et préparer le stockage persistant : voir [stockage persistant](stockage-persistant.md)
 
-Cette configuration n'est pas destinee a etre une distribution prete pour la production. Elle sert d'exemple d'infrastructure utilise pour l'experimentation et la documentation.
+Cette configuration n'est pas destinée à être une distribution prête pour la production. Elle sert d'exemple d'infrastructure utilisé pour l'expérimentation et la documentation.
 
 ---
 
 ## Plateforme
 
-L'environnement de deploiement de reference utilise :
+L'environnement de déploiement de référence utilise :
 
 - OKD (OpenShift Kubernetes Distribution)
-- services conteneurises
+- services conteneurisés
 - isolation par namespaces
-- segmentation reseau via NetworkPolicies Kubernetes
+- segmentation réseau via NetworkPolicies Kubernetes
 
-La structure de deploiement suit les principes architecturaux decrits dans `docs/architecture.md`.
+La structure de déploiement suit les principes architecturaux décrits dans `docs/architecture.md`.
 
 ---
 
@@ -65,56 +65,56 @@ La même pour toutes les recettes ; son but est de ne jamais casser ce qui tourn
 6. **Un réglage commun s'essaie sur un seul composant** avant les autres.
 7. **Aucune suppression implicite** : un objet retiré d'un gabarit se retire du cluster par une étape à part, contrôlée.
 
-## Modele de namespaces
+## Modèle de namespaces
 
-Le deploiement exemple utilise une architecture de namespaces segmentee. Les namespaces typiques incluent :
+Le déploiement exemple utilise une architecture de namespaces segmentée. Les namespaces typiques incluent :
 
-| Namespace        | Role                                      |
+| Namespace        | Rôle                                      |
 |------------------|-------------------------------------------|
 | sophia-core      | services d'orchestration                  |
-| sophia-inference | execution locale de modeles               |
+| sophia-inference | exécution locale de modèles               |
 | sophia-memory    | base vectorielle                          |
-| sophia-git       | depots de projets                         |
+| sophia-git       | dépôts de projets                         |
 | sophia-skills    | outils MCP                                |
-| sophia-dmz       | acquisition web controlee                 |
-| sophia-sandbox   | environnements de developpement           |
+| sophia-dmz       | acquisition web contrôlée                 |
+| sophia-sandbox   | environnements de développement           |
 | sophia-test      | environnements de validation              |
 | sophia-apps      | modules                                   |
 | sophia-interface | interface de discussion                   |
 | sophia-workflow  | outil de visualisation                    |
 | sophia-workspace | bureautique                               |
 | sophia-messagerie | chat permanent (Matrix), en recette      |
-| sophia-visio     | visioconference (Jitsi Meet), en recette  |
+| sophia-visio     | visioconférence (Jitsi Meet), en recette  |
 | sophia-skills-build | builds des outils MCP, sans compte d'agent |
 | namespace des agents | panthéon et assistant de code         |
 | sophia-identity  | identité et SSO (Keycloak)                |
 | sophia-storage   | stockage objet S3 commun                  |
 
-Cette disposition illustre l'architecture Hub and Spoke utilisee par la plateforme.
+Cette disposition illustre l'architecture Hub and Spoke utilisée par la plateforme.
 
 ---
 
 ## Remarques importantes
 
-Cet exemple de deploiement reflete la configuration utilisee pour l'environnement d'experimentation de l'auteur. Il peut inclure des politiques de securite simplifiees, des hypotheses d'infrastructure locale et des configurations specifiques au developpement.
+Cet exemple de déploiement reflète la configuration utilisée pour l'environnement d'expérimentation de l'auteur. Il peut inclure des politiques de sécurité simplifiées, des hypothèses d'infrastructure locale et des configurations spécifiques au développement.
 
-Avant tout deploiement reel, les organisations doivent adapter la configuration a leur propre infrastructure et exigences de securite.
+Avant tout déploiement réel, les organisations doivent adapter la configuration à leur propre infrastructure et exigences de sécurité.
 
 ---
 
-## Ameliorations futures
+## Améliorations futures
 
-A l'avenir, la couche de deploiement pourra inclure :
+À l'avenir, la couche de déploiement pourra inclure :
 
 - des charts Helm reproductibles
 - des packages Kustomize
-- un bootstrap automatise de cluster
-- des architectures de reference pour differentes echelles de deploiement
+- un bootstrap automatisé de cluster
+- des architectures de référence pour différentes échelles de déploiement
 
 ---
 
 ## Statut
 
-Experimental.
+Expérimental.
 
-Ce repertoire documente l'infrastructure utilisee pour valider les concepts architecturaux decrits dans ce depot.
+Ce répertoire documente l'infrastructure utilisée pour valider les concepts architecturaux décrits dans ce dépôt.
