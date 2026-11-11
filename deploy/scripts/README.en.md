@@ -1,27 +1,17 @@
-# Scripts — Reference
+# Scripts
 
-This directory documents the operational scripts found in the internal agent configuration repository (`scripts/`). These scripts are specific to the live infrastructure and are not reproduced here.
+The reference installation's operating scripts (backups, certificate rotation, the administrator's workstation) are not published: they carry that installation's paths, names and secrets. The scripts needed to reproduce the platform are published **next to the recipe that uses them**, driven by variables (a few node paths, in the inference and tools scripts, are still to be turned into variables):
 
-## Script Inventory
+| Recipe | Scripts | Role |
+|---|---|---|
+| [Model router](../okd/core/README.en.md) | `okd/core/litellm/*.py` | virtual keys per use and per agent, a key's models, prices copied from the provider |
+| [Identity](../okd/identity/README.en.md) | `ajouter-mappeur-audience.py`, `temporal-keycloak.py`, `sessions/acl.sh` | audiences of the relayed token, Temporal's client, session accounts |
+| [Chat interface](../okd/apps/chat-interface/README.en.md) | `entrypoint.sh`, `render-*.py` | configuration rendered at start-up |
+| [VPN](../okd/host/wireguard/README.en.md) | `add-peer.sh`, `wg-filter*`, `test-*.sh` | peers, the node's filter and its tests |
+| [Inference](../okd/inference/README.en.md) | `fetch-*.sh`, `export-voices.sh`, `bench.py` | models and voices on the node, measurement bench |
+| [Memory](../okd/memory/README.en.md) | `qdrant-schema.py` | vector database collections |
+| [Monitoring](../okd/monitoring/README.en.md) | `*-ajout.py`, `node-metrics/` | alert routes, node exporter |
+| [Tools](../okd/skills/README.en.md) | `fetch-geo-data.sh`, `geo_build.py` | local geographic data |
+| [Development assistant](../okd/hermes-system/assistant/README.en.md) | `ws` | one session per project |
 
-| Script | Purpose |
-|---|---|
-| `save-brain.sh` | Automated commit and push for both the agent config repository and the memory repository. Supports `--dry-run`, `--engine-only`, `--memory-only` flags. |
-| `sophia-vault.sh` | SOPS encryption/decryption wrapper for managing encrypted secrets (`secrets.enc.env`). |
-| `backup_db.sh` | Database backup reference script. PostgreSQL was removed in favor of Langfuse Cloud for observability; kept for future RAG with PostgreSQL + pgvector. |
-| `rotate-certificates-macos.sh` | OpenShift certificate rotation for macOS environments. Triggered when certificates are exposed. |
-| `rotate-certificates-emergency.sh` | Emergency manual certificate rotation guide for OpenShift. Requires manual admin intervention. |
-| `rotate-kubeconfig.md` | Step-by-step guide for revoking and rotating exposed `kubeconfig` certificates. |
-| `generate_workspaces.py` | Generates `.code-workspace` multi-root files for all projects (Production + Memory directories). |
-| `migrate_all_projects.sh` | Bulk migration script for project infrastructure. |
-| `create_sophia_links.sh` | Creates symbolic links and directory structure for the Sophia workspace. |
-| `check_and_start.sh` | Health check and startup script for agent gateway. |
-| `direnv_hook.sh` | Shell hook for environment variable auto-loading with direnv. |
-
-## Deployment Notes
-
-These scripts are **not** included in the public repository as they contain infrastructure-specific logic, paths, and credentials. If you need similar functionality:
-
-- **Backup/rotation**: Adapt from the reference scripts using your cluster's native backup tools (Velero, etcd snapshots)
-- **Secret management**: Use SOPS, Helm Secrets, or External Secrets Operator
-- **Workspace management**: Use the OpenShift API or a GitOps tool (ArgoCD)
+Each script's usage, dry run included when it has one, is in its recipe.
