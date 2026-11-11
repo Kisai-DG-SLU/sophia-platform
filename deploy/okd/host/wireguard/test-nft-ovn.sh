@@ -3,7 +3,8 @@
 # sudo bash test-nft-ovn.sh — tables de test SANS chaîne de base (aucun hook, aucun effet
 # sur le trafic), chacune supprimée aussitôt. Ne touche ni à OVN, ni à OpenShift, ni à wg0.
 # Adresses de documentation (RFC 5737) et ports neutres : seule la syntaxe compte ici.
-# Attendu (OKD 4.21, nft OVN 1.0.9) : 02, 03, 06, 07, 21 → 139 (sets nommés) ; tout le reste → 0.
+# Attendu (OKD 4.21, nft OVN 1.0.9) : 02, 03, 06, 07, 21 → 139 (sets nommés) ; tout le reste → 0,
+# 22 à 26 compris (udp dport du média de la visio, en forward et en input ; port de la passerelle de dev).
 set -u
 CID=$(crictl ps --name '^ovn-controller$' -q | head -1); [ -n "$CID" ] || { echo "ovn-controller introuvable"; exit 1; }
 echo "hôte: $(nft --version) | OVN: $(crictl exec "$CID" nft --version)"
@@ -44,4 +45,9 @@ t 16 inet none 'meta nfproto ipv4 ct original daddr 192.0.2.1 accept'
 t 17 inet none 'ct status dnat accept'
 t 20 inet none  'ip saddr 192.0.2.2-192.0.2.9 ct original ip daddr 192.0.2.1 tcp dport { 8022, 8080 } accept'
 t 21 inet plain 'ip saddr @admins ct original ip daddr 192.0.2.1 tcp dport { 8022, 8080 } accept'
+t 22 inet none  'udp dport 10000 accept'
+t 23 inet none  'ct original ip daddr 192.0.2.1 udp dport 10000 counter accept comment "visio : média"'
+t 24 inet none  'counter drop comment "VPN : rien de relayé hors Forgejo (admin) et visio"'
+t 25 inet none  'iifname "wg0" ip daddr 192.0.2.1 udp dport 10000 counter accept comment "visio : média en input"'
+t 26 inet none  'ip saddr 192.0.2.2-192.0.2.9 ct original ip daddr 192.0.2.1 tcp dport 8023 counter accept comment "administration : passerelle de dev"'
 echo "restantes : $(nft list tables | grep -c sophia_t_)"   # doit afficher 0
