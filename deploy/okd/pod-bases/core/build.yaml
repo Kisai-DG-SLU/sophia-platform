@@ -15,6 +15,11 @@ spec:
     type: Docker
     dockerStrategy:
       dockerfilePath: Containerfile
+  # Le pod de build compte dans le quota de sophia-core : limites explicites, sinon il reçoit les valeurs
+  # par défaut du namespace
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
   output:
     to:
       kind: ImageStreamTag

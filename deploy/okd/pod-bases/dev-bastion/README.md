@@ -30,6 +30,7 @@ Retrait de la SCC `privileged` : sauvegarde des liaisons hors du dépôt, SCC pr
 | `${INTERNAL_REGISTRY}` | registre interne du cluster | `image-registry.openshift-image-registry.svc:5000` |
 | `${VPN_SERVER_IP}` | adresse du serveur sur le VPN, externalIP de `dev-gateway-vpn` | `a.b.c.1` |
 | `${DEV_GATEWAY_VPN_PORT}` | port SSH de la passerelle sur cette adresse, distinct des ports de Forgejo | — |
+| `${DEV_GATEWAY_CLUSTER_IP}` | ClusterIP fixée de `dev-gateway`, point d'arrivée du secours d'administration par le nœud | une adresse libre du réseau des Services |
 
 ## Utilisation
 

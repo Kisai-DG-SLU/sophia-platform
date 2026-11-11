@@ -14,6 +14,8 @@ metadata:
   namespace: ${SANDBOX_NAMESPACE}
 spec:
   type: ClusterIP
+  # ClusterIP fixée : le secours d'administration (rebond par le nœud) vise cette adresse et ce port
+  clusterIP: ${DEV_GATEWAY_CLUSTER_IP}
   selector:
     app: dev-gateway
   ports:
