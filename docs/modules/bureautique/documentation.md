@@ -30,6 +30,7 @@ Collabora ──► API WOPI de Fichiers (TLS interne), DNS ; rien d'autre
 | Isolation | pods en `restricted-v2`, sans capacité ; Collabora isole les documents par **Landlock** | Collabora ne reçoit aucune capacité Linux ; Landlock est vérifié actif dans son journal |
 | Collabora | `always_save_on_exit=true`, `idle_timeout_secs=1800`, `max_concurrency=2`, `cleanup.limit_dirty_mem_mb=1024` ; sauvegarde automatique à 30 s et 5 min ; sonde sur `/` | rien ne se perd à la fermeture ; un document oublié libère la mémoire ; deux conversions au plus en parallèle sur un nœud partagé |
 | Preuve WOPI | une clé de preuve RSA dans un Secret monté | sans elle, Collabora ne signe pas ses appels et Fichiers ne vérifie pas leur origine |
+| API REST de Collabora | refusée (403) par nginx (`convert-to`, `get-thumbnail`, `getMetrics` et voisines) ; console d'administration fermée (404) | Collabora admet son API REST depuis les réseaux privés, donc depuis le nginx qui relaie l'éditeur : sans ce refus, tout appareil du réseau d'accès lancerait des conversions sans compte. Un service interne qui doit convertir joint Collabora par son Service ([recette](../../../deploy/okd/office/README.md#réglages-notables)) |
 | Images | figées par empreinte | une mise à jour est une décision |
 
 ### nginx de Fichiers : trois correctifs de la mise en service
@@ -112,6 +113,8 @@ tablette (dashboard, cadre « Bureau ») ──► routeur ──► portier : n
 
 **Pièges de la mise en service.**
 
+- **Surcouche muette sur la tablette ancienne** (WebKit d'iOS 15, quel que soit le navigateur) : la surcouche du poste ajoutée à noVNC était un module ES qui importait le module de l'interface de noVNC. Ce graphe contient un `await` de premier niveau, et un second module qui l'importe pendant son évaluation asynchrone ne s'exécute pas toujours sous ce moteur : ni erreur, ni boutons, ni signaux, alors que noVNC marchait (un premier essai avait réussi par hasard d'ordre de chargement). Règle : une surcouche ajoutée à une application web est un **script classique** (`defer`), jamais un second module importé de l'application ; l'application lui passe ce qu'il faut par une variable globale posée dans son propre module (une ligne ajoutée au build, et contrôlée). Un essai simule un module qui n'en finit pas d'évaluer. Corrigé, vérifié sur la tablette d'un enfant.
+- **Leçon de méthode** : un banc Chromium qui retire des API pour imiter un Safari ancien ne reproduit pas les défauts du moteur WebKit lui-même, ici l'ordre d'évaluation des modules. Le contrôle final se fait sur le vrai appareil.
 - **L'EgressFirewall coupait l'API du cluster** : le Service `kubernetes` aboutit à l'adresse du nœud, sur le port de l'API ; la NetworkPolicy l'autorisait, l'EgressFirewall du namespace non. Le portier ne pouvait ni lire, ni allumer, ni éteindre un poste. Correctif : une règle vers les nœuds du plan de contrôle, sur le port de l'API, avant le refus. Le banc n'avait pas d'EgressFirewall : croiser NetworkPolicy **et** EgressFirewall à la relecture.
 - **Une session d'un autre compte restée sur la tablette** faisait voir le portier un adulte, refusé : d'où l'effacement ci-dessus, et la **déconnexion des modules** par le dashboard (voir l'[interface](../../../deploy/okd/apps/chat-interface/README.md#dashboard)).
 
