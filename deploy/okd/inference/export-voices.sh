@@ -9,12 +9,12 @@
 # puis créer un jeton en lecture (Settings → Access Tokens).
 # Usage (sur le nœud) :
 #   read -rs HF_TOKEN; export HF_TOKEN      # coller le jeton, Entrée
-#   sudo --preserve-env=HF_TOKEN bash export-voices.sh
+#   sudo --preserve-env=HF_TOKEN MODELS_MOUNT_POINT=<point de montage> bash export-voices.sh
 #   unset HF_TOKEN
 set -euo pipefail
 [ -n "${HF_TOKEN:-}" ] || { echo "❌ HF_TOKEN absent (read -rs HF_TOKEN; export HF_TOKEN)"; exit 1; }
-DEST=/var/mnt/models/voice/pocket-tts-fr/embeddings
-REV=323332d33f997de8394f24a193e1a76df720e01a          # kyutai/tts-voices, figé le 
+DEST="${MODELS_MOUNT_POINT:?MODELS_MOUNT_POINT non défini : point de montage du volume des modèles (README)}"/voice/pocket-tts-fr/embeddings
+REV=323332d33f997de8394f24a193e1a76df720e01a          # kyutai/tts-voices, révision figée
 [ -d "$DEST" ] || { echo "❌ $DEST absent : lancer d'abord fetch-voice-models.sh"; exit 1; }
 
 podman run --rm --network host -e HF_TOKEN -v "$DEST":/out:z docker.io/library/python:3.12-slim bash -euc "

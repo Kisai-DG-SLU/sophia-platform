@@ -74,6 +74,7 @@ spec:
     metadata:
       labels: { app: sophia-image-gen }
     spec:
+      priorityClassName: sophia-images    # images (../cluster/priority-classes.yaml)
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
@@ -83,7 +84,7 @@ spec:
           # sd-server n'accepte pas « --option=valeur » : option et valeur séparées
           args: [--listen-ip, 0.0.0.0, --listen-port, "1234",
                  --model, /models/image/sd_xl_turbo_1.0_fp16.safetensors,
-                 --taesd, /models/image/taesdxl.safetensors, --type, q8_0, --threads, "16"]
+                 --taesd, /models/image/taesdxl.safetensors, --type, q8_0, --threads, "8"]
           ports: [{ name: sd, containerPort: 1234 }]
           securityContext:
             allowPrivilegeEscalation: false
@@ -96,7 +97,8 @@ spec:
             failureThreshold: 20          # chargement du modèle (≈ 7 Go) au démarrage
           resources:
             requests: { cpu: "1", memory: 6Gi }
-            limits: { cpu: "16", memory: 12Gi }
+            # 8 CPU au plus (pic mesuré sur 7 jours : 2,7) ; autant de fils que de CPU
+            limits: { cpu: "8", memory: 12Gi }
         - name: nsfw
           image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-image-nsfw:latest
           ports: [{ name: nsfw, containerPort: 8001 }]

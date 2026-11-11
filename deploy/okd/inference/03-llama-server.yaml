@@ -1,11 +1,11 @@
 # Serveur d'inférence locale : llama.cpp, Qwen3.5-9B Q6_K, sur l'A2 (15 Go).
 #
-# Mémoire GPU visée (≈ 13,5 Go) : poids 7,5 Go + vision 0,9 Go + cache de contexte ≈ 4,3 Go + tampons
-# (mesuré sans la vision : 11 925 Mio sur 15 356).
+# Mémoire GPU, mesurée par NVML (exporteur du nœud) : 14,24 Go à 8 places sur 16,10 Go (fixe : cache et tampons
+# réservés au démarrage). Rien d'autre sur la carte : la voix et les images sont sur le CPU.
 # Qwen3.5 est hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token en
 # 16 bits, ≈ 17 Kio en 8 bits (q8_0). Cache en 8 bits et PARTAGÉ (--kv-unified) : 245 760 tokens
-# dans la même mémoire que les 131 072 en 16 bits d'avant ; une discussion peut en prendre jusqu'à
-# 4 × 61 440 garantis, davantage quand les autres sont courtes. La fenêtre par discussion est
+# dans la même mémoire que les 131 072 en 16 bits d'avant ; 8 places : 8 × 30 720 garantis, une discussion
+# peut aller jusqu'à 61 440 quand les autres sont plus courtes. La fenêtre par discussion est
 # bornée côté interface (SOPHIA_CONTEXT_LIMITS, 61 440) : au-delà, la lecture du prompt dépasse
 # la minute sur l'A2.
 # --jinja : gabarit de discussion du modèle, nécessaire aux appels d'outils (MCP, skills).
@@ -25,7 +25,7 @@ metadata:
   namespace: sophia-inference
   labels: { app: llama-server }
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"llama-server:v0.5.0-cu124","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"llama-server\")].image"}]'
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"llama-server:v0.7.0-cu124","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"llama-server\")].image"}]'
 spec:
   replicas: 1
   strategy: { type: Recreate }        # un seul GPU : l'ancien pod libère la carte avant le nouveau
@@ -40,7 +40,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: llama-server
-          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/llama-server:v0.5.0-cu124
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/llama-server:v0.7.0-cu124
           args:
             - --model
             - /models/qwen3.5-9b/Qwen3.5-9B-Q6_K.gguf
@@ -61,7 +61,7 @@ spec:
             - --ctx-size
             - "245760"
             - --parallel
-            - "4"
+            - "8"
             - --kv-unified
             - --cache-type-k
             - q8_0
