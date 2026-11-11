@@ -1,9 +1,9 @@
 # Réseau de sophia-storage : tout refusé, entrées et sorties.
 #   entrée : passerelle S3 (8443) depuis le routeur (Route, VPN : URL présignées envoyées par le
 #            navigateur), depuis le namespace de l'espace de travail (application de fichiers) et
-#            depuis le Job d'initialisation ;
+#            depuis le service mémoire (son seul pod, pour son seau) et depuis le Job d'initialisation ;
 #   sortie : DNS seulement (aucun besoin d'Internet ni d'un autre service).
-# Consommateurs suivants (mémoire, modules) : une entrée chacun, ajoutée ici.
+# Consommateurs suivants (modules) : une entrée chacun, ajoutée ici.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -28,6 +28,11 @@ spec:
             matchLabels: { policy-group.network.openshift.io/ingress: "" }
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: "${WORKSPACE_NAMESPACE}" }
+        # Service mémoire : son seul pod (identité et politique limitées à son seau)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: "${SOPHIA_MEMORY_NAMESPACE}" }
+          podSelector:
+            matchLabels: { app: sophia-memoire }
         - podSelector:
             matchLabels: { app: s3-init }
       ports:

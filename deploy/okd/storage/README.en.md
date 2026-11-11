@@ -50,6 +50,7 @@ initialization Job ────────────────────�
 | `${S3_HOST}` | DNS name of the S3 API, resolved to the VPN address | `s3.apps.example.org` |
 | `${FILES_ORIGIN}` | exact origin of the file application (CORS) | `https://files.apps.example.org` |
 | `${WORKSPACE_NAMESPACE}` | namespace of the file application | `workspace` |
+| `${SOPHIA_MEMORY_NAMESPACE}` | namespace of the memory service, admitted on the S3 gateway's ingress | `sophia-memory` |
 | `${NODE_NAME}` | node carrying the volume (`oc get nodes`) | `node-0` |
 | `${S3_MOUNT_POINT}` | mount point of the volume on the node | `/var/mnt/s3` |
 | `${S3_SIZE}` | size of the PV and PVC | `200Gi` |
@@ -105,6 +106,6 @@ While nothing depends on the storage: delete the Route, the Job and `02-seaweedf
 
 ## Next
 
-- **New consumer** (memory, modules): an identity in `s3-config`, limited to its bucket; an ingress rule in `03-network.yaml`; a bucket policy like `ProtegerVersions` if the bucket is versioned.
+- **New consumer** (modules): an identity in `s3-config`, limited to its bucket; an ingress rule in `03-network.yaml`; a bucket policy like `ProtegerVersions` if the bucket is versioned. The [memory service](../memory/memoire/README.en.md) follows this model: its own identity, its single pod on ingress, a policy that refuses it any deletion of what is validated.
 - **Several nodes**: `weed volume` instances added to the master, or separate components.
 - **Upgrade**: a new digest in `02-seaweedfs.yaml`, options re-read in that version's `weed mini -h`, then `oc diff` and `apply`; data stays compatible.
