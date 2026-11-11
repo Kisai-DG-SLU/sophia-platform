@@ -1,6 +1,6 @@
 # Workflow d'Orchestration des Tests de Projets
 
-Ce document définit la méthode standard pour gérer les tests des projets d'intelligence artificielle via un environnement de notebooks au sein de l'ecosystème SophIA.
+Ce document définit la méthode standard pour gérer les tests des projets d'intelligence artificielle via un environnement de notebooks au sein de l'écosystème SophIA.
 
 ## 1. Architecture du Système
 
@@ -34,7 +34,7 @@ $WORKSPACE_DIR/
 
 ## 3. Workflow Opérationnel
 
-### A. Initialisation ou Recuperation
+### A. Initialisation ou Récupération
 
 1.  Clonage avec token d'accès :
 
@@ -52,7 +52,7 @@ $WORKSPACE_DIR/
 
 ### B. Configuration du Noyau de l'IDE
 
-Chaque projet possede son propre noyau pour eviter les conflits de bibliotheques.
+Chaque projet possède son propre noyau pour éviter les conflits de bibliothèques.
 
 ```bash
 env run python -m ipykernel install --user \
@@ -64,20 +64,20 @@ env run python -m ipykernel install --user \
 
 1.  Ouvrir l'interface IDE via la route Kubernetes.
 2.  Naviguer vers le dossier du projet.
-3.  Selectionner le noyau correspondant au projet actif.
+3.  Sélectionner le noyau correspondant au projet actif.
 
 ---
 
-## 4. Gestion des Donnees et Sauvegarde
+## 4. Gestion des Données et Sauvegarde
 
-- Les donnees (`/data`) sont stockees sur le volume persistant.
-- Le code est synchronise vers le depôt Git interne via les commandes standard.
-- Plusieurs projets peuvent etre ouverts simultanement, chacun utilisant son propre environnement.
+- Les données (`/data`) sont stockées sur le volume persistant.
+- Le code est synchronisé vers le dépôt Git interne via les commandes standard.
+- Plusieurs projets peuvent être ouverts simultanément, chacun utilisant son propre environnement.
 
 ---
 
 ## 5. Maintenance
 
-- Les tokens d'acces sont recuperables depuis les logs du pod.
-- Les chemins des noyaux sont verifiables dans la configuration de l'IDE.
-- Les secrets globaux sont injectes dans le pod ; les secrets specifiques peuvent etre geres par fichier d'environnement local.
+- Les tokens d'accès sont récupérables depuis les logs du pod.
+- Les chemins des noyaux sont vérifiables dans la configuration de l'IDE.
+- Les secrets globaux sont injectés dans le pod ; les secrets spécifiques peuvent être gérés par fichier d'environnement local.

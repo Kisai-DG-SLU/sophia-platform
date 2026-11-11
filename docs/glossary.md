@@ -1,8 +1,8 @@
 # Glossaire
 
-Ce glossaire definit les termes cles utilises dans la documentation SophIA.
+Ce glossaire définit les termes clés utilisés dans la documentation SophIA.
 
-Il inclut a la fois des concepts generaux de l'IA et des termes specifiques a l'architecture.
+Il inclut à la fois des concepts généraux de l'IA et des termes spécifiques à l'architecture.
 
 ---
 
@@ -10,31 +10,31 @@ Il inclut a la fois des concepts generaux de l'IA et des termes specifiques a l'
 
 ## LLM (Large Language Model)
 
-Modele de langage entraine sur de grands ensembles de donnees textuelles, capable de generer et de comprendre le langage naturel.
+Modèle de langage entraîné sur de grands ensembles de données textuelles, capable de générer et de comprendre le langage naturel.
 
-Exemples : modeles de type GPT, ou modeles open-source tels que Llama ou Mistral.
+Exemples : modèles de type GPT, ou modèles open-source tels que Llama ou Mistral.
 
 ---
 
 ## RAG (Retrieval-Augmented Generation)
 
-Technique qui ameliore les reponses d'un modele de langage en recuperant des informations pertinentes depuis une base de connaissance externe avant de generer une reponse.
+Technique qui améliore les réponses d'un modèle de langage en récupérant des informations pertinentes depuis une base de connaissance externe avant de générer une réponse.
 
-Cela implique generalement une base vectorielle, des embeddings et un pipeline de recherche.
+Cela implique généralement une base vectorielle, des embeddings et un pipeline de recherche.
 
 ---
 
 ## Embeddings
 
-Representations vectorielles du texte utilisees pour comparer la similarite semantique entre documents.
+Représentations vectorielles du texte utilisées pour comparer la similarité sémantique entre documents.
 
-Les embeddings permettent aux systemes de recuperer des informations pertinentes dans de grandes collections de documents.
+Les embeddings permettent aux systèmes de récupérer des informations pertinentes dans de grandes collections de documents.
 
 ---
 
 ## Base vectorielle
 
-Base de donnees conque pour stocker et rechercher efficacement des embeddings.
+Base de données conque pour stocker et rechercher efficacement des embeddings.
 
 Exemples courants : Qdrant, Weaviate, Milvus.
 
@@ -42,9 +42,9 @@ Exemples courants : Qdrant, Weaviate, Milvus.
 
 ## Agent
 
-Composant logiciel capable d'effectuer des taches en utilisant des modeles d'IA et des outils externes.
+Composant logiciel capable d'effectuer des tâches en utilisant des modèles d'IA et des outils externes.
 
-Les agents peuvent ecrire du code, interroger des donnees, interagir avec des API ou orchestrer des flux de travail.
+Les agents peuvent écrire du code, interroger des données, interagir avec des API ou orchestrer des flux de travail.
 
 ---
 
@@ -54,43 +54,43 @@ Les agents peuvent ecrire du code, interroger des donnees, interagir avec des AP
 
 Acronyme de **Sovereign Orchestrator Platform for Holistic Intelligence Architecture**.
 
-Architecture experimentale conque pour orchestrer des systemes d'IA dans une infrastructure securisee et souveraine.
+Architecture expérimentale conque pour orchestrer des systèmes d'IA dans une infrastructure sécurisée et souveraine.
 
 ---
 
 ## Brain
 
-Le Brain contient la memoire et la structure intellectuelle d'un projet. Il inclut generalement les specifications, la configuration du projet et la memoire persistante.
+Le Brain contient la mémoire et la structure intellectuelle d'un projet. Il inclut généralement les spécifications, la configuration du projet et la mémoire persistante.
 
-Le Brain ne contient pas de code executable.
+Le Brain ne contient pas de code exécutable.
 
 ---
 
 ## Repository
 
-Le repository contient les artefacts operationnels d'un projet : code source, notebooks, jeux de donnees, sorties generees.
+Le repository contient les artefacts opérationnels d'un projet : code source, notebooks, jeux de données, sorties générées.
 
-Les repositories sont generalement geres via Git.
+Les repositories sont généralement gérés via Git.
 
 ---
 
 ## Workspace
 
-Environnement d'execution temporaire utilise par les agents ou les utilisateurs. Caracteristiques : ephemere, reproductible, isole.
+Environnement d'exécution temporaire utilisé par les agents ou les utilisateurs. Caractéristiques : éphémère, reproductible, isolé.
 
-Les workspaces peuvent fonctionner localement ou dans des environnements conteneurises.
+Les workspaces peuvent fonctionner localement ou dans des environnements conteneurisés.
 
 ---
 
 ## Projet
 
-Dans SophIA, tout est modelise comme un projet. Un projet represente une unite de travail qui inclut un Brain, un repository et un ou plusieurs workspaces.
+Dans SophIA, tout est modélisé comme un projet. Un projet représente une unité de travail qui inclut un Brain, un repository et un ou plusieurs workspaces.
 
 ---
 
 ## Dashboard
 
-L'interface de discussion devenue la coquille de toutes les interactions : un accueil pour parler a Sophia, un volet des modules permis par le role, chaque application affichee au centre dans un cadre, sous sa propre connexion, et un volet « Quoi de neuf ? » fait de resumes deterministes fournis par les applications. Une application signale au dashboard qu'elle est prete par un message `sophia.pret`. Voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md).
+L'interface de discussion devenue la coquille de toutes les interactions : un accueil pour parler à Sophia, un volet des modules permis par le rôle, chaque application affichée au centre dans un cadre, sous sa propre connexion, et un volet « Quoi de neuf ? » fait de résumés déterministes fournis par les applications. Une application signale au dashboard qu'elle est prête par un message `sophia.pret`. Voir [interface de discussion](../deploy/okd/apps/chat-interface/README.md).
 
 Le dashboard s'appelle **cockpit dans le code** et dans le libellé de l'application : les noms de fichiers réels le gardent (`sophia-interface-cockpit-egress.yaml`, `/sophia-cockpit/pret.js`). À ne pas confondre avec le tableau de bord du système (module Visualisation), affiché dans le dashboard.
 
@@ -102,21 +102,21 @@ Espace prévu où chaque membre du foyer suit les projets qu'il a demandés à S
 
 ---
 
-# Concepts de securite
+# Concepts de sécurité
 
-## Sas Paranoiaque
+## Sas Paranoïaque
 
-Couche d'acquisition isolee responsable de la recuperation d'informations depuis Internet tout en protegeant l'infrastructure interne.
+Couche d'acquisition isolée responsable de la récupération d'informations depuis Internet tout en protégeant l'infrastructure interne.
 
-Ses responsabilites incluent : isolation de l'acces web, nettoyage du contenu, prevention des fuites de donnees.
+Ses responsabilités incluent : isolation de l'accès web, nettoyage du contenu, prévention des fuites de données.
 
 ---
 
-## Tribunal Semantique
+## Tribunal Sémantique
 
-Mecanisme de validation qui evalue la credibilite des informations externes avant leur integration dans la base de connaissance.
+Mécanisme de validation qui évalue la crédibilité des informations externes avant leur intégration dans la base de connaissance.
 
-Son objectif est de reduire le risque d'ingestion de contenu non fiable ou gener par IA.
+Son objectif est de réduire le risque d'ingestion de contenu non fiable ou gener par IA.
 
 ---
 
@@ -124,25 +124,25 @@ Son objectif est de reduire le risque d'ingestion de contenu non fiable ou gener
 
 ## Namespace
 
-Limite d'isolation logique utilisee dans les environnements Kubernetes.
+Limite d'isolation logique utilisée dans les environnements Kubernetes.
 
-Les namespaces permettent de separer et securiser les composants au sein d'un meme cluster.
+Les namespaces permettent de séparer et sécuriser les composants au sein d'un même cluster.
 
 ---
 
 ## DMZ (Demilitarized Zone)
 
-Segment reseau concu pour isoler les systemes qui interagissent avec les reseaux externes.
+Segment réseau conçu pour isoler les systèmes qui interagissent avec les réseaux externes.
 
-Dans SophIA, la DMZ heberge les services responsables de l'interaction avec Internet.
+Dans SophIA, la DMZ héberge les services responsables de l'interaction avec Internet.
 
 ---
 
 ## MCP (Model Context Protocol)
 
-Protocole utilise pour exposer des outils et des capacites aux modeles d'IA de maniere structuree.
+Protocole utilisé pour exposer des outils et des capacités aux modèles d'IA de manière structurée.
 
-MCP permet aux agents de decouvrir et d'invoquer des capacites externes.
+MCP permet aux agents de découvrir et d'invoquer des capacités externes.
 
 ---
 
@@ -150,14 +150,14 @@ MCP permet aux agents de decouvrir et d'invoquer des capacites externes.
 
 ## Gestion de contexte
 
-Processus de construction et de controle des informations fournies aux modeles d'IA.
+Processus de construction et de contrôle des informations fournies aux modèles d'IA.
 
-Une gestion de contexte appropriee garantit un comportement previsible, une utilisation efficace des fenetres de contexte et une reduction du bruit dans les prompts.
+Une gestion de contexte appropriée garantit un comportement prévisible, une utilisation efficace des fenêtres de contexte et une réduction du bruit dans les prompts.
 
 ---
 
 ## Gestion des espaces de travail
 
-Mecanismes utilises pour gerer les environnements d'execution des projets et des agents.
+Mécanismes utilisés pour gérer les environnements d'exécution des projets et des agents.
 
-Cela inclut la creation d'environnements, l'isolation et la reproductibilite.
+Cela inclut la création d'environnements, l'isolation et la reproductibilité.

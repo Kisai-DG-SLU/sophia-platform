@@ -1,18 +1,18 @@
-# Deploiement du Pantheon Agentique Sophia
+# Déploiement du Panthéon Agentique Sophia
 
-Ce repertoire contient les manifests OpenShift/Kubernetes pour deployer le **Pantheon Agentique SophIA** — une architecture multi-agents basee sur le zero-trust et la segmentation RBAC stricte.
+Ce répertoire contient les manifests OpenShift/Kubernetes pour déployer le **Panthéon Agentique SophIA** — une architecture multi-agents basée sur le zero-trust et la segmentation RBAC stricte.
 
-## Ordre de deploiement
+## Ordre de déploiement
 
-Les manifests doivent etre appliques sequentiellement pour satisfaire les dependances :
+Les manifests doivent être appliqués séquentiellement pour satisfaire les dépendances :
 
 1. `01-agent-build.yaml` — Namespace, ServiceAccount, ImageStream, BuildConfig
 2. `02-observer-dionysos.yaml` — (Optionnel) Pod observateur Dionysos pour le diagnostic du cluster
 3. `03-agent-config.yaml` — ConfigMap avec les endpoints RAG et la configuration LLM
-4. `04-agent-deployment-sophia.yaml` — Deploiement principal de l'agent Sophia
-5. `05-gods-rbac.yaml` — ServiceAccounts et RBAC pour les agents specialises
-6. `06-gods-deployments.yaml` — Deploiements d'Athena, Hephaistos, Ouranos
-7. `07-network-policies.yaml` — Politiques reseau pour l'isolation zero-trust
+4. `04-agent-deployment-sophia.yaml` — Déploiement principal de l'agent Sophia
+5. `05-gods-rbac.yaml` — ServiceAccounts et RBAC pour les agents spécialisés
+6. `06-gods-deployments.yaml` — Déploiements d'Athena, Hephaistos, Ouranos
+7. `07-network-policies.yaml` — Politiques réseau pour l'isolation zero-trust
 8. `08-services.yaml` — Services internes headless pour le routage des agents
 9. `09-executants-network.yaml` — entrée de l'`api_server` d'un exécutant ouverte au seul [répartiteur](../core/repartiteur/)
 10. `10-recette-repartiteur.yaml` — Job de recette : une mission « pong » demandée au répartiteur par le vrai chemin
@@ -53,31 +53,31 @@ Chaque réglage s'essaie d'abord sur un seul agent, redémarré seul, puis sur l
 
 ## Assistant de code persistant (Dionysos)
 
-Dionysos peut heberger un assistant de code (Claude Code) pour l'administration. Son volume `/opt/data` est un `emptyDir` : il survit au redemarrage du noeud, pas a la recreation du pod. Pour que l'assistant, sa configuration et son historique survivent, `02-observer-dionysos.yaml` ajoute :
+Dionysos peut héberger un assistant de code (Claude Code) pour l'administration. Son volume `/opt/data` est un `emptyDir` : il survit au redémarrage du noeud, pas à la recréation du pod. Pour que l'assistant, sa configuration et son historique survivent, `02-observer-dionysos.yaml` ajoute :
 
-| Element | Role |
+| Élément | Rôle |
 |---|---|
-| initContainer `init-claude` | restaure la configuration et l'historique depuis un depot Git prive dedie (`${CLAUDE_REPO}`), puis installe l'assistant a la version `${CLAUDE_CODE_VERSION}` si elle manque ; idempotent (rejoue apres un redemarrage du noeud sans ecraser le travail local) |
-| sidecar natif `claude-sync` | pousse l'historique toutes les `${CLAUDE_SYNC_INTERVAL}` secondes, a chaque fin de session (un hook `SessionEnd` de l'assistant cree `/opt/data/.claude-home/.sync-request`, couvre `/clear` et la sortie) et a l'arret du pod (`SIGTERM`, `terminationGracePeriodSeconds: 60`) |
-| conteneur `dionysos` | `CLAUDE_CONFIG_DIR`, `PATH`, `npm_config_*`, `DISABLE_AUTOUPDATER` (version figee par l'initContainer), `CLAUDE_CODE_OAUTH_TOKEN` |
+| initContainer `init-claude` | restaure la configuration et l'historique depuis un dépôt Git privé dédié (`${CLAUDE_REPO}`), puis installe l'assistant à la version `${CLAUDE_CODE_VERSION}` si elle manque ; idempotent (rejoue après un redémarrage du noeud sans écraser le travail local) |
+| sidecar natif `claude-sync` | pousse l'historique toutes les `${CLAUDE_SYNC_INTERVAL}` secondes, à chaque fin de session (un hook `SessionEnd` de l'assistant crée `/opt/data/.claude-home/.sync-request`, couvre `/clear` et la sortie) et à l'arrêt du pod (`SIGTERM`, `terminationGracePeriodSeconds: 60`) |
+| conteneur `dionysos` | `CLAUDE_CONFIG_DIR`, `PATH`, `npm_config_*`, `DISABLE_AUTOUPDATER` (version figée par l'initContainer), `CLAUDE_CODE_OAUTH_TOKEN` |
 
-**Secret `${CLAUDE_SECRET}`** (cree par l'administrateur, jamais versionne), cles `oauth-token` (jeton de `claude setup-token`), `forgejo-username`, `forgejo-token` (jeton limite a l'ecriture de depots : celui de `${FORGEJO_SECRET_PREFIX}-dionysos` reste en lecture seule). Toutes les references sont `optional` : sans Secret, le pod demarre, seule la synchronisation echoue.
+**Secret `${CLAUDE_SECRET}`** (créé par l'administrateur, jamais versionné), clés `oauth-token` (jeton de `claude setup-token`), `forgejo-username`, `forgejo-token` (jeton limité à l'écriture de dépôts : celui de `${FORGEJO_SECRET_PREFIX}-dionysos` reste en lecture seule). Toutes les références sont `optional` : sans Secret, le pod démarre, seule la synchronisation échoue.
 
-**Ce qui est versionne** : liste blanche dans le `.gitignore` du depot (`.claude.json`, `settings.json`, `history.jsonl`, `projects/`, `agents/`, `commands/`, `skills/`, listes de plugins). **Jamais** `.credentials.json` : l'authentification passe par le Secret. Les transcripts peuvent contenir des sorties d'outils sensibles : le depot doit rester prive.
+**Ce qui est versionné** : liste blanche dans le `.gitignore` du dépôt (`.claude.json`, `settings.json`, `history.jsonl`, `projects/`, `agents/`, `commands/`, `skills/`, listes de plugins). **Jamais** `.credentials.json` : l'authentification passe par le Secret. Les transcripts peuvent contenir des sorties d'outils sensibles : le dépôt doit rester privé.
 
-**Sessions par projet** : le conteneur lance `ws up` au demarrage (un repertoire, une session, une memoire et un onglet zellij par projet) ; le sidecar releve le travail non pousse. Voir `assistant/README.md`. Les pushes de l'assistant passent par un jeton d'ecriture monte en fichier (`${PUSH_SECRET}`, `/var/run/secrets/forgejo-push/`), jamais en variable d'environnement.
+**Sessions par projet** : le conteneur lance `ws up` au démarrage (un répertoire, une session, une mémoire et un onglet zellij par projet) ; le sidecar relève le travail non poussé. Voir `assistant/README.md`. Les pushes de l'assistant passent par un jeton d'écriture monté en fichier (`${PUSH_SECRET}`, `/var/run/secrets/forgejo-push/`), jamais en variable d'environnement.
 
-Dans les scripts du manifeste, les variables du shell (`$CH`, `$CFG`…) cotoient les variables du gabarit : rendre le fichier avec `envsubst` et la **liste explicite** des variables du tableau ci-dessous, jamais `envsubst` seul.
+Dans les scripts du manifeste, les variables du shell (`$CH`, `$CFG`…) côtoient les variables du gabarit : rendre le fichier avec `envsubst` et la **liste explicite** des variables du tableau ci-dessous, jamais `envsubst` seul.
 
 Les identifiants Forgejo des agents (`FORGEJO_USER`, `FORGEJO_TOKEN`) viennent d'un Secret et ne sont **pas** des variables du gabarit : l'initContainer les passe à git par un credential helper, jamais dans l'URL du remote, où ils resteraient en clair dans `.git/config` (`git remote -v`). `git remote set-url` nettoie un volume déjà initialisé avec l'ancienne URL.
 
-## Reference des variables
+## Référence des variables
 
 Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 
-| Variable | Description | Defaut |
+| Variable | Description | Défaut |
 |---|---|---|
-| `${AGENT_NAMESPACE}` | Namespace du systeme d'agents | `hermes-system` |
+| `${AGENT_NAMESPACE}` | Namespace du système d'agents | `hermes-system` |
 | `${INTERNAL_REGISTRY}` | URL du registre d'images interne | `image-registry.openshift-image-registry.svc:5000` |
 | `${AGENT_IMAGE_NAME}` | Nom de l'image stream de l'agent | `hermes-agent-oc` |
 | `${AGENT_IMAGE_DIGEST}` | Empreinte de l'image de l'agent (recette du répartiteur) | `sha256:…` |
@@ -87,7 +87,7 @@ Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 | `${FORGEJO_SERVICE}` | URL interne du service Git | `forgejo-svc.git-ns.svc.cluster.local:3000` |
 | `${LITELLM_SERVICE}` | URL du proxy LiteLLM | `http://litellm-svc.core-ns.svc.cluster.local:4000/v1` |
 | `${ORG_NAME}` | Organisation Git | `my-org` |
-| `${BRAIN_REPO}` | Depot de configuration des agents | `agent-brain` |
+| `${BRAIN_REPO}` | Dépôt de configuration des agents | `agent-brain` |
 | `${SANDBOX_NAMESPACE}` | Namespace sandbox d'Hephaistos | `sandbox` |
 | `${APPS_NAMESPACE}` | Namespace apps d'Ouranos | `apps` |
 | `${GIT_NAMESPACE}` | Namespace du service Git | `git` |
@@ -98,8 +98,8 @@ Substituez les variables suivantes (via envsubst ou Helm) avant d'appliquer :
 | `${OBSERVER_UID}`, `${OBSERVER_FSGROUP}` | UID et groupe propres de l'observateur | (à fixer, hors de la plage des autres agents) |
 | `${EXECUTANT_IMAGE_NAME}`, `${EXECUTANT_IMAGE_DIGEST}` | Image des exécutants et son empreinte | `hermes-executant`, `sha256:…` |
 | `${HERMES_AGENT_VERSION}`, `${HERMES_AGENT_DIGEST}` | Version et empreinte de la base de l'image des agents | (à fixer) |
-| `${CLAUDE_REPO}` | Depot Git prive de la configuration et de l'historique de l'assistant de code | `assistant-history` |
-| `${CLAUDE_SECRET}` | Secret de l'assistant (jeton OAuth, identifiants Forgejo en ecriture) | (requis pour la synchronisation) |
-| `${CLAUDE_CODE_VERSION}` | Version de l'assistant installee par `init-claude` | (a fixer) |
+| `${CLAUDE_REPO}` | Dépôt Git privé de la configuration et de l'historique de l'assistant de code | `assistant-history` |
+| `${CLAUDE_SECRET}` | Secret de l'assistant (jeton OAuth, identifiants Forgejo en écriture) | (requis pour la synchronisation) |
+| `${CLAUDE_CODE_VERSION}` | Version de l'assistant installée par `init-claude` | (à fixer) |
 | `${CLAUDE_SYNC_INTERVAL}` | Intervalle de synchronisation de l'historique, en secondes | `900` |
-| `${PUSH_SECRET}` | Secret du jeton Forgejo en ecriture utilise par l'assistant (cles `username`, `password`) | (optionnel) |
+| `${PUSH_SECRET}` | Secret du jeton Forgejo en écriture utilisé par l'assistant (clés `username`, `password`) | (optionnel) |
