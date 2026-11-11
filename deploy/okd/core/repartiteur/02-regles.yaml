@@ -13,6 +13,16 @@
 # Une mission vers le déploiement ou la maintenance porte « validation: d3a_d3b » ; « approbateurs »
 # liste les sub Keycloak autorisés à approuver (principal des signaux). Un compte partagé par
 # plusieurs pods ne prouve aucune identité : un compte de service par agent.
+#
+# Places du modèle local laissées aux missions des agents (alias de fond), selon l'heure locale ; au-delà,
+# 409 « modèle local occupé ». Exemple, pour un serveur de modèle à 8 emplacements partagés avec la
+# discussion, les applications et l'école :
+#   modele_local:
+#     executants: [hephaistos, sophia, athena, ouranos]
+#     places_jour: 1
+#     places_nuit: 2
+#     nuit: ["03:00", "07:00"]
+#     fuseau: Europe/Paris
 apiVersion: v1
 kind: ConfigMap
 metadata:

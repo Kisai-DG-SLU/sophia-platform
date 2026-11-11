@@ -1,3 +1,19 @@
+# Base importée par l'API d'OKD, figée par empreinte (main-v1.82.6-nightly, index multi-arch) ; le build
+# la tire du registre interne. Changer de version = nouvelle empreinte, décidée.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: litellm-base
+  namespace: sophia-core
+spec:
+  tags:
+    - name: v1.82.6-nightly
+      from:
+        kind: DockerImage
+        name: ghcr.io/berriai/litellm-non_root@sha256:035b5cf38757109690c9be8f026aa5c5d19b0bba336f7d3b6f265cc41942b047
+      referencePolicy:
+        type: Local
+---
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -15,6 +31,9 @@ spec:
     type: Docker
     dockerStrategy:
       dockerfilePath: Containerfile
+      from:
+        kind: ImageStreamTag
+        name: litellm-base:v1.82.6-nightly
   # Le pod de build compte dans le quota de sophia-core (voir ../00-namespace-guardrails.yaml)
   resources:
     requests: { cpu: 200m, memory: 512Mi }

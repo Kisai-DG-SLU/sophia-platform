@@ -3,6 +3,9 @@ kind: Route
 metadata:
   name: litellm-route
   namespace: sophia-core
+  annotations:
+    # Requêtes longues (flux, gros modèles)
+    haproxy.router.openshift.io/timeout: 900s
 spec:
   host: ${LITELLM_HOST}   # nom DNS vers l'adresse du VPN
   to:

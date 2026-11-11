@@ -1,6 +1,7 @@
 # Entrées du routeur de modèles. Sans règle, il est ouvert à tout pod du cluster.
 # Appelants à relever avant d'appliquer (manifestes, règles de sortie, journaux du routeur) :
-#   sophia-apps       : interface et modules, leurs builds ;
+#   sophia-apps       : modules, leurs builds ;
+#   sophia-interface  : interface de discussion, dans son namespace dédié ;
 #   ${AGENT_NAMESPACE} : agents du panthéon ; un pod en réseau de l'hôte arrive par le réseau du nœud ;
 #   sophia-sandbox    : environnements de développement ;
 #   sophia-memory     : ingestion (embeddings) ;
@@ -21,7 +22,7 @@ spec:
             matchExpressions:
               - key: kubernetes.io/metadata.name
                 operator: In
-                values: [sophia-apps, "${AGENT_NAMESPACE}", sophia-sandbox, sophia-memory]
+                values: [sophia-apps, sophia-interface, "${AGENT_NAMESPACE}", sophia-sandbox, sophia-memory]
         - namespaceSelector:
             matchLabels: { policy-group.network.openshift.io/ingress: "" }
         - namespaceSelector:
