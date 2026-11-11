@@ -30,6 +30,7 @@ Collabora ──► Files WOPI API (internal TLS), DNS; nothing else
 | Isolation | pods in `restricted-v2`, no capabilities; Collabora isolates documents with **Landlock** | Collabora gets no Linux capability; Landlock is checked active in its log |
 | Collabora | `always_save_on_exit=true`, `idle_timeout_secs=1800`, `max_concurrency=2`, `cleanup.limit_dirty_mem_mb=1024`; autosave at 30 s and 5 min; probe on `/` | nothing is lost on close; a forgotten document frees memory; at most two conversions in parallel on a shared node |
 | WOPI proof | an RSA proof key in a mounted Secret | without it, Collabora does not sign its calls and Files does not check their origin |
+| Collabora REST API | refused (403) by nginx (`convert-to`, `get-thumbnail`, `getMetrics` and neighbours); administration console closed (404) | Collabora accepts its REST API from private networks, hence from the nginx that relays the editor: without this refusal, any device on the access network could run conversions without an account. An internal service that needs to convert reaches Collabora through its Service ([recipe](../../../deploy/okd/office/README.en.md#notable-settings)) |
 | Images | pinned by digest | an update is a decision |
 
 ### Files nginx: three fixes from the go-live
@@ -112,6 +113,8 @@ tablet (dashboard, "Desk" frame) ──► router ──► gatekeeper: nginx �
 
 **Pitfalls at go-live.**
 
+- **Silent overlay on the old tablet** (iOS 15 WebKit, whatever the browser): the workstation's overlay added to noVNC was an ES module importing noVNC's interface module. That graph contains a top-level `await`, and a second module importing it during its asynchronous evaluation does not always run under this engine: no error, no buttons, no signals, while noVNC itself worked (a first test had passed by chance of loading order). Rule: an overlay added to a web application is a **classic script** (`defer`), never a second module importing the application; the application hands it what it needs through a global variable set in its own module (one line added at build time, and checked). A test simulates a module that never finishes evaluating. Fixed, verified on a child's tablet.
+- **Method lesson**: a Chromium bench that removes APIs to imitate an old Safari does not reproduce the defects of the WebKit engine itself, here the module evaluation order. The final check is done on the real device.
 - **The EgressFirewall cut off the cluster API**: the `kubernetes` Service ends at the node's address, on the API port; the NetworkPolicy allowed it, the namespace's EgressFirewall did not. The gatekeeper could neither read, nor switch on, nor switch off a workstation. Fix: a rule towards the control-plane nodes, on the API port, before the deny. The test bench had no EgressFirewall: cross-check NetworkPolicy **and** EgressFirewall when reviewing.
 - **Another account's session left on the tablet** made the gatekeeper see an adult, refused: hence the clearing above, and the **module sign-out** by the dashboard (see the [interface](../../../deploy/okd/apps/chat-interface/README.en.md#dashboard)).
 

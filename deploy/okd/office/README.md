@@ -55,6 +55,17 @@ Les valeurs sont produites sur place (mot de passe du rôle, secret du client OI
 
 - **Collabora** : `always_save_on_exit=true`, `idle_timeout_secs=1800`, `max_concurrency=2`, `cleanup.limit_dirty_mem_mb=1024` ; sonde sur `/`.
 - **nginx** : en-têtes `X-Forwarded-*` vidés vers le S3 (sinon la signature est vérifiée sur l'hôte public) ; `location ~ ^/cool` après la regex du WebSocket ; format de journal qui masque les jetons WOPI. Le serveur interne reprend les `proxy_set_header` du serveur public, `X-Forwarded-Proto: https` compris (sinon l'API, en production, répond 301 vers https).
+- **API REST de Collabora jamais exposée** : Collabora admet son API REST (`convert-to`, `get-thumbnail`, `getMetrics`…) depuis les réseaux privés (`net.post_allow` par défaut, `10.0.0.0/8`), donc depuis le nginx qui relaie `/cool` ; sans refus, tout appareil du réseau d'accès lancerait des conversions sans compte. Dans le serveur public, **avant** la location du WebSocket, avec la console d'administration de Collabora fermée de même :
+  ```nginx
+  location ^~ /browser/dist/admin { return 404; }
+  location ^~ /cool/adminws { return 404; }
+  location ~ ^/cool/(convert-to|extract-link-targets|extract-document-structure|transform-document-structure|get-thumbnail|render-search-result|getMetrics)(/|$) {
+      return 403;
+  }
+  location ~ ^/cool/(.*/)?ws$ { … }
+  location ~ ^/cool { proxy_pass http://collabora; }
+  ```
+  Le WebSocket de l'éditeur et le téléchargement depuis l'éditeur (`/cool/<document>/download/…`) passent toujours. Un service interne qui doit convertir joint Collabora par son Service, avec une NetworkPolicy dédiée. Contrôle : `POST /cool/convert-to/pdf` et `GET /cool/getMetrics` rendent 403, l'accueil de Fichiers 200 ; un document s'ouvre, s'enregistre et se télécharge en PDF. En service.
 - **Pods** : `restricted-v2`, classe `sophia-workspace-low`, images figées par empreinte.
 - **Dashboard** : réglages de `fichiers-nginx` et de Collabora pour l'affichage dans le seul chat, en fin de page.
 

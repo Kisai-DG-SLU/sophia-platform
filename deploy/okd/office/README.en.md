@@ -55,6 +55,17 @@ Values are produced on the spot (role password, OIDC client secret, S3 keys), ke
 
 - **Collabora**: `always_save_on_exit=true`, `idle_timeout_secs=1800`, `max_concurrency=2`, `cleanup.limit_dirty_mem_mb=1024`; probe on `/`.
 - **nginx**: `X-Forwarded-*` headers cleared towards S3 (otherwise the signature is checked against the public host); `location ~ ^/cool` after the WebSocket regex; a log format that masks WOPI tokens. The internal server copies the public server's `proxy_set_header` lines, `X-Forwarded-Proto: https` included (otherwise the API, in production, answers 301 to https).
+- **Collabora's REST API never exposed**: Collabora accepts its REST API (`convert-to`, `get-thumbnail`, `getMetrics`…) from private networks (`net.post_allow` by default, `10.0.0.0/8`), hence from the nginx that relays `/cool`; without a refusal, any device on the access network could run conversions without an account. In the public server, **before** the WebSocket location, with Collabora's administration console closed the same way:
+  ```nginx
+  location ^~ /browser/dist/admin { return 404; }
+  location ^~ /cool/adminws { return 404; }
+  location ~ ^/cool/(convert-to|extract-link-targets|extract-document-structure|transform-document-structure|get-thumbnail|render-search-result|getMetrics)(/|$) {
+      return 403;
+  }
+  location ~ ^/cool/(.*/)?ws$ { … }
+  location ~ ^/cool { proxy_pass http://collabora; }
+  ```
+  The editor's WebSocket and downloads from the editor (`/cool/<document>/download/…`) still pass. An internal service that needs to convert reaches Collabora through its Service, with a dedicated NetworkPolicy. Check: `POST /cool/convert-to/pdf` and `GET /cool/getMetrics` return 403, the Files home page 200; a document opens, saves and downloads as PDF. In service.
 - **Pods**: `restricted-v2`, class `sophia-workspace-low`, images pinned by digest.
 - **Dashboard**: `fichiers-nginx` and Collabora settings for display in the chat only, at the end of this page.
 
