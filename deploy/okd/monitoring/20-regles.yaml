@@ -117,7 +117,7 @@ spec:
         severity: warning
         sophia: oui
       annotations:
-        summary: Des requêtes attendent un emplacement libre sur llama-server depuis 10 min (4 emplacements occupés)
+        summary: Des requêtes attendent un emplacement libre sur llama-server depuis 10 min (8 emplacements occupés)
         action: Vérifier qui consomme (agents, chat) ; seuil à calibrer après une semaine de mesures.
 ---
 apiVersion: monitoring.coreos.com/v1
