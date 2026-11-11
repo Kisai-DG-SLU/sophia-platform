@@ -2,7 +2,7 @@
 
 **Sovereign Orchestrator Platform for Holistic Intelligence Architecture**
 
-SophIA est une architecture ouverte conque pour aider les organisations à utiliser l'intelligence artificielle tout en préservant le contrôle de leurs données, de leurs modèles et de leur infrastructure.
+SophIA est une architecture ouverte conçue pour aider les organisations à utiliser l'intelligence artificielle tout en préservant le contrôle de leurs données, de leurs modèles et de leur infrastructure.
 
 Le projet explore comment des composants open-source peuvent être assemblés en une plateforme cohérente et sécurisée pour déployer, orchestrer et gouverner des systèmes d'IA.
 

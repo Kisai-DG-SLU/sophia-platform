@@ -56,7 +56,7 @@ La gestion explicite du contexte devient essentielle dans les grands systèmes d
 
 L'écosystème de l'IA évolue extrêmement rapidement. Les organisations doivent naviguer dans un paysage en constante évolution d'outils : moteurs d'inférence, bases vectorielles, frameworks d'agents, outils d'orchestration, environnements de développement.
 
-Ces composants sont rarement conçus pour fonctionner ensemble de manière native. En conséquence, de nombreuses équipes assembles des systèmes fragiles et difficiles à maintenir.
+Ces composants sont rarement conçus pour fonctionner ensemble de manière native. En conséquence, de nombreuses équipes assemblent des systèmes fragiles et difficiles à maintenir.
 
 ---
 

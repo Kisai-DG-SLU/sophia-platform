@@ -20,7 +20,7 @@ L'infrastructure de référence pour ce POC repose sur les éléments suivants :
 - **Accélération :** 1 GPU 16 Go
 - **Stockage :** Volumes persistants sur disques locaux ; un volume logique XFS dédié, extensible à chaud, pour chaque donnée qui grossit (base relationnelle, base vectorielle, stockage objet, forge), avec une alerte de remplissage — voir [stockage persistant](stockage-persistant.md)
 
-Cette configuration permet de faire fonctionner l'intégralité de la stack (orchestration, inférence locale, base vectorielle, Git, outils) sur un noeud unique, ce qui est suffisant pour un POC et les phases initiales de déploiement.
+Cette configuration permet de faire fonctionner l'intégralité de la stack (orchestration, inférence locale, base vectorielle, Git, outils) sur un nœud unique, ce qui est suffisant pour un POC et les phases initiales de déploiement.
 
 ## Substitutions possibles
 
