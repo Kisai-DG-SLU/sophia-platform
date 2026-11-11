@@ -1,3 +1,4 @@
+# Historique, non maintenu : image du runner d'intégration continue, à l'arrêt (0 réplique) dans l'installation de référence (voir deploy/docker/README.md).
 FROM ${BASE_IMAGE:-registry.access.redhat.com/ubi9/ubi-minimal:latest}
 
 USER root

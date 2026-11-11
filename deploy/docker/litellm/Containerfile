@@ -1,3 +1,4 @@
+# Historique, non maintenu : ancienne copie ; l'image du routeur de modèles se construit depuis deploy/okd/core/litellm/Containerfile (voir deploy/docker/README.md).
 FROM ghcr.io/berriai/litellm-non_root:main-latest
 
 USER root

@@ -1,3 +1,4 @@
+# Historique, non maintenu : ancienne copie ; l'image de base construite est deploy/okd/pod-bases/core/Containerfile (voir deploy/docker/README.md).
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 RUN microdnf install -y \

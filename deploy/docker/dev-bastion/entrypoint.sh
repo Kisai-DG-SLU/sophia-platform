@@ -1,4 +1,5 @@
 #!/bin/bash
+# Historique, non maintenu : image du socle de juin 2026, ni construite ni déployée (voir deploy/docker/README.md).
 set -e
 
 mkdir -p /home/${APP_USER:-app-user}/.ssh
