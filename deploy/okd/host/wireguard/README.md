@@ -17,6 +17,7 @@ Aucune valeur de l'installation de référence n'est donnée ici : choisissez le
 | `${GIT_SSH_PORT}`, `${GIT_HTTP_PORT}` | ports de Forgejo exposés sur l'externalIP | — |
 | `${JVB_UDP_PORT}` | port UDP du média de la visio, exposé sur la même externalIP (section 6) | — |
 | `${DEV_GATEWAY_VPN_PORT}` | port SSH de la passerelle de dev sur la même externalIP, réservé à l'administration (section 7) | — |
+| `${SOPHIA_VAR_DIR}` | répertoire de la plateforme sur `/var` du nœud, où le garde-fou garde l'image OVN vue et écrit sa métrique (`wg-filter-check.sh`) ; le même que pour la [métrologie](../../monitoring/README.md) | `/var/lib/sophia` |
 | `${LAN_NODE_IP}` | adresse du nœud sur le réseau local : secours d'administration hors VPN (section 7) | — |
 
 Toute adresse hors de `${VPN_ADMIN_RANGE}` est un appareil **utilisateur** : HTTP/HTTPS seulement.
@@ -95,15 +96,16 @@ Depuis un poste d'**administration** (la session reste ouverte quoi qu'il arrive
 
 ```bash
 # rendu du gabarit (liste EXPLICITE : les « $ » du code nft ne sont pas touchés)
-export VPN_SERVER_IP=… VPN_ADMIN_RANGE=… GIT_SSH_PORT=… GIT_HTTP_PORT=…
+export VPN_SERVER_IP=… VPN_ADMIN_RANGE=… GIT_SSH_PORT=… GIT_HTTP_PORT=… SOPHIA_VAR_DIR=…
 envsubst '$VPN_SERVER_IP $VPN_ADMIN_RANGE $GIT_SSH_PORT $GIT_HTTP_PORT' < wg-filter.nft > wg-filter.rendu.nft
 grep -n '\${' wg-filter.rendu.nft && echo "⚠ variable non rendue" || echo "rendu complet"
-# copie vers le nœud : wg-filter.rendu.nft, wg-filter-check.sh, test-nft-ovn.sh, les trois unités systemd
+envsubst '$SOPHIA_VAR_DIR' < wg-filter-check.sh > wg-filter-check.rendu.sh   # le garde-fou est aussi un gabarit
+# copie vers le nœud : wg-filter.rendu.nft, wg-filter-check.rendu.sh, test-nft-ovn.sh, les trois unités systemd
 # sur le nœud
 sudo nft list ruleset > ~/backup-nft-$(date +%Y%m%d).txt          # sauvegarde
 sudo bash test-nft-ovn.sh                                          # compatibilité avec le nft d'OVN
 sudo mkdir -p /etc/sophia
-sudo install -m 644 wg-filter.rendu.nft /etc/sophia/wg-filter.nft && sudo install -m 755 wg-filter-check.sh /etc/sophia/
+sudo install -m 644 wg-filter.rendu.nft /etc/sophia/wg-filter.nft && sudo install -m 755 wg-filter-check.rendu.sh /etc/sophia/wg-filter-check.sh
 sudo nft -c -f /etc/sophia/wg-filter.nft && echo "syntaxe OK"         # contrôle, n'applique rien
 # interrupteur automatique : la table saute dans 3 min si on n'annule pas (le tunnel n'est pas touché)
 sudo systemd-run --unit=wg-filter-deadman --on-active=180 /usr/sbin/nft delete table inet sophia_wg
@@ -151,7 +153,7 @@ Si le garde-fou a retiré la table : le cluster tourne mais **le VPN n'est plus 
 
 ## 5. Garde-fou en métrique
 
-À chaque passage, le garde-fou écrit son code (0 lisible, 1 table retirée, 2 vérification impossible) et un horodatage dans `/var/lib/sophia/metrics/wg_filter.prom`, que lit l'exporteur du nœud ([`../../monitoring/`](../../monitoring/)). Trois alertes en découlent : filtre retiré, vérification impossible, garde-fou muet depuis plus de 45 minutes. L'écriture est atomique (fichier temporaire, puis `mv`) et **toute erreur est ignorée** : ni les décisions, ni les actions, ni les codes de sortie du garde-fou ne changent.
+À chaque passage, le garde-fou écrit son code (0 lisible, 1 table retirée, 2 vérification impossible) et un horodatage dans `${SOPHIA_VAR_DIR}/metrics/wg_filter.prom`, que lit l'exporteur du nœud ([`../../monitoring/`](../../monitoring/)). Trois alertes en découlent : filtre retiré, vérification impossible, garde-fou muet depuis plus de 45 minutes. L'écriture est atomique (fichier temporaire, puis `mv`) et **toute erreur est ignorée** : ni les décisions, ni les actions, ni les codes de sortie du garde-fou ne changent.
 
 C'est le seul chemin d'administration : un changement du garde-fou s'installe avec la même prudence que le filtre.
 
