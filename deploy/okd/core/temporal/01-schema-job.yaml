@@ -1,4 +1,4 @@
-# Schémas de Temporal dans postgres-sophia (bases temporal et temporal_visibility, créées
+# Schémas de Temporal dans postgres-sophia-18 (bases temporal et temporal_visibility, créées
 # par l'administrateur, voir README.md). Rejouable : setup-schema ne crée que les tables de version absentes
 # et ne redescend jamais une version ; update-schema applique les versions manquantes. Même Job à
 # chaque montée de version de Temporal (changer l'image, supprimer l'ancien Job, réappliquer).
@@ -34,7 +34,7 @@ spec:
               done
           env:
             - { name: SQL_PLUGIN, value: postgres12 }
-            - { name: SQL_HOST, value: postgres-sophia.sophia-core.svc }
+            - { name: SQL_HOST, value: postgres-sophia-18.sophia-core.svc }
             - { name: SQL_PORT, value: "5432" }
             - name: SQL_USER
               valueFrom: { secretKeyRef: { name: temporal-db, key: username } }

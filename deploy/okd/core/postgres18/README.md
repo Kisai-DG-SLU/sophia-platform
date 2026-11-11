@@ -72,6 +72,8 @@ Pour chaque base, une à la fois :
 - L'ancienne instance passe à **0 réplique**, avec une sauvegarde finale complète ; elle reste en place **7 jours** comme retour arrière.
 - Ensuite, suppression par l'administrateur : Deployment, Service, PVC, PV, Secret et règles réseau de l'ancienne instance, répertoire du nœud, règles de sortie des applications vers l'ancienne instance, sauvegardes intermédiaires. La sauvegarde finale est gardée 30 jours de plus.
 
+État : fait dans l'installation de référence ; l'ancienne instance PostgreSQL 15 est supprimée après la garde, et ses manifestes et règles réseau sont retirés de ce dépôt. Toute base vit dans l'instance 18.
+
 ### Ajouter une base : chat permanent (Matrix)
 
 Le [module Communication](../../../../docs/modules/communication/documentation.md) (installé, en recette) a deux bases, chacune avec son rôle propriétaire et son Secret, créés selon la règle ci-dessus (Secret d'abord, puis rôle) :

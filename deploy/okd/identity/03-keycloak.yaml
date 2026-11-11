@@ -16,7 +16,7 @@ spec:
   instances: 1
   db:
     vendor: postgres
-    host: postgres-sophia.sophia-core.svc.cluster.local
+    host: postgres-sophia-18.sophia-core.svc.cluster.local
     port: 5432
     database: keycloak
     usernameSecret: { name: keycloak-db, key: username }

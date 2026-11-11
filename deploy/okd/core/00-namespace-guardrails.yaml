@@ -1,7 +1,7 @@
-# sophia-core (orchestration : LiteLLM, postgres-sophia, RabbitMQ, Temporal ; n8n à venir) —
+# sophia-core (orchestration : LiteLLM, postgres-sophia-18, RabbitMQ, Temporal ; n8n à venir) —
 # quota et valeurs par défaut, comme sophia-inference et sophia-skills.
 # Le quota exige des limites sur chaque conteneur, builds compris : appliquer d'abord les ressources
-# explicites de LiteLLM, postgres-sophia et des deux BuildConfig, sinon leur prochain pod reçoit les
+# explicites de LiteLLM, postgres-sophia-18 et des deux BuildConfig, sinon leur prochain pod reçoit les
 # valeurs par défaut ci-dessous (512 Mi) et meurt en OOM.
 ---
 apiVersion: v1

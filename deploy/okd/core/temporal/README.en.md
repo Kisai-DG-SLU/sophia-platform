@@ -40,7 +40,7 @@ Replace the `example.org` domain of Routes and redirect URLs with yours.
 T_DB_PASS=$(openssl rand -base64 30 | tr -d '/+=' | cut -c1-32)
 oc create secret generic temporal-db -n sophia-core \
   --from-literal=username=temporal --from-literal=password="$T_DB_PASS"
-oc exec -i -n sophia-core deploy/postgres-sophia -- psql -v ON_ERROR_STOP=1 <<SQL
+oc exec -i -n sophia-core deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1 <<SQL
 CREATE ROLE temporal LOGIN PASSWORD '$T_DB_PASS';
 CREATE DATABASE temporal OWNER temporal;
 CREATE DATABASE temporal_visibility OWNER temporal;
