@@ -60,9 +60,13 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+        # Interface de discussion, dans son namespace dédié
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-interface } }
           podSelector: { matchLabels: { app: sophia-interface } }
         - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: hermes-system } }
+        # Module Cuisine : recherche de recettes réelles (web_search, fetch_page)
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+          podSelector: { matchLabels: { app: recettes } }
       ports: [{ protocol: TCP, port: 8000 }]
 ---
 apiVersion: networking.k8s.io/v1
