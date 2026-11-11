@@ -1,6 +1,7 @@
 # Réseau de sophia-skills : tout refusé ; aucune sortie vers Internet (ce qui sort est en DMZ).
-#   entrée  : l'API des discussions (sophia-apps / sophia-interface) → port MCP 8000 ;
-#   sortie  : DNS ; sophia-image → modèles d'image de sophia-inference (1234, 8001).
+#   entrée  : l'API des discussions (namespace sophia-interface) → port MCP 8000 ;
+#   sortie  : DNS ; sophia-image → modèles d'image de sophia-inference (1234, 8001) ;
+#             mcp-fichiers → fournisseur d'identité et port interne réservé de Fichiers.
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -21,7 +22,8 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+        # l'interface vit dans son namespace dédié
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-interface } }
           podSelector: { matchLabels: { app: sophia-interface } }
       ports: [{ protocol: TCP, port: 8000 }]
 ---
@@ -74,3 +76,26 @@ spec:
       ports:
         - { protocol: TCP, port: 1234 }
         - { protocol: TCP, port: 8001 }
+---
+# Outil MCP des fichiers : sortie vers le fournisseur d'identité (échange de jeton RFC 8693, clés JWKS) et
+# vers le port interne réservé de Fichiers (API externe en GET seulement). Rien d'autre : ni Internet, ni
+# les autres services.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-fichiers-egress
+  namespace: sophia-skills
+spec:
+  podSelector: { matchLabels: { app: mcp-fichiers } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-identity } }
+          podSelector: { matchLabels: { app: keycloak } }
+      ports:
+        - { protocol: TCP, port: 8080 }
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: "${WORKSPACE_NAMESPACE}" } }
+          podSelector: { matchLabels: { app: fichiers-nginx } }
+      ports:
+        - { protocol: TCP, port: ${API_INTERNAL_PORT} }

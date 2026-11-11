@@ -10,7 +10,10 @@ Sources libres, téléchargées depuis le nœud (mise à jour = relancer fetch-g
 Sortie (gzip JSON, dans le dossier donné) : lieux.json.gz, pays-10m.json.gz, pays-50m.json.gz,
 sources.json (URL et date du téléchargement).
 
-    python geo_build.py <dossier de sortie> [<dossier de téléchargement déjà rempli>]
+    python geo_build.py <dossier de sortie> [<dossier de téléchargement déjà rempli>] [--ban <dép> <dép>…]
+
+--ban : adresses de la Base Adresse Nationale des départements donnés (Licence Ouverte 2.0), dans
+ban.sqlite (ban.py). La liste est donnée au lancement et n'est écrite que dans sources.json, sur le volume.
 """
 import gzip
 import io
@@ -23,6 +26,8 @@ import zipfile
 from datetime import date
 
 import shapefile   # pyshp, seulement au build
+
+import ban         # à côté de ce fichier (fetch-geo-data.sh le monte aussi)
 
 URLS = {
     "communes": "https://geo.api.gouv.fr/communes?fields=nom,code,codesPostaux,centre,population,codeDepartement,departement,region&format=json",
@@ -68,7 +73,15 @@ def read_shp(data: bytes):
                             shx=io.BytesIO(z.read(base + ".shx")), encoding="utf-8")
 
 
-def main(out: str, cache: str = "") -> None:
+def fetch_ban(dep: str, cache: str) -> bytes:
+    name = os.path.join(cache, f"adresses-{dep}.csv.gz") if cache else None
+    if name and os.path.exists(name):
+        return open(name, "rb").read()
+    req = urllib.request.Request(ban.URL.format(dep=dep), headers={"User-Agent": "sophia-geo-build"})
+    return urllib.request.urlopen(req, timeout=600).read()
+
+
+def main(out: str, cache: str = "", departements: list = ()) -> None:
     os.makedirs(out, exist_ok=True)
     put = lambda name, obj: gzip.open(os.path.join(out, name), "wt", encoding="utf-8").write(
         json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
@@ -124,12 +137,21 @@ def main(out: str, cache: str = "") -> None:
         lieux.append({"id": "geonames:" + f[0], "nom": nom, "autres": autres, "lat": float(f[4]), "lon": float(f[5]),
                       "pop": int(f[14] or 0), "pays": f[8], "region": admin1.get(f"{f[8]}.{f[10]}"), "source": "GeoNames"})
     put("lieux.json.gz", {"lieux": lieux, "pays": noms_pays})
-    json.dump({"date": date.today().isoformat(), "urls": URLS,
-               "licences": {"geo.api.gouv.fr": "Licence Ouverte Etalab 2.0", "GeoNames": "CC BY 4.0",
-                            "Natural Earth": "domaine public"}},
-              open(os.path.join(out, "sources.json"), "w"), ensure_ascii=False, indent=1)
+    licences = {"geo.api.gouv.fr": "Licence Ouverte Etalab 2.0", "GeoNames": "CC BY 4.0", "Natural Earth": "domaine public"}
+    sources = {"date": date.today().isoformat(), "urls": URLS, "licences": licences}
+    if departements:
+        comptes = ban.construire(out, list(departements), lambda d: fetch_ban(d, cache))
+        licences["Base Adresse Nationale"] = "Licence Ouverte 2.0"
+        sources["ban"] = {"url": ban.URL, "departements": list(departements)}
+        for d, n in comptes.items():
+            print(f"BAN {d} : {n} adresses")
+        print(f"ban.sqlite : {os.path.getsize(os.path.join(out, ban.FICHIER)) / 1e6:.0f} Mo")
+    json.dump(sources, open(os.path.join(out, "sources.json"), "w"), ensure_ascii=False, indent=1)
     print(f"{len(lieux)} lieux, {len(noms_pays)} pays")
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    args = sys.argv[1:]
+    deps = args[args.index("--ban") + 1:] if "--ban" in args else []
+    pos = args[:args.index("--ban")] if "--ban" in args else args
+    main(*pos, departements=deps)

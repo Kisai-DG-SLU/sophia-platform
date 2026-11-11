@@ -19,11 +19,11 @@ modules (ex. cuisine) ──────────MCP :8000──→ sophia-im
 | Fichier | Contenu |
 |---|---|
 | `00-namespace-guardrails.yaml` | `ResourceQuota`, `LimitRange` |
-| `01-network.yaml` | tout refusé ; entrée : l'interface → 8000 (pods `sophia-mcp: "true"`), un module → `sophia-image` seul ; sortie : DNS, `sophia-image` → `sophia-image-gen` |
+| `01-network.yaml` | tout refusé ; entrée : l'interface → 8000 (pods `sophia-mcp: "true"`), un module → `sophia-image` seul ; sortie : DNS, `sophia-image` → `sophia-image-gen`, `mcp-fichiers` → fournisseur d'identité et port interne réservé de Fichiers |
 | `02-storage.yaml` | PV local `${MODELS_MOUNT_POINT}/skills` (même volume que les modèles, dossier à part) et PVC `pvc-skills-data`, lus en lecture seule |
 | `03-geo.yaml` | `sophia-geo` : outils `lieu`, `distance`, `carte` |
 | `04-image.yaml` | `sophia-image` : outil `image` ; modèles dans [`../inference/06-image.yaml`](../inference/06-image.yaml) |
-| `fetch-geo-data.sh`, `geo_build.py` | données géographiques, préparées sur le nœud dans un conteneur jetable ; l'ancienne version reste en place si la préparation échoue |
+| `fetch-geo-data.sh`, `geo_build.py`, `ban.py` | données géographiques, préparées sur le nœud dans un conteneur jetable (`ban.py` : base d'adresses locale, avec `--ban`) ; l'ancienne version reste en place si la préparation échoue |
 
 Chaque serveur MCP porte l'étiquette `sophia-mcp: "true"`, écoute sur 8000 (`/mcp`, *streamable HTTP*, sans état) et répond sur `/health` ; l'interface l'ajoute à sa liste de serveurs MCP.
 
@@ -105,10 +105,11 @@ Route HTTP à côté du MCP : `GET /api/resume`, le résumé de Fichiers pour le
 | `${NODE_NAME}` | nœud qui porte le volume (`oc get nodes`), dans `02-storage.yaml` |
 | `${MODELS_MOUNT_POINT}` | point de montage du volume des modèles ([`../inference/`](../inference/)), dans `02-storage.yaml` ; substitution nommée : `envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 02-storage.yaml` |
 | `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | dossiers du code des serveurs (builds binaires) |
+| `${WORKSPACE_NAMESPACE}`, `${API_INTERNAL_PORT}` | namespace de la bureautique et port interne réservé de Fichiers ([`../office/`](../office/README.md)), dans `01-network.yaml` ; substitution nommée : `envsubst '${MODULE_APP} ${WORKSPACE_NAMESPACE} ${API_INTERNAL_PORT}' < 01-network.yaml` |
 
 ## Procédure (l'administrateur)
 
-1. Données : `fetch-geo-data.sh` et `geo_build.py` copiés sur le nœud, puis `sudo bash fetch-geo-data.sh`.
+1. Données : `fetch-geo-data.sh`, `geo_build.py` et `ban.py` copiés sur le nœud, puis `sudo bash fetch-geo-data.sh` (avec `--ban <départements>` pour la base d'adresses locale).
 2. Modèles d'image : voir [`../inference/`](../inference/).
 3. `00` à `04` : `--dry-run=server`, puis `apply` ; builds : `oc start-build sophia-geo` et `sophia-image` (`--from-dir`).
 4. Interface : ajouter `http://sophia-geo.sophia-skills.svc:8000/mcp` et `http://sophia-image.sophia-skills.svc:8000/mcp` à sa liste de serveurs MCP.

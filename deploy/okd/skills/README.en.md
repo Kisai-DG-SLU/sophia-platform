@@ -19,11 +19,11 @@ modules (e.g. cooking) ─MCP :8000──→ sophia-image only        generator 
 | File | Content |
 |---|---|
 | `00-namespace-guardrails.yaml` | `ResourceQuota`, `LimitRange` |
-| `01-network.yaml` | deny all; ingress: the interface → 8000 (pods `sophia-mcp: "true"`), a module → `sophia-image` only; egress: DNS, `sophia-image` → `sophia-image-gen` |
+| `01-network.yaml` | deny all; ingress: the interface → 8000 (pods `sophia-mcp: "true"`), a module → `sophia-image` only; egress: DNS, `sophia-image` → `sophia-image-gen`, `mcp-fichiers` → identity provider and Files' reserved internal port |
 | `02-storage.yaml` | local PV `${MODELS_MOUNT_POINT}/skills` (same volume as the models, separate directory) and PVC `pvc-skills-data`, read-only |
 | `03-geo.yaml` | `sophia-geo`: `lieu`, `distance`, `carte` tools |
 | `04-image.yaml` | `sophia-image`: `image` tool; models in [`../inference/06-image.yaml`](../inference/06-image.yaml) |
-| `fetch-geo-data.sh`, `geo_build.py` | geographic data, prepared on the node in a throw-away container; the previous version stays in place if preparation fails |
+| `fetch-geo-data.sh`, `geo_build.py`, `ban.py` | geographic data, prepared on the node in a throw-away container (`ban.py`: local address base, with `--ban`); the previous version stays in place if preparation fails |
 
 Each MCP server carries the label `sophia-mcp: "true"`, listens on 8000 (`/mcp`, stateless *streamable HTTP*) and answers on `/health`; the interface adds it to its list of MCP servers.
 
@@ -105,10 +105,11 @@ HTTP route next to the MCP: `GET /api/resume`, the Files summary for the interfa
 | `${NODE_NAME}` | node carrying the volume (`oc get nodes`), in `02-storage.yaml` |
 | `${MODELS_MOUNT_POINT}` | mount point of the models volume ([`../inference/`](../inference/)), in `02-storage.yaml`; named substitution: `envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 02-storage.yaml` |
 | `${GEO_SRC_DIR}`, `${IMAGE_SRC_DIR}` | directories with the servers' code (binary builds) |
+| `${WORKSPACE_NAMESPACE}`, `${API_INTERNAL_PORT}` | office suite namespace and Files' reserved internal port ([`../office/`](../office/README.en.md)), in `01-network.yaml`; named substitution: `envsubst '${MODULE_APP} ${WORKSPACE_NAMESPACE} ${API_INTERNAL_PORT}' < 01-network.yaml` |
 
 ## Procedure (administrator)
 
-1. Data: copy `fetch-geo-data.sh` and `geo_build.py` to the node, then `sudo bash fetch-geo-data.sh`.
+1. Data: copy `fetch-geo-data.sh`, `geo_build.py` and `ban.py` to the node, then `sudo bash fetch-geo-data.sh` (with `--ban <départements>` for the local address base).
 2. Image models: see [`../inference/`](../inference/).
 3. `00` to `04`: `--dry-run=server`, then `apply`; builds: `oc start-build sophia-geo` and `sophia-image` (`--from-dir`).
 4. Interface: add `http://sophia-geo.sophia-skills.svc:8000/mcp` and `http://sophia-image.sophia-skills.svc:8000/mcp` to its list of MCP servers.
