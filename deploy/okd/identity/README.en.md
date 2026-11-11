@@ -15,7 +15,7 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 |---|---|
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (manual approval) |
 | `02-network.yaml` | on its HTTP port, Keycloak only accepts the router and a named list of clients that call it through its internal Service, and on its management port only its own namespace |
-| `03-keycloak.yaml` | Keycloak instance (with the ingress list of the network policy the operator creates) and Route |
+| `03-keycloak.yaml` | Keycloak instance: image pinned by digest (`startOptimized: false`, image pulled only if absent), the chat's priority class, ingress list of the network policy the operator creates; Route |
 | `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*); audience mappers of the token relayed by the interface |
 | `ajouter-mappeur-audience.py` | adds to the interface's client an audience mapper towards a service that receives the relayed token (below); read-only with `--dry-run`, replayable |
 | [`sessions/`](sessions/README.en.md) | Valkey reserved for the oauth2-proxy sessions: one ACL user per application, AOF persistence, no network egress |
@@ -52,7 +52,7 @@ When the chat interface relays the person's access token (see [Identity relay](.
 |---|---|---|
 | MCP server that exchanges the token (files) | signature, then exchange on behalf of its client | client audience (`included.client.audience`) |
 | an application's oauth2-proxy, for its dashboard summary route | `--skip-jwt-bearer-tokens`: the provider's main verifier, the application's `client-id` required in `aud` | client audience, equal to the application's `client-id` |
-| a module that checks the signature itself, without a client of its own (messaging summary) | signature with the realm keys, issuer, audience, originating client, groups | **custom audience** (`included.custom.audience`, `--personnalisee` option): no Keycloak client is created, since it would only serve introspection or exchange |
+| a module that checks the signature itself, without a client of its own (messaging summary, memory service) | signature with the realm keys, issuer, audience, originating client, groups | **custom audience** (`included.custom.audience`, `--personnalisee` option): no Keycloak client is created, since it would only serve introspection or exchange |
 
 ```bash
 python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <application-client> --dry-run
@@ -67,7 +67,7 @@ python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <free-a
 - The realm's headers do not change: the sign-in page is still refused in a frame (the dashboard offers "Sign in again").
 - These mappers are in `04-realm-sophia.yaml` for a fresh install; the script adds them to an existing realm, since the import only applies at creation.
 
-Status: four audiences (three applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by the first two applications; the third (finances), by the dashboard's real call (200, token accepted).
+Status: four audiences (three applications, messaging) in service, checked by replaying the script ("exists, unchanged") and by an invalid token refused with 403 by the first two applications; the third (finances), by the dashboard's real call (200, token accepted). The memory service (custom audience) and the browser workstations' gatekeeper (client audience) have theirs too, carried over into `04-realm-sophia.yaml`.
 
 ## Account birth dates, read by an application
 

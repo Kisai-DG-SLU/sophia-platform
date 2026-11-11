@@ -1,6 +1,6 @@
 # Server-side oauth2-proxy sessions (Valkey)
 
-The applications protected by oauth2-proxy (the chat and the household's other web applications) store their sessions in a **Valkey reserved for sessions**, next to Keycloak. The browser cookie only carries a ticket of about a hundred bytes. In service for every application behind oauth2-proxy.
+The applications protected by oauth2-proxy (the chat and the household's other web applications) store their sessions in a **Valkey reserved for sessions**, next to Keycloak. The browser cookie only carries a ticket of about a hundred bytes. In service for the chat, the workflow visualisation, the school, cooking and the finances; the shopping module's remote browser keeps its sessions in a cookie.
 
 ## Why
 

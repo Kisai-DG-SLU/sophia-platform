@@ -19,12 +19,12 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels: { policy-group.network.openshift.io/ingress: "" }
-        # oauth2-proxy des modules de sophia-apps (pas les pods de build)
+        # oauth2-proxy des applications de sophia-apps (pas les pods de build)
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-apps }
           podSelector:
             matchExpressions:
-              - { key: app, operator: In, values: [ecole, recettes, courses] }
+              - { key: app, operator: In, values: [ecole, recettes, courses, finances] }
         # navigateur distant du module Courses (oauth2-proxy), dans le sas
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-dmz }
@@ -58,6 +58,22 @@ spec:
           podSelector:
             matchExpressions:
               - { key: app, operator: In, values: [fichiers-backend, fichiers-worker] }
+        # oauth2-proxy des postes au navigateur (jeton, clés) ; le navigateur du poste passe par le routeur,
+        # déjà admis ci-dessus
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-postes }
+          podSelector:
+            matchLabels: { sophia/poste: "true" }
+        # service mémoire : clés du realm (JWKS), pour vérifier les jetons relayés par le chat
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-memory }
+          podSelector:
+            matchLabels: { app: sophia-memoire }
+        # messagerie : oauth2-proxy (jeton, clés) et serveur XMPP (userinfo, par le nom complet du Service)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-messagerie }
+          podSelector:
+            matchLabels: { sophia/messagerie: "true" }
       ports:
         - { protocol: TCP, port: 8080 }
     - from:

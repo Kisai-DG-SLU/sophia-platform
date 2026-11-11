@@ -1,6 +1,6 @@
 # Sessions d'oauth2-proxy côté serveur (Valkey)
 
-Les applications protégées par oauth2-proxy (le chat et les autres applications web du foyer) rangent leurs sessions dans un **Valkey réservé aux sessions**, à côté de Keycloak. Le cookie du navigateur ne porte plus qu'un ticket d'une centaine d'octets. En service pour toutes les applications derrière oauth2-proxy.
+Les applications protégées par oauth2-proxy (le chat et les autres applications web du foyer) rangent leurs sessions dans un **Valkey réservé aux sessions**, à côté de Keycloak. Le cookie du navigateur ne porte plus qu'un ticket d'une centaine d'octets. En service pour le chat, la visualisation des workflows, l'école, la cuisine et les finances ; le navigateur distant des courses garde ses sessions en cookie.
 
 ## Pourquoi
 

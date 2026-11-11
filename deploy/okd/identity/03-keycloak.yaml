@@ -14,6 +14,23 @@ metadata:
   namespace: sophia-identity
 spec:
   instances: 1
+  # Image figée par empreinte (index multi-architecture) plutôt que par étiquette : une étiquette peut être
+  # republiée avec un autre contenu. Changer d'image = une nouvelle empreinte ici, décidée.
+  image: quay.io/keycloak/keycloak@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+  # Avec une image explicite, l'opérateur suppose une image déjà construite (« start --optimized ») ;
+  # l'image officielle ne l'est pas : on garde « start ».
+  startOptimized: false
+  # IfNotPresent : un redémarrage ne dépend pas du registre public. Le CR n'a pas de champ pour cela ;
+  # l'opérateur garde la politique d'un conteneur fourni par podTemplate et complète le reste (nom,
+  # arguments, sondes).
+  unsupported:
+    podTemplate:
+      spec:
+        # classe des dépendances du chat (le SSO de toutes les applications)
+        priorityClassName: sophia-chat
+        containers:
+          - name: keycloak
+            imagePullPolicy: IfNotPresent
   db:
     vendor: postgres
     host: postgres-sophia-18.sophia-core.svc.cluster.local
@@ -42,7 +59,7 @@ spec:
       - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
         podSelector:
           matchExpressions:
-            - { key: app, operator: In, values: [ecole, recettes, courses] }
+            - { key: app, operator: In, values: [ecole, recettes, courses, finances] }
       - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-dmz } }
         podSelector: { matchLabels: { app: courses-navigateur } }
       - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-skills } }
@@ -59,6 +76,12 @@ spec:
         podSelector:
           matchExpressions:
             - { key: app, operator: In, values: [fichiers-backend, fichiers-worker] }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-postes } }
+        podSelector: { matchLabels: { sophia/poste: "true" } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-memory } }
+        podSelector: { matchLabels: { app: sophia-memoire } }
+      - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-messagerie } }
+        podSelector: { matchLabels: { sophia/messagerie: "true" } }
       - podSelector: {}
     management:
       - podSelector: {}
