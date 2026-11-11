@@ -15,7 +15,7 @@ agents ────────────────────────�
 |---|---|
 | `00-searxng.yaml` | métamoteur SearXNG : moteurs choisis, sortie JSON, instance privée (pas de limiteur), SafeSearch modéré, strict pour les utilisateurs protégés (par requête) |
 | `01-sophia-web.yaml` | serveur MCP + REST `sophia-web` : ImageStream et BuildConfig dans le namespace des applications, Deployment et Service dans le sas |
-| `02-network.yaml` | NetworkPolicies : tout refusé par défaut ; sortie Internet 80/443 hors plages privées, DNS ; entrée de `sophia-web` depuis l'interface et les agents seulement ; SearXNG joignable par `sophia-web` seulement |
+| `02-network.yaml` | NetworkPolicies : tout refusé par défaut ; sortie Internet 80/443 hors plages privées, DNS ; entrée de `sophia-web` depuis l'interface, les agents et le module Cuisine seulement ; SearXNG joignable par `sophia-web` seulement |
 
 ## Le service `sophia-web`
 
@@ -31,7 +31,7 @@ Règles côté interface : la recherche est déclenchée par défaut pour toute 
 
 **Météo d'un lieu enregistré** (en service) : `weather_forecast` accepte des coordonnées avec un libellé, et saute alors le géocodage en ligne. L'interface envoie **le centre de la commune** du lieu, jamais l'adresse : la précision d'une prévision ne justifie pas d'envoyer l'emplacement d'un domicile à un service extérieur. En second filet, le service **arrondit lui-même les coordonnées à 0,01°** (environ 1 km) avant de les transmettre. La forme « Commune (code postal) » est aussi acceptée : le code postal est retiré avant le géocodage puis sert à vérifier la réponse, qui dit « introuvable » plutôt que de retenir un homonyme.
 
-**Cache de secours de la météo** (codé et relu, pas encore en service) :
+**Cache de secours de la météo** (en service ; Secret `sophia-web-cache`, clé `jeton`, même valeur côté interface, facultatif) :
 
 - `PUT /cache/communes` : l'interface envoie la liste anonyme des communes de ses lieux enregistrés (libellé et coordonnées, sans nom de lieu, propriétaire ni adresse), au plus 50, arrondies à 0,01° par le service ; elle remplace la précédente ;
 - la route exige un **jeton partagé**, comparé en temps constant : d'autres pods peuvent joindre le service, seule l'interface doit pouvoir remplacer la liste. Le jeton est dans un Secret créé par l'administrateur en un seul tube, sans affichage, et n'est jamais journalisé ;

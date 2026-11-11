@@ -43,6 +43,7 @@ spec:
     metadata:
       labels: { app: searxng }
     spec:
+      priorityClassName: sophia-agents    # services de fond (../cluster/priority-classes.yaml)
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }

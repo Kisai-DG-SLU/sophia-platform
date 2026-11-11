@@ -47,6 +47,7 @@ spec:
     metadata:
       labels: { app: sophia-web }
     spec:
+      priorityClassName: sophia-agents    # services de fond (../cluster/priority-classes.yaml)
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
@@ -56,6 +57,10 @@ spec:
           ports: [{ name: http, containerPort: 8000 }]
           env:
             - { name: SEARXNG_URL, value: "http://searxng.sophia-dmz.svc.cluster.local:8080" }
+            # Jeton partagé avec l'interface pour PUT /cache/communes (Secret de l'administrateur, même valeur
+            # côté interface). Facultatif : sans lui, le cache de secours est désactivé, le reste ne change pas.
+            - name: SOPHIA_WEB_CACHE_TOKEN
+              valueFrom: { secretKeyRef: { name: sophia-web-cache, key: jeton, optional: true } }
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
@@ -63,8 +68,8 @@ spec:
             httpGet: { path: /health, port: http }
             periodSeconds: 15
           resources:
-            requests: { cpu: 20m, memory: 96Mi }
-            limits: { cpu: "1", memory: 512Mi }
+            requests: { cpu: 20m, memory: 320Mi }
+            limits: { cpu: "1", memory: 768Mi }
 ---
 apiVersion: v1
 kind: Service

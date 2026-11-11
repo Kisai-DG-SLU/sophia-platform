@@ -15,7 +15,7 @@ agents ───────────────────────┴�
 |---|---|
 | `00-searxng.yaml` | SearXNG metasearch: selected engines, JSON output, private instance (no limiter), moderate SafeSearch, strict for protected users (per request) |
 | `01-sophia-web.yaml` | `sophia-web` MCP + REST server: ImageStream and BuildConfig in the applications namespace, Deployment and Service in the airlock |
-| `02-network.yaml` | NetworkPolicies: deny by default; Internet egress on 80/443 outside private ranges, DNS; ingress to `sophia-web` from the interface and the agents only; SearXNG reachable from `sophia-web` only |
+| `02-network.yaml` | NetworkPolicies: deny by default; Internet egress on 80/443 outside private ranges, DNS; ingress to `sophia-web` from the interface, the agents and the Cooking module only; SearXNG reachable from `sophia-web` only |
 
 ## The `sophia-web` service
 
@@ -31,7 +31,7 @@ Interface-side rules: search is triggered by default for any information request
 
 **Weather for a saved place** (in service): `weather_forecast` accepts coordinates with a label, and then skips online geocoding. The interface sends **the centre of the place's municipality**, never the address: the accuracy of a forecast does not justify sending a home's location to an external service. As a second safety net, the service **rounds the coordinates itself to 0.01°** (about 1 km) before passing them on. The "Municipality (postcode)" form is also accepted: the postcode is removed before geocoding then used to check the answer, which says "not found" rather than keeping a namesake.
 
-**Weather fallback cache** (coded and reviewed, not yet in service):
+**Weather fallback cache** (in service; Secret `sophia-web-cache`, key `jeton`, same value on the interface side, optional):
 
 - `PUT /cache/communes`: the interface sends the anonymous list of the municipalities of its saved places (label and coordinates, with no place name, owner or address), at most 50, rounded to 0.01° by the service; it replaces the previous one;
 - the route requires a **shared token**, compared in constant time: other pods can reach the service, only the interface must be able to replace the list. The token is in a Secret created by the administrator through a single pipe, never displayed, and never logged;
