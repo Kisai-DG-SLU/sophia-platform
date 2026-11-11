@@ -22,7 +22,7 @@ spec:
   successfulBuildsHistoryLimit: 2
   failedBuildsHistoryLimit: 2
   output:
-    to: { kind: ImageStreamTag, name: "llama-server:v0.5.0-cu124" }
+    to: { kind: ImageStreamTag, name: "llama-server:v0.7.0-cu124" }
   resources:
     requests: { cpu: "4", memory: 8Gi }
     limits: { cpu: "16", memory: 24Gi }
@@ -30,8 +30,8 @@ spec:
     type: Docker
     dockerStrategy:
       buildArgs:
-        - { name: LLAMA_REF, value: v0.5.0 }
-        - { name: LLAMA_SHA, value: 7fe450e19305b828c199d602c23a8337aaa1f03b }
+        - { name: LLAMA_REF, value: v0.7.0 }
+        - { name: LLAMA_SHA, value: 620d2225cc436ab0b001e3200e590e3b286ef9ab }
   source:
     type: Dockerfile
     dockerfile: |

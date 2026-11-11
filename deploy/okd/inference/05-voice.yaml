@@ -55,7 +55,14 @@ spec:
           ports: [{ name: http, containerPort: 8000 }]
           env:
             - { name: DEFAULT_VOICE, value: estelle }
+            # Racine appariée : poids sans clonage d'une révision, voix calculées avec ses poids jumeaux, et sa
+            # configuration à côté (une empreinte de voix est liée à ses poids). Retour arrière : retirer ces deux
+            # variables (oc set env … VOICE_MODELS- TTS_CONFIG-).
+            - { name: VOICE_MODELS, value: "/models/voice/${VOICE_REVISION}" }
+            - { name: TTS_CONFIG, value: "/models/voice/${VOICE_REVISION}/config.yaml" }
             - { name: TTS_THREADS, value: "2" }     # génération et décodage ont chacun ce nombre de fils : 2 × 2 = la limite de 4 CPU
+            # Synthèse en float32 : mots moins avalés qu'en int8, calcul environ 1,5 fois plus long
+            - { name: TTS_INT8, value: "0" }
             - { name: ASR_THREADS, value: "4" }
           volumeMounts:
             - { name: models, mountPath: /models/voice, subPath: voice, readOnly: true }

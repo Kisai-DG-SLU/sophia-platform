@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Modèles vocaux de sophia-voice, déposés DEPUIS LE NŒUD dans /var/mnt/models/voice
+# Modèles vocaux de sophia-voice, déposés DEPUIS LE NŒUD dans ${MODELS_MOUNT_POINT}/voice
 # (sophia-inference n'a pas d'accès à Internet). Révisions Hugging Face et SHA-256 figés.
-# Usage (sur le nœud) : sudo bash fetch-voice-models.sh
+# Usage (sur le nœud) : sudo MODELS_MOUNT_POINT=<point de montage> bash fetch-voice-models.sh
 set -euo pipefail
-ROOT=/var/mnt/models/voice
+ROOT="${MODELS_MOUNT_POINT:?MODELS_MOUNT_POINT non défini : point de montage du volume des modèles (README)}"/voice
 TTS=https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/575d14372df89a4534bcb989870a34e77544b09f/languages/french
 ASR=https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce
 

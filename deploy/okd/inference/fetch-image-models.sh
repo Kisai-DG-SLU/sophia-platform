@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Modèles de sophia-image, déposés DEPUIS LE NŒUD dans /var/mnt/models/image
+# Modèles de sophia-image, déposés DEPUIS LE NŒUD dans ${MODELS_MOUNT_POINT}/image
 # (sophia-inference n'a pas d'accès à Internet). Révisions Hugging Face et SHA-256 figés.
 #   - SDXL-Turbo fp16 (Stability AI, licence sai-nc-community : usage NON commercial)
 #   - TAESDXL (décodeur rapide, MIT)
 #   - classifieur Falconsai/nsfw_image_detection (Apache 2.0), contrôle des images générées
-# Usage (sur le nœud) : sudo bash fetch-image-models.sh      (≈ 7,3 Go)
+# Usage (sur le nœud) : sudo MODELS_MOUNT_POINT=<point de montage> bash fetch-image-models.sh      (≈ 7,3 Go)
 set -euo pipefail
-ROOT=/var/mnt/models/image
+ROOT="${MODELS_MOUNT_POINT:?MODELS_MOUNT_POINT non défini : point de montage du volume des modèles (README)}"/image
 HF=https://huggingface.co
 
 fetch() {  # fetch URL DESTINATION SHA256
