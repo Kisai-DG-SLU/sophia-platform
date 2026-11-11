@@ -23,7 +23,7 @@ Un **module** est une application du foyer ou de l'organisation, construite sur 
 | **Un module = un pod, une base, un groupe** | pod avec son oauth2-proxy sur sa propre adresse (une application servie sous l'origine de l'interface aurait tous les droits de la personne sur la discussion), base et rôle propres dans le PostgreSQL partagé, groupe du realm ; build depuis la forge interne. Dans le dashboard, le module est affiché **en cadre** depuis sa propre adresse : il ne partage jamais l'origine de l'interface |
 | **L'humain garde la main sur l'irréversible** | validation d'une liste, paiement, correction d'une dictée |
 
-Pour intégrer un module à la discussion : exposer un serveur MCP (voir le [contrat des outils](../../deploy/okd/skills/README.md)), l'ajouter à `SOPHIA_MCP_URLS` de l'[interface](../../deploy/okd/apps/chat-interface/README.md) et ouvrir le flux dans sa NetworkPolicy ; pour lui donner une base : un bloc dans [`allow-apps-to-postgres.yaml`](../../deploy/okd/core/postgres/allow-apps-to-postgres.yaml).
+Pour intégrer un module à la discussion : exposer un serveur MCP (voir le [contrat des outils](../../deploy/okd/skills/README.md)), l'ajouter à `SOPHIA_MCP_URLS` de l'[interface](../../deploy/okd/apps/chat-interface/README.md) et ouvrir le flux dans sa NetworkPolicy ; pour lui donner une base : son étiquette dans l'entrée de PostgreSQL 18, [`03-network.yaml`](../../deploy/okd/core/postgres18/03-network.yaml), puis un rôle et une base ([procédure](../../deploy/okd/core/postgres18/README.md#ajouter-une-base--chat-permanent-matrix)).
 
 ## Intégrer un module au dashboard
 

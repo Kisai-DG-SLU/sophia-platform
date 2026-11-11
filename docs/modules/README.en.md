@@ -23,7 +23,7 @@ A **module** is an application for the household or the organisation, built on t
 | **One module = one pod, one database, one group** | pod with its oauth2-proxy on its own address (an application served under the interface's origin would have all of the person's rights over the chat), own database and role in the shared PostgreSQL, realm group; build from the internal forge. In the dashboard, the module is shown **in a frame** from its own address: it never shares the interface's origin |
 | **The human keeps control of the irreversible** | validating a list, payment, marking a dictation |
 
-To plug a module into the chat: expose an MCP server (see the [tool contract](../../deploy/okd/skills/README.en.md)), add it to the [interface](../../deploy/okd/apps/chat-interface/README.en.md)'s `SOPHIA_MCP_URLS` and open the flow in its NetworkPolicy; to give it a database: a block in [`allow-apps-to-postgres.yaml`](../../deploy/okd/core/postgres/allow-apps-to-postgres.yaml).
+To plug a module into the chat: expose an MCP server (see the [tool contract](../../deploy/okd/skills/README.en.md)), add it to the [interface](../../deploy/okd/apps/chat-interface/README.en.md)'s `SOPHIA_MCP_URLS` and open the flow in its NetworkPolicy; to give it a database: its label in the PostgreSQL 18 ingress, [`03-network.yaml`](../../deploy/okd/core/postgres18/03-network.yaml), then a role and a database ([procedure](../../deploy/okd/core/postgres18/README.en.md#adding-a-database-persistent-chat-matrix)).
 
 ## Plugging a module into the dashboard
 

@@ -72,6 +72,8 @@ For each database, one at a time:
 - The old instance goes to **0 replicas**, with a full final backup; it stays in place for **7 days** as a fallback.
 - Then the administrator deletes: the old instance's Deployment, Service, PVC, PV, Secret and network rules, the node directory, the applications' egress rules to the old instance, intermediate backups. The final backup is kept 30 more days.
 
+Status: done in the reference installation; the former PostgreSQL 15 instance was deleted after the hold, and its manifests and network rules are removed from this repository. Every database lives in the 18 instance.
+
 ### Adding a database: persistent chat (Matrix)
 
 The [Communication module](../../../../docs/modules/communication/documentation.en.md) (installed, in acceptance testing) has two databases, each with its owner role and its Secret, created following the rule above (Secret first, then role):

@@ -14,7 +14,7 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 | File | Content |
 |---|---|
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (manual approval) |
-| `02-network.yaml` | PostgreSQL accepts the identity namespace; on its HTTP port Keycloak only accepts the router and a named list of clients that call it through its internal Service, and on its management port only its own namespace |
+| `02-network.yaml` | on its HTTP port, Keycloak only accepts the router and a named list of clients that call it through its internal Service, and on its management port only its own namespace |
 | `03-keycloak.yaml` | Keycloak instance (with the ingress list of the network policy the operator creates) and Route |
 | `04-realm-sophia.yaml` | realm: groups, password policy, OIDC clients — chat interface (PKCE, secret through a *placeholder*), RabbitMQ management (public PKCE client, `rabbitmq` audience), Temporal UI (oauth2-proxy, secret through a *placeholder*); audience mappers of the token relayed by the interface |
 | `ajouter-mappeur-audience.py` | adds to the interface's client an audience mapper towards a service that receives the relayed token (below); read-only with `--dry-run`, replayable |
@@ -23,11 +23,11 @@ Single identity provider for the platform (OIDC): one person, one account, one s
 ## Procedure
 
 1. **Operator**: `oc apply -f 00-namespace-operator.yaml`, approve the InstallPlan, wait for the CSV to reach `Succeeded`.
-2. **Database**: create the `keycloak-db` secret (user, random password), then the role and database in PostgreSQL. **The password goes through `psql`'s standard input, never the command line**: `oc exec` arguments are recorded by the API.
+2. **Database**: create the `keycloak-db` secret (user, random password), then the role and database in PostgreSQL 18, whose ingress already admits the identity namespace ([`core/postgres18/03-network.yaml`](../core/postgres18/03-network.yaml)). **The password goes through `psql`'s standard input, never the command line**: `oc exec` arguments are recorded by the API.
    ```bash
    KC_DB_PASS=$(openssl rand -base64 30 | tr -d '/+=' | cut -c1-32)
    oc create secret generic keycloak-db -n sophia-identity --from-literal=username=keycloak --from-literal=password="$KC_DB_PASS"
-   oc exec -i -n sophia-core deploy/postgres -- psql -v ON_ERROR_STOP=1 <<SQL
+   oc exec -i -n sophia-core deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1 <<SQL
    CREATE ROLE keycloak LOGIN PASSWORD '$KC_DB_PASS';
    CREATE DATABASE keycloak OWNER keycloak;
    REVOKE ALL ON DATABASE keycloak FROM PUBLIC;

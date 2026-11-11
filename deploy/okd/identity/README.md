@@ -14,7 +14,7 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 | Fichier | Contenu |
 |---|---|
 | `00-namespace-operator.yaml` | namespace, OperatorGroup, Subscription (approbation manuelle) |
-| `02-network.yaml` | PostgreSQL accepte le namespace d'identité ; Keycloak n'accepte, sur son port HTTP, que le routeur et une liste nommée de clients qui l'appellent par son Service interne, et sur son port de gestion que son propre namespace |
+| `02-network.yaml` | Keycloak n'accepte, sur son port HTTP, que le routeur et une liste nommée de clients qui l'appellent par son Service interne, et sur son port de gestion que son propre namespace |
 | `03-keycloak.yaml` | instance Keycloak (avec la liste des entrées de la politique réseau que crée l'operator) et Route |
 | `04-realm-sophia.yaml` | realm : groupes, politique de mots de passe, clients OIDC — interface de discussion (PKCE, secret par *placeholder*), administration de RabbitMQ (client public PKCE, audience `rabbitmq`), interface de Temporal (oauth2-proxy, secret par *placeholder*) ; mappeurs d'audience du jeton relayé par l'interface |
 | `ajouter-mappeur-audience.py` | ajoute au client de l'interface un mappeur d'audience vers un service qui reçoit le jeton relayé (ci-dessous) ; lecture seule avec `--dry-run`, rejouable |
@@ -23,11 +23,11 @@ Fournisseur d'identité unique de la plateforme (OIDC) : une personne, un compte
 ## Procédure
 
 1. **Operator** : `oc apply -f 00-namespace-operator.yaml`, approuver l'InstallPlan, attendre le CSV `Succeeded`.
-2. **Base** : créer le secret `keycloak-db` (utilisateur, mot de passe aléatoire), puis le rôle et la base dans PostgreSQL. **Le mot de passe passe par l'entrée standard de `psql`, jamais par la ligne de commande** : les arguments d'`oc exec` sont tracés par l'API.
+2. **Base** : créer le secret `keycloak-db` (utilisateur, mot de passe aléatoire), puis le rôle et la base dans PostgreSQL 18, dont l'entrée admet déjà le namespace d'identité ([`core/postgres18/03-network.yaml`](../core/postgres18/03-network.yaml)). **Le mot de passe passe par l'entrée standard de `psql`, jamais par la ligne de commande** : les arguments d'`oc exec` sont tracés par l'API.
    ```bash
    KC_DB_PASS=$(openssl rand -base64 30 | tr -d '/+=' | cut -c1-32)
    oc create secret generic keycloak-db -n sophia-identity --from-literal=username=keycloak --from-literal=password="$KC_DB_PASS"
-   oc exec -i -n sophia-core deploy/postgres -- psql -v ON_ERROR_STOP=1 <<SQL
+   oc exec -i -n sophia-core deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1 <<SQL
    CREATE ROLE keycloak LOGIN PASSWORD '$KC_DB_PASS';
    CREATE DATABASE keycloak OWNER keycloak;
    REVOKE ALL ON DATABASE keycloak FROM PUBLIC;

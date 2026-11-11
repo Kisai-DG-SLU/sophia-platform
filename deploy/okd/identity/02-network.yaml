@@ -1,22 +1,5 @@
 # PIdent.2/3 — Flux réseau de l'identité.
 ---
-# PostgreSQL accepte Keycloak (s'ajoute à allow-litellm-to-postgres, sans la modifier).
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-identity-to-postgres
-  namespace: sophia-core
-spec:
-  podSelector:
-    matchLabels: { app: postgres-sophia }
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels: { kubernetes.io/metadata.name: sophia-identity }
-      ports:
-        - { protocol: TCP, port: 5432 }
----
 # Keycloak : entrée depuis le routeur (navigateurs, et les clients qui passent par le nom public), et depuis
 # les seuls clients OIDC qui l'appellent par son Service interne (proxys OIDC, échanges serveur à serveur), sur
 # 8080 seulement ; depuis le namespace lui-même (operator, Jobs d'import) sur 8080 et 9000. Le cluster

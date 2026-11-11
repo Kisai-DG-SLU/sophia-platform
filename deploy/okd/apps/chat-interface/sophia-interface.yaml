@@ -293,11 +293,6 @@ spec:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-core }
           podSelector:
-            matchLabels: { app: postgres-sophia }
-        # PostgreSQL 18 : l'ancienne instance reste ouverte pendant la garde qui suit la migration, pour un retour arrière
-        - namespaceSelector:
-            matchLabels: { kubernetes.io/metadata.name: sophia-core }
-          podSelector:
             matchLabels: { app: postgres-sophia-18 }
       ports:
         - { protocol: TCP, port: 5432 }
