@@ -80,4 +80,4 @@ oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --comme <reference
 oc exec -i -n sophia-core deploy/litellm -- python3 - --info <alias> < litellm/create-virtual-key.py
 ```
 
-Creation replaces `--dry-run` with `--eval <VARIABLE>` inside an `eval "$(…)"`, then the key goes into the caller's Secret through standard input. `--info` gives the models, the limits and the start of the key's SHA-256 fingerprint: compared with the fingerprint of the Secret's value, it proves it is the right key, without displaying it.
+Creation replaces `--dry-run` with `--eval <VARIABLE>` inside an `eval "$(…)"`, then the key goes into the caller's Secret through standard input; alternatively `--tube` writes the key alone on standard output, for a pipe into `oc create secret generic … --from-file=cle=/dev/stdin`, with no variable in the terminal (`create-virtual-key.py`). `--info` gives the models, the limits and the start of the key's SHA-256 fingerprint: compared with the fingerprint of the Secret's value, it proves it is the right key, without displaying it.

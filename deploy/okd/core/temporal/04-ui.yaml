@@ -17,6 +17,7 @@ spec:
     metadata:
       labels: { app: temporal-ui }
     spec:
+      priorityClassName: sophia-agents
       containers:
         - name: ui
           image: docker.io/temporalio/ui:2.56.0
@@ -52,6 +53,9 @@ spec:
             - --http-address=0.0.0.0:4180
             - --upstream=http://127.0.0.1:8080/
             - --reverse-proxy=true
+            # Seul appelant admis à fournir X-Forwarded-* : le routeur d'OKD, en réseau de l'hôte, vu des pods
+            # par une adresse du nœud (relevée dans le journal d'oauth2-proxy). /ping n'en dépend pas.
+            - --trusted-proxy-ip=ROUTER_POD_SIDE_IP/32
             - --provider=keycloak-oidc
             - --client-id=temporal-ui
             - --client-secret-file=/etc/oauth2/client-secret

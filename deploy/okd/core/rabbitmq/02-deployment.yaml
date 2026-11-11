@@ -18,6 +18,7 @@ spec:
       labels:
         app: rabbitmq
     spec:
+      priorityClassName: sophia-agents
       # Nom de nœud RabbitMQ fixe (rabbit@rabbitmq) : il nomme le répertoire de données. Avec le
       # nom du pod, chaque recréation repartait d'un répertoire vide (files et comptes perdus).
       hostname: rabbitmq

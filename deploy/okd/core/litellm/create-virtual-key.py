@@ -8,6 +8,10 @@ jamais affichée). La clé créée ne sort que sous la forme NOM='…', pour un 
   oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --comme <alias-de-référence> --dry-run < create-virtual-key.py
   eval "$(oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --comme <alias-de-référence> --eval NOM < create-virtual-key.py)"
 
+Pour un Secret, sans variable du terminal :
+
+  oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --modeles m1 --rpm N --tube < create-virtual-key.py | oc -n <ns> create secret generic <nom> --from-file=cle=/dev/stdin
+
 --sans m1,m2 retire des modèles de la liste recopiée (moindre privilège). Il ne peut jamais en ajouter.
 
 Sans clé de référence, --modeles m1,m2 --rpm N donne une liste explicite et un débit, sans budget
@@ -53,6 +57,9 @@ def option(argv, nom):
 def main():
     argv = sys.argv[1:]
     dry = "--dry-run" in argv
+    # --tube : la clé seule sur la sortie standard, sans saut de ligne, pour un tube vers « oc create secret …
+    # --from-file=cle=/dev/stdin » (aucun secret dans une variable du terminal).
+    tube = "--tube" in argv
     var, comme, sans = option(argv, "--eval"), option(argv, "--comme"), option(argv, "--sans")
     liste, rpm, info = option(argv, "--modeles"), option(argv, "--rpm"), option(argv, "--info")
     keys = [k for k in call("GET", "/key/list?return_full_object=true&size=100").get("keys") or [] if isinstance(k, dict)]
@@ -65,11 +72,12 @@ def main():
               f"budget {k.get('max_budget')}, dépensé {k.get('spend')}, empreinte {str(k.get('token'))[:12]}")
         return
     args = [a for a in argv if not a.startswith("--") and a not in (var, comme, sans, liste, rpm)]
-    if (len(args) != 1 or not ALIAS.match(args[0]) or (not dry and not var) or bool(comme) == bool(liste)
+    if (len(args) != 1 or not ALIAS.match(args[0]) or (not dry and not var and not tube) or (var and tube)
+            or bool(comme) == bool(liste)
             or (liste and (sans or not rpm or not rpm.isdigit() or not 1 <= int(rpm) <= 10000))
             or (var and not re.fullmatch(r"[A-Z][A-Z0-9_]*", var))):
         sys.exit("usage : python3 - <alias> (--comme <alias-de-référence> [--sans m1,m2] | --modeles m1,m2 --rpm N)"
-                 " --dry-run | --eval NOM_DE_VARIABLE ; ou python3 - --info <alias>")
+                 " --dry-run | --eval NOM_DE_VARIABLE | --tube ; ou python3 - --info <alias>")
     alias = args[0]
     if any(k.get("key_alias") == alias for k in keys):
         sys.exit(f"❌ la clé {alias} existe déjà : rien n'est créé")
@@ -107,7 +115,10 @@ def creer(alias, modeles, limites, origine, var, dry):
     if not re.fullmatch(r"sk-[A-Za-z0-9_-]{8,}", cle):
         sys.exit("❌ réponse inattendue de /key/generate : rien n'est exporté")
     print(f"✓ {alias} créée : modèles {modeles}, limites {limites} ({origine})", file=sys.stderr)
-    print(f"{var}='{cle}'")
+    if var:
+        print(f"{var}='{cle}'")
+    else:
+        sys.stdout.write(cle)
 
 
 if __name__ == "__main__":

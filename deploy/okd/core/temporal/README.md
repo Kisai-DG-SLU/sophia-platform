@@ -23,14 +23,14 @@ Exécution durable des délégations entre agents : chaque délégation est un *
 |---|---|
 | `01-schema-job.yaml` | Job de création et de mise à jour des schémas (rejouable) |
 | `02-server.yaml` | configuration dynamique, autorité de certification, serveur, Services (dont l'annotation du certificat) |
-| `03-network-policy.yaml` | entrée de Temporal (répartiteur, interface, Jobs, entre pods Temporal) et de Postgres (Temporal) ; l'entrée de l'interface (routeur) est dans `04-ui.yaml` |
+| `03-network-policy.yaml` | entrée de Temporal (répartiteur, interface, Jobs, entre pods Temporal) ; l'entrée de PostgreSQL est dans [`../postgres18/03-network.yaml`](../postgres18/03-network.yaml), celle de l'interface (routeur) dans `04-ui.yaml` |
 | `04-ui.yaml` | interface, oauth2-proxy, Route `edge` |
 | `05-namespace-job.yaml` | création du namespace `sophia` (jeton du compte d'administration) |
 | `06-smoke-test-job.yaml` | recette : appel sans jeton refusé, puis un workflow « bonjour » de bout en bout |
 | [`../../identity/temporal-keycloak.py`](../../identity/temporal-keycloak.py) | client `temporal`, scope `temporal-permissions`, comptes de service et leurs Secrets (rejouable, `--dry-run`) |
 | [`../../identity/clients/`](../../identity/clients/) | clients `temporal-ui` et `rabbitmq`, à importer sur un realm existant |
 
-Le domaine `example.org` des Routes et des adresses de redirection se remplace par le vôtre.
+Le domaine `example.org` des Routes et des adresses de redirection se remplace par le vôtre, et `ROUTER_POD_SIDE_IP` (`04-ui.yaml`) par l'adresse du routeur vue des pods, relevée comme pour l'[interface de discussion](../../apps/chat-interface/README.md).
 
 ## Procédure (l'administrateur)
 

@@ -23,14 +23,14 @@ Durable execution of delegations between agents: each delegation is a **workflow
 |---|---|
 | `01-schema-job.yaml` | Job creating and updating the schemas (replayable) |
 | `02-server.yaml` | dynamic configuration, certificate authority, server, Services (including the certificate annotation) |
-| `03-network-policy.yaml` | ingress to Temporal (dispatcher, UI, Jobs, between Temporal pods) and to Postgres (Temporal); the UI ingress (router) is in `04-ui.yaml` |
+| `03-network-policy.yaml` | ingress to Temporal (dispatcher, UI, Jobs, between Temporal pods); the PostgreSQL ingress is in [`../postgres18/03-network.yaml`](../postgres18/03-network.yaml), the UI ingress (router) in `04-ui.yaml` |
 | `04-ui.yaml` | UI, oauth2-proxy, `edge` Route |
 | `05-namespace-job.yaml` | creates the `sophia` namespace (admin account token) |
 | `06-smoke-test-job.yaml` | acceptance test: call without a token refused, then an end-to-end "hello" workflow |
 | [`../../identity/temporal-keycloak.py`](../../identity/temporal-keycloak.py) | `temporal` client, `temporal-permissions` scope, service accounts and their Secrets (replayable, `--dry-run`) |
 | [`../../identity/clients/`](../../identity/clients/) | `temporal-ui` and `rabbitmq` clients, to import into an existing realm |
 
-Replace the `example.org` domain of Routes and redirect URLs with yours.
+Replace the `example.org` domain of Routes and redirect URLs with yours, and `ROUTER_POD_SIDE_IP` (`04-ui.yaml`) with the router's address as seen from the pods, found as for the [chat interface](../../apps/chat-interface/README.en.md).
 
 ## Procedure (administrator)
 

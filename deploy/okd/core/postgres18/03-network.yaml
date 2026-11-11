@@ -25,7 +25,7 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: sophia-apps }
           podSelector:
             matchExpressions:
-              - { key: app, operator: In, values: [recettes, courses] }  # une étiquette par application
+              - { key: app, operator: In, values: [recettes, courses, finances] }  # une étiquette par application
         # Interface de discussion, dans son namespace dédié
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: sophia-interface }
@@ -39,5 +39,17 @@ spec:
               - key: app
                 operator: In
                 values: [fichiers-backend, fichiers-worker, fichiers-beat, fichiers-migrate, fichiers-configure-wopi]
+        # Service mémoire : audit et registre
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-memory }
+          podSelector:
+            matchLabels: { app: sophia-memoire }
+        # Chat Matrix : Synapse (base synapse) et son service d'authentification (base mas, migrations au
+        # démarrage) ; le client web et les notifications n'y ont pas accès
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-messagerie }
+          podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [synapse, mas] }
       ports:
         - { protocol: TCP, port: 5432 }

@@ -1,5 +1,7 @@
 # SOPHIA-CORE : Build 37
-FROM ghcr.io/berriai/litellm-non_root:main-latest
+# Base figée : main-v1.82.6-nightly, index multi-arch. Dans le cluster, dockerStrategy.from la remplace
+# par l'ImageStreamTag litellm-base:v1.82.6-nightly (même empreinte, build.yaml).
+FROM ghcr.io/berriai/litellm-non_root@sha256:035b5cf38757109690c9be8f026aa5c5d19b0bba336f7d3b6f265cc41942b047
 
 USER root
 

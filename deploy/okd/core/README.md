@@ -80,4 +80,4 @@ oc exec -i -n sophia-core deploy/litellm -- python3 - <alias> --comme <alias-de-
 oc exec -i -n sophia-core deploy/litellm -- python3 - --info <alias> < litellm/create-virtual-key.py
 ```
 
-La création remplace `--dry-run` par `--eval <VARIABLE>` dans un `eval "$(…)"`, puis la clé part dans le Secret de l'appelant par l'entrée standard. `--info` donne les modèles, les limites et le début de l'empreinte SHA-256 de la clé : comparé à l'empreinte de la valeur du Secret, il prouve que c'est la bonne clé, sans l'afficher.
+La création remplace `--dry-run` par `--eval <VARIABLE>` dans un `eval "$(…)"`, puis la clé part dans le Secret de l'appelant par l'entrée standard ; ou bien `--tube` écrit la clé seule sur la sortie standard, pour un tube vers `oc create secret generic … --from-file=cle=/dev/stdin`, sans aucune variable du terminal (`create-virtual-key.py`). `--info` donne les modèles, les limites et le début de l'empreinte SHA-256 de la clé : comparé à l'empreinte de la valeur du Secret, il prouve que c'est la bonne clé, sans l'afficher.
