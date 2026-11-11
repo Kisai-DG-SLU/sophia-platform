@@ -83,7 +83,7 @@ Le déploiement exemple utilise une architecture de namespaces segmentée. Les n
 | sophia-interface | interface de discussion                   |
 | sophia-workflow  | outil de visualisation                    |
 | sophia-workspace | bureautique                               |
-| sophia-messagerie | chat permanent (Matrix), en recette      |
+| sophia-messagerie | messagerie : XMPP (Prosody, Converse.js) en service ; Matrix jusqu'à la fin de la recette |
 | sophia-visio     | visioconférence (Jitsi Meet), en recette  |
 | sophia-skills-build | builds des outils MCP, sans compte d'agent |
 | namespace des agents | panthéon et assistant de code         |

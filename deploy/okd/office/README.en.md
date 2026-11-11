@@ -97,7 +97,7 @@ Tool and identity-provider side: [`../skills/`](../skills/README.en.md) and [Ide
 
 Recipe of the [Communication module](../../../docs/modules/communication/documentation.en.md): Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) in `sophia-messagerie`, Jitsi Meet (`stable-11248-2`: web, Prosody, Jicofo, JVB) and an OIDC → token adapter in `sophia-visio`. As for the office suite, this is a procedure, without the reference installation's manifests; the choices and their reasons are in the module documentation.
 
-Status: **in service, in acceptance testing**: chat and video calls installed and checked through the real path (sign-in, room without a padlock, video adapter); **first video call with picture** between a computer and the older tablet, in the dashboard, through the VPN; three-device call, guest refusal, child account and testing each device at the acceptance step. Video calls go **through the browser only** (household decision): Jitsi's mobile app is no longer used. Matrix messaging will be replaced by Converse.js and Prosody ([Communication module](../../../docs/modules/communication/documentation.en.md#messaging-from-matrix-to-xmpp)); its recipe will be published with the final version.
+Status: **in service, in acceptance testing**: chat and video calls installed and checked through the real path (sign-in, room without a padlock, video adapter); **first video call with picture** between a computer and the older tablet, in the dashboard, through the VPN; three-device call, guest refusal, child account and testing each device at the acceptance step. Video calls go **through the browser only** (household decision): Jitsi's mobile app is no longer used. Matrix messaging is being replaced by Converse.js and Prosody, in service next to it until the end of acceptance testing: see [XMPP messaging](#xmpp-messaging-final-version).
 
 ### Components
 
@@ -165,6 +165,83 @@ Each value is generated on the spot and written through a pipe, without a traili
 ### Rollback
 
 `oc delete -k` on the chat or the video service: the database, the media volume and the Secrets remain. Bases, databases, OIDC clients and the nftables rule: removed by the administrator, according to their recipes.
+
+## XMPP messaging (final version)
+
+Recipe for the messaging of the [Communication module](../../../docs/modules/communication/documentation.en.md#messaging-from-matrix-to-xmpp): Prosody 13.0.7 (XMPP server) and Converse.js 14.0.1 (web client), in `sophia-messagerie`, next to Matrix, which stays in service until the end of the family acceptance testing. As for the office suite, this is a procedure, without the reference installation's manifests; the choices and their reasons are in the module's documentation.
+
+Status: **in service, under acceptance testing**; "tell" in service; Matrix taken down after acceptance testing.
+
+### Components
+
+| Pod | Container | Role |
+|---|---|---|
+| `prosody` (1 replica, `Recreate`) | `prosody` | Prosody from Jitsi's public image, pinned by digest, started on its own (without the image's init); configuration and modules mounted from ConfigMaps; sign-in with the identity provider's token only (SASL OAUTHBEARER, userinfo through the internal Service); "Family" room created from the start; data on a local `Retain` volume |
+| | `passerelle` | Android notifications (XEP-0357 → ntfy, "New message", neither text nor sender); "tell" relay on a port of its own, the only port open to the chat; XEP-0114 component over the pod's loopback |
+| `messagerie-web` (1 replica, `Recreate`) | `nginx` | image built in the cluster: Converse.js (npm archive whose digest is checked before the build), the household's page and plugins; session check through `auth_request`, token handed to Converse.js (`/credentials`), the person's ntfy topic (`/push.json`), WebSocket and file relay to Prosody; displayable in the dashboard only |
+| | `oauth2-proxy` | listens on `127.0.0.1` only; `messagerie` client; household groups only (repeated `--allowed-group`), never guests; relayed token (`--pass-access-token`, `--cookie-refresh=4m` under the token's 5-minute life) |
+
+All containers: unprivileged, read-only file system, no capability, the office suite's priority class. Pods do not surge during an update (`Recreate`): the namespace quota, shared with Matrix until it is taken down, thus keeps one pod of margin.
+
+### Prerequisites
+
+| # | Object | Recipe |
+|---|---|---|
+| 0 | The namespace's base (that of the persistent chat, above), already applied | above |
+| 1 | 10 GiB local volume, `Retain`, reserved for the `prosody-donnees` PVC (`claimRef`) | [`../../stockage-persistant.en.md`](../../stockage-persistant.en.md) |
+| 2 | Confidential OIDC client `messagerie`: standard flow with PKCE S256, group mapper without path; `messagerie-oauth2` Secret (`client-secret`, `cookie-secret`) | [`../identity/`](../identity/README.en.md) |
+| 3 | Keycloak ingress on its internal Service for pods labelled `sophia/messagerie: "true"` | [`../identity/`](../identity/README.en.md#pitfalls-we-hit) |
+| 4 | Household groups checked: each adult in the administrators' group or the guardians' group, each child in the children's group and in no other, no guest; they decide the role in the Family room (owner or member) | identity provider console |
+| 5 | One more access line in ntfy for the gateway's topics (`"*:msg*:rw"`), the only ntfy object applied | persistent chat, above |
+
+### Network
+
+- **Web**: ingress from the router on its HTTP port; egress to Prosody (WebSocket and files, gateway) and to Keycloak's internal Service (token, keys).
+- **Prosody and its gateway**: ingress from the web pod only; from the interface pod only, on the "tell" relay port, **never** on the WebSocket port (which has no oauth2-proxy in front of it); egress to Keycloak (userinfo) and to ntfy through its internal Service.
+- **ntfy**: one more ingress, from Prosody.
+- **Full Service names** (`.svc.cluster.local`) everywhere: Prosody resolves through libunbound, without search domains.
+- No server-to-server, no registration, no TCP client.
+
+### Variables
+
+| Variable | Role | Example |
+|---|---|---|
+| `${MESSAGERIE_HOST}` | messaging name (page, WebSocket, files, OIDC return) | `messagerie.apps.example.org` |
+| `${XMPP_DOMAIN}` | XMPP domain of the accounts (`<identifier>@${XMPP_DOMAIN}`) | `messagerie.example.org` |
+| `${CHAT_ORIGIN}`, `${NTFY_HOST}` | dashboard origin (`frame-ancestors`), notification relay | see above |
+| `${IDP_HOST}` | public name of the identity provider (sign-in and issuer) | see [`../core/`](../core/README.en.md) |
+
+### Secrets (content, never a value)
+
+| Secret | Content |
+|---|---|
+| `sophia-messagerie/messagerie-oauth2` | OIDC client secret, cookie secret |
+| `sophia-messagerie/messagerie-push` | ntfy topic key (HMAC, 32 bytes); XEP-0114 component secret (24 bytes) |
+
+Values drawn at random and passed through a pipe, never displayed; checked by length. **The topic key no longer changes** once phones are subscribed: each topic derives from it, and changing it forces everyone to subscribe again.
+
+### Procedure
+
+1. **Prerequisites 0 to 5** in place; one is missing: stop.
+2. **Secrets** (above).
+3. **Images**, built in the cluster: Converse.js downloaded from npm and **checked against its digest** before the build (another digest: stop); build archive without the workstation's extended attributes (no `LIBARCHIVE` or `SCHILY` entry); then the gateway. The two resulting digests are written into the kustomization.
+4. **ntfy**: only the topics' access line, applied alone (its ConfigMap extracted from the render); ntfy restarts, phones reconnect on their own.
+5. **Dry run**: Prosody's and nginx's configuration is read outside the kustomization folder, hence an `oc kustomize --load-restrictor LoadRestrictionsNone` render, reviewed then applied. Expected: no zero digest; Secrets with their keys only; PV `Available`; enough quota; `oc diff` limited to the 13 new objects (4 ConfigMaps, 2 Services, 2 Deployments, the PVC, 3 NetworkPolicies, the Route); server dry run without error.
+6. **Apply**: 13 objects created, two deployments ready, PVC `Bound`; in Prosody's log, its version and the WebSocket service on `${MESSAGERIE_HOST}`; the gateway connected to Prosody.
+7. **Real-path checks**: page served; `/credentials` and `/push.json` at 401 without a session; no-session page and a content policy ending with `frame-ancestors 'self' ${CHAT_ORIGIN}`; WebSocket handshake refused (401) without a session; sign-out with `Clear-Site-Data`. Then an adult signs in: Converse.js opens on the Family room with the owner badge. Android notifications: from the "Notifications" page, subscription in ntfy to the person's topic.
+8. **"Tell"**: the relay route is open to the interface pod only; each person must have signed in to the messaging once since the update (their account then carries their household status); otherwise "tell" answers with a closed reason (sender, recipient without an account). See the [interface](../apps/chat-interface/README.en.md).
+
+**Pitfall encountered**: a Prosody module missing from its ConfigMap's file list made Prosody start without it ("Unable to load module"), without stopping the messaging. The bench now mounts the configuration from the real render, and the post-apply check looks for that line in the log.
+
+### A member leaving
+
+1. Remove them from the household groups in the identity provider: oauth2-proxy and Prosody refuse any new sign-in.
+2. An owner of the Family room removes them (`/revoke <identifier>`).
+3. Delete their Prosody account (`prosodyctl … deluser`), which otherwise keeps its former status; their archives stay on the volume. Command not yet tested on the bench.
+
+### Rollback
+
+Stop: `oc scale` of both deployments to 0 (Matrix is not touched). Update: re-apply the previous render, kept at the dry run. Full removal: `oc delete` of the render; once the PVC is deleted, the PV stays (`Retain`) with its data. OIDC client, Secret, Keycloak ingress and ntfy line: deletions by the administrator, following their recipes.
 
 ## Display in the dashboard
 

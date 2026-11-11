@@ -100,4 +100,6 @@ Les clients `matrix` (service d'authentification de Matrix) et `jitsi` (adaptate
 
 Piège : la négation de la condition se règle par sa clé de configuration `negate` ; une condition mal niée refuse tout le monde, ou personne. Seul l'essai avec les deux comptes le montre.
 
+Le client `messagerie` de la [messagerie XMPP](../office/README.md#messagerie-xmpp-version-définitive) n'a pas besoin de ce flux : son oauth2-proxy n'admet que les groupes du foyer (`--allowed-group`), et Prosody refuse à la connexion tout compte hors de ces groupes.
+
 Applications clientes : [interface de discussion](../apps/chat-interface/README.md), [RabbitMQ](../core/rabbitmq/README.md), [Temporal](../core/temporal/README.md), [bureautique, chat permanent et visio](../office/README.md). Keycloak accepte depuis `sophia-core` les pods de Temporal (clés de signature, jetons des comptes de service) : `02-network.yaml`.

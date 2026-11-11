@@ -100,4 +100,6 @@ The `matrix` (Matrix authentication service) and `jitsi` (video adapter) clients
 
 Pitfall: the condition's negation is set through its `negate` configuration key; a wrongly negated condition refuses everyone, or no one. Only the test with both accounts shows it.
 
+The `messagerie` client of the [XMPP messaging](../office/README.en.md#xmpp-messaging-final-version) does not need this flow: its oauth2-proxy only admits the household groups (`--allowed-group`), and Prosody refuses at sign-in any account outside those groups.
+
 Client applications: [chat interface](../apps/chat-interface/README.en.md), [RabbitMQ](../core/rabbitmq/README.en.md), [Temporal](../core/temporal/README.en.md), [office suite, persistent chat and video calls](../office/README.en.md). Keycloak accepts Temporal's pods from `sophia-core` (signing keys, service account tokens): `02-network.yaml`.
