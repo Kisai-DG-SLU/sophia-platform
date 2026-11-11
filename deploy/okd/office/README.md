@@ -97,7 +97,7 @@ Côté outil et fournisseur d'identité : [`../skills/`](../skills/README.md) et
 
 Recette du [module Communication](../../../docs/modules/communication/documentation.md) : Matrix (Synapse 1.163.2, MAS, Element Web, ntfy) dans `sophia-messagerie`, Jitsi Meet (`stable-11248-2` : web, Prosody, Jicofo, JVB) et un adaptateur OIDC → jeton dans `sophia-visio`. Comme pour la bureautique, c'est une procédure, sans les manifestes de l'installation de référence ; les choix et leurs raisons sont dans la documentation du module.
 
-État : **en service, en recette** : chat et visio installés et contrôlés par le vrai chemin (connexion, salon sans cadenas, adaptateur de la visio) ; **première visio avec image** entre un ordinateur et la tablette ancienne, dans le dashboard, par le VPN ; essai à trois appareils, refus d'un invité, compte d'enfant et essai de chaque appareil à l'étape de recette. La visio passe **par le navigateur seulement** (décision du foyer) : l'application mobile de Jitsi n'est plus utilisée. La messagerie Matrix sera remplacée par Converse.js et Prosody ([module Communication](../../../docs/modules/communication/documentation.md#messagerie--de-matrix-à-xmpp)) ; sa recette sera publiée avec la version définitive.
+État : **en service, en recette** : chat et visio installés et contrôlés par le vrai chemin (connexion, salon sans cadenas, adaptateur de la visio) ; **première visio avec image** entre un ordinateur et la tablette ancienne, dans le dashboard, par le VPN ; essai à trois appareils, refus d'un invité, compte d'enfant et essai de chaque appareil à l'étape de recette. La visio passe **par le navigateur seulement** (décision du foyer) : l'application mobile de Jitsi n'est plus utilisée. La messagerie Matrix est remplacée par Converse.js et Prosody, en service à côté d'elle jusqu'à la fin de la recette : voir [Messagerie XMPP](#messagerie-xmpp-version-définitive).
 
 ### Composants
 
@@ -165,6 +165,83 @@ Chaque valeur est générée sur place et écrite par un tube, sans saut de lign
 ### Retour arrière
 
 `oc delete -k` sur le chat ou la visio : la base, le volume des médias et les Secrets restent. Socles, bases, clients OIDC et règle nftables : suppressions par l'administrateur, selon leurs recettes.
+
+## Messagerie XMPP (version définitive)
+
+Recette de la messagerie du [module Communication](../../../docs/modules/communication/documentation.md#messagerie--de-matrix-à-xmpp) : Prosody 13.0.7 (serveur XMPP) et Converse.js 14.0.1 (client web), dans `sophia-messagerie`, à côté de Matrix, qui reste en service jusqu'à la fin de la recette familiale. Comme pour la bureautique, c'est une procédure, sans les manifestes de l'installation de référence ; les choix et leurs raisons sont dans la documentation du module.
+
+État : **en service, en recette** ; « dis à » en service ; démontage de Matrix après la recette.
+
+### Composants
+
+| Pod | Conteneur | Rôle |
+|---|---|---|
+| `prosody` (1 réplique, `Recreate`) | `prosody` | Prosody de l'image publique de Jitsi, figée par empreinte, lancé seul (sans l'init de l'image) ; configuration et modules montés depuis des ConfigMaps ; connexion par le jeton du fournisseur d'identité seulement (SASL OAUTHBEARER, userinfo par le Service interne) ; salon « Famille » créé d'office ; données sur un volume local `Retain` |
+| | `passerelle` | notifications Android (XEP-0357 → ntfy, « Nouveau message », ni texte ni expéditeur) ; relais de « dis à » sur un port à lui, seul port ouvert au chat ; composant XEP-0114 en boucle locale du pod |
+| `messagerie-web` (1 réplique, `Recreate`) | `nginx` | image construite dans le cluster : Converse.js (archive npm à l'empreinte vérifiée avant le build), page et greffons du foyer ; contrôle de session par `auth_request`, remise du jeton à Converse.js (`/credentials`), sujet ntfy de la personne (`/push.json`), relais du WebSocket et des fichiers vers Prosody ; affichable dans le seul dashboard |
+| | `oauth2-proxy` | n'écoute que sur `127.0.0.1` ; client `messagerie` ; groupes du foyer seulement (`--allowed-group` répété), jamais les invités ; jeton relayé (`--pass-access-token`, `--cookie-refresh=4m` sous la vie de 5 min du jeton) |
+
+Tous les conteneurs : sans privilège, système de fichiers en lecture seule, aucune capacité, classe de priorité de la bureautique. Les pods ne font pas de surplus pendant une mise à jour (`Recreate`) : le quota du namespace, partagé avec Matrix jusqu'à son démontage, garde ainsi un pod de marge.
+
+### Prérequis
+
+| # | Objet | Recette |
+|---|---|---|
+| 0 | Socle du namespace (celui du chat permanent, ci-dessus), déjà appliqué | ci-dessus |
+| 1 | Volume local de 10 Gio, `Retain`, réservé à la PVC `prosody-donnees` (`claimRef`) | [`../../stockage-persistant.md`](../../stockage-persistant.md) |
+| 2 | Client OIDC confidentiel `messagerie` : flux standard avec PKCE S256, mappeur de groupes sans chemin ; Secret `messagerie-oauth2` (`client-secret`, `cookie-secret`) | [`../identity/`](../identity/README.md) |
+| 3 | Entrée de Keycloak sur son Service interne pour les pods étiquetés `sophia/messagerie: "true"` | [`../identity/`](../identity/README.md#pièges-rencontrés) |
+| 4 | Groupes du foyer vérifiés : chaque adulte dans le groupe des administrateurs ou celui des responsables, chaque enfant dans le groupe des enfants et dans aucun autre, aucun invité ; ils décident du rôle dans le salon Famille (propriétaire ou membre) | console du fournisseur d'identité |
+| 5 | Une ligne d'accès de plus dans ntfy pour les sujets de la passerelle (`"*:msg*:rw"`), seul objet de ntfy appliqué | chat permanent, ci-dessus |
+
+### Réseau
+
+- **Web** : entrée du routeur sur son port HTTP ; sortie vers Prosody (WebSocket et fichiers, passerelle) et vers le Service interne de Keycloak (jeton, clés).
+- **Prosody et sa passerelle** : entrée depuis le seul pod web ; depuis le seul pod de l'interface, sur le port du relais « dis à », **jamais** sur le port du WebSocket (qui n'a pas d'oauth2-proxy devant lui) ; sortie vers Keycloak (userinfo) et vers ntfy par son Service interne.
+- **ntfy** : une entrée de plus, depuis Prosody.
+- **Noms de Service complets** (`.svc.cluster.local`) partout : Prosody résout par libunbound, sans les domaines de recherche.
+- Ni serveur à serveur, ni inscription, ni client en TCP.
+
+### Variables
+
+| Variable | Rôle | Exemple |
+|---|---|---|
+| `${MESSAGERIE_HOST}` | nom de la messagerie (page, WebSocket, fichiers, retour OIDC) | `messagerie.apps.example.org` |
+| `${XMPP_DOMAIN}` | domaine XMPP des comptes (`<identifiant>@${XMPP_DOMAIN}`) | `messagerie.example.org` |
+| `${CHAT_ORIGIN}`, `${NTFY_HOST}` | origine du dashboard (`frame-ancestors`), relais de notifications | voir ci-dessus |
+| `${IDP_HOST}` | nom public du fournisseur d'identité (connexion et émetteur) | voir [`../core/`](../core/README.md) |
+
+### Secrets (contenu, jamais de valeur)
+
+| Secret | Contenu |
+|---|---|
+| `sophia-messagerie/messagerie-oauth2` | secret du client OIDC, secret du cookie |
+| `sophia-messagerie/messagerie-push` | clé des sujets ntfy (HMAC, 32 octets) ; secret du composant XEP-0114 (24 octets) |
+
+Valeurs tirées au hasard et passées par un tube, jamais affichées ; contrôle par la longueur. **La clé des sujets ne change plus** une fois les téléphones abonnés : chaque sujet en dérive, et la changer oblige chaque personne à se réabonner.
+
+### Procédure
+
+1. **Prérequis 0 à 5** en place ; un point manque : s'arrêter.
+2. **Secrets** (ci-dessus).
+3. **Images**, construites dans le cluster : Converse.js téléchargé depuis npm et **contrôlé par son empreinte** avant le build (une autre empreinte : s'arrêter) ; archive du build sans attributs étendus du poste (aucune entrée `LIBARCHIVE` ni `SCHILY`) ; puis la passerelle. Les deux empreintes obtenues s'écrivent dans la kustomization.
+4. **ntfy** : la seule ligne d'accès des sujets, appliquée seule (son ConfigMap extrait du rendu) ; ntfy redémarre, les téléphones se reconnectent seuls.
+5. **Essai à blanc** : la configuration de Prosody et de nginx est lue hors du dossier de la kustomization, d'où un rendu `oc kustomize --load-restrictor LoadRestrictionsNone` relu puis appliqué. Attendu : aucune empreinte à zéro ; Secrets avec leurs seules clés ; PV `Available` ; quota suffisant ; `oc diff` limité aux 13 objets nouveaux (4 ConfigMaps, 2 Services, 2 Deployments, la PVC, 3 NetworkPolicies, la Route) ; essai à blanc serveur sans erreur.
+6. **Application** : 13 objets créés, deux déploiements prêts, PVC `Bound` ; au journal de Prosody, sa version et le service WebSocket sur `${MESSAGERIE_HOST}` ; la passerelle connectée à Prosody.
+7. **Contrôles par le vrai chemin** : page servie ; `/credentials` et `/push.json` en 401 sans session ; page sans session et politique de contenu qui finit par `frame-ancestors 'self' ${CHAT_ORIGIN}` ; poignée de main WebSocket refusée (401) sans session ; déconnexion avec `Clear-Site-Data`. Puis connexion d'un adulte : Converse.js s'ouvre sur le salon Famille avec le badge de propriétaire. Notifications Android : depuis la page « Notifications », abonnement dans ntfy au sujet de la personne.
+8. **« Dis à »** : la route du relais n'est ouverte qu'au pod de l'interface ; chaque personne doit s'être connectée une fois à la messagerie depuis la mise à jour (son compte porte alors son statut dans le foyer) ; sinon « dis à » répond par un motif fermé (expéditeur, destinataire sans compte). Voir l'[interface](../apps/chat-interface/README.md).
+
+**Piège rencontré** : un module de Prosody absent de la liste des fichiers de son ConfigMap faisait démarrer Prosody sans lui (« Unable to load module »), sans arrêter la messagerie. Le banc monte désormais la configuration depuis le rendu réel, et le contrôle d'après application cherche cette ligne au journal.
+
+### Départ d'un membre
+
+1. Le retirer des groupes du foyer dans le fournisseur d'identité : oauth2-proxy et Prosody refusent toute nouvelle connexion.
+2. Un propriétaire du salon Famille le retire (`/revoke <identifiant>`).
+3. Supprimer son compte Prosody (`prosodyctl … deluser`), qui garde sinon son ancien statut ; ses archives restent sur le volume. Commande non éprouvée au banc à ce jour.
+
+### Retour arrière
+
+Arrêt : `oc scale` à 0 des deux déploiements (Matrix n'est pas touché). Mise à jour : réappliquer le rendu d'avant, gardé à l'essai à blanc. Retrait complet : `oc delete` du rendu ; la PVC supprimée, le PV reste (`Retain`) avec ses données. Client OIDC, Secret, entrée de Keycloak et ligne de ntfy : suppressions par l'administrateur, selon leurs recettes.
 
 ## Affichage dans le dashboard
 

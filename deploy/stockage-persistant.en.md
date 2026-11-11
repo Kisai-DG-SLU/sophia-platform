@@ -26,6 +26,7 @@ State verified on 2026-10-25, by reading the cluster.
 | RabbitMQ | `${NS_CORE}` | yes | 5Gi | node directory, bound by name (`claimRef` + `volumeName`) | delegation events and dead letters; see `okd/core/rabbitmq/` |
 | Forgejo | `${NS_GIT}` | yes | 50Gi | **dedicated logical volume** | repositories and local SQLite database |
 | Persistent chat media (Synapse) | `sophia-messagerie` | yes | 10Gi | **dedicated logical volume**, `Retain` PV | files of 50 MB at most; **no backup**, accepted choice (messages are in PostgreSQL); installed, in acceptance testing; see `okd/office/` |
+| XMPP messaging data (Prosody) | `sophia-messagerie` | yes | 10Gi | **dedicated logical volume**, `Retain` PV, reserved to its PVC | accounts, rooms, archives and shared files; **no backup** so far; in service, under acceptance testing; see `okd/office/` |
 | Neo4j | `${NS_MEMORY}` | yes | 10Gi | node directory, 0 replicas | graph to be built, no data; image pinned, on hold |
 | Embedding service | `${NS_MEMORY}` | yes | 5Gi | node directory | cache and model, no corpus |
 | Workspace | `${NS_APPS}` | yes | 20Gi | node directory, consumer down | preproduction, notebooks, webapps, APIs |
