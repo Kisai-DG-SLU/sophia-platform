@@ -50,6 +50,10 @@ spec:
       - name: invites
     # Pas de liste clientScopes : elle remplacerait les scopes par défaut de
     # Keycloak (profile, email, basic, roles…) au lieu de s'y ajouter.
+    # Date de naissance : ni le profil utilisateur ni la portée profile ne sont déclarés ici, pour la même raison
+    # (un profil déclaré remplacerait le profil par défaut entier). Sur une installation neuve, après l'import :
+    # attribut birthdate (administration seule), mappeur birthdate retiré de la portée profile, puis un client de
+    # lecture par application. Voir le README, « Date de naissance des comptes ».
     clients:
       - clientId: sophia-interface
         name: Interface SophIA
@@ -114,6 +118,33 @@ spec:
             protocolMapper: oidc-audience-mapper
             config:
               included.custom.audience: sophia-messages
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          # Résumé des finances du foyer dans le dashboard (oauth2-proxy de l'application : audience = son client-id)
+          - name: audience-finances
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.client.audience: finances
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          # Service mémoire : il vérifie lui-même la signature du jeton relayé (audience libre, sans client)
+          - name: audience-sophia-memoire
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.custom.audience: sophia-memoire
+              id.token.claim: "false"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          # Portier des postes au navigateur (état du poste, demandé par l'interface avec le jeton relayé)
+          - name: audience-sophia-poste
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.client.audience: sophia-poste
               id.token.claim: "false"
               access.token.claim: "true"
               introspection.token.claim: "true"

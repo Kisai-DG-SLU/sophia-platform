@@ -41,7 +41,7 @@ COMMANDES='+ping +hello +auth +client|setinfo +get +set +del +exists +mget +mset
 # Une application : utilisateur, namespace et Secret de son mot de passe, nom de son cookie.
 # oauth2-proxy nomme ses clés `<cookie>-<ticket>` et son verrou `<cookie>-<ticket>.lock` : le motif
 # `~<cookie>-*` les couvre, sans toucher aux clés d'une autre application (`_sophia-*` ne prend pas
-# `_sophia_autre-…`).
+# `_sophia_workflow-…`).
 application() {
   local utilisateur=$1 ns=$2 secret=$3 cookie=$4 h
   h=$(empreinte_secret "$ns" "$secret") || return 1
@@ -53,6 +53,11 @@ ACL="user default reset off"
 h=$(empreinte_secret sophia-identity valkey-sessions-controle) || exit 1
 ACL+=$'\n'"user controle reset on #$h +ping +hello +auth +info +dbsize"
 ligne=$(application sophia-interface sophia-interface sophia-interface-sessions _sophia) || exit 1; ACL+=$'\n'"$ligne"
+# Visualisation des workflows, école, cuisine et finances, chacune avec son entrée dans 03-network.yaml :
+ligne=$(application sophia-workflow sophia-workflow sophia-workflow-sessions _sophia_workflow) || exit 1; ACL+=$'\n'"$ligne"
+ligne=$(application ecole sophia-apps ecole-sessions _ecole) || exit 1; ACL+=$'\n'"$ligne"
+ligne=$(application recettes sophia-apps recettes-sessions _recettes) || exit 1; ACL+=$'\n'"$ligne"
+ligne=$(application finances sophia-apps finances-sessions _finances) || exit 1; ACL+=$'\n'"$ligne"
 # Une autre application, avec son entrée dans 03-network.yaml (utilisateur, namespace, Secret, cookie) :
 # ligne=$(application <application> <namespace> <application>-sessions <cookie>) || exit 1; ACL+=$'\n'"$ligne"
 

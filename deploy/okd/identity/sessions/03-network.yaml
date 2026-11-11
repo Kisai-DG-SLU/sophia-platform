@@ -20,6 +20,16 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: sophia-interface }
           podSelector:
             matchLabels: { app: sophia-interface }
+        # Visualisation des workflows, puis l'école, la cuisine et les finances, chacune avec son utilisateur d'ACL
+        # (le navigateur distant des courses garde ses sessions en cookie)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-workflow }
+          podSelector:
+            matchLabels: { app: sophia-workflow-collecteur }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-apps }
+          podSelector:
+            matchExpressions: [ { key: app, operator: In, values: [ecole, recettes, finances] } ]
         # Une autre application derrière oauth2-proxy, avec son utilisateur d'ACL (même motif) :
         # - namespaceSelector:
         #     matchLabels: { kubernetes.io/metadata.name: <namespace> }
