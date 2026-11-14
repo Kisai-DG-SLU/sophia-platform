@@ -130,7 +130,7 @@ Dans la discussion avec Sophia, « dis à papa que… » ou « dis à tout le mo
 
 Choix d'usage : l'analyse de l'intention par le modèle, la confirmation, l'envoi par une règle ; une réponse autre que « oui » n'envoie rien.
 
-### Visio : Jitsi Meet### Visio : Jitsi Meet
+### Visio : Jitsi Meet
 
 Jitsi Meet a remplacé la visio de La Suite numérique, d'abord prévue : son interface ne démarre pas sur les tablettes anciennes du foyer.
 

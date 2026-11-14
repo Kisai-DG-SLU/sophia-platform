@@ -130,7 +130,7 @@ In the conversation with Sophia, "tell dad that…" or "tell everyone that…": 
 
 Usage choices: the model analyses the intent, the person confirms, a rule sends; any answer other than "yes" sends nothing.
 
-### Video calls: Jitsi Meet### Video calls: Jitsi Meet
+### Video calls: Jitsi Meet
 
 Jitsi Meet replaced La Suite numérique's video service, planned first: its interface does not start on the household's older tablets.
 
