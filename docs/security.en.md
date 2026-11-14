@@ -107,7 +107,7 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 - permanent chat and video calls without end-to-end encryption, a deliberate choice: a platform administrator can read the rooms; XMPP messaging refuses any encrypted message on the server side (in service, under acceptance testing); chat media have no backup;
 - tokens masked in the relays' access logs; model-router logs at `INFO`, never `DEBUG` (which would write every full request);
 - retention: the model router's detailed log and workflow history 30 days; object-storage trash 30 days; metrics 15 days; conversations and applications without automatic purge;
-- **scheduled backups: target**. Today, full manual backups before each operation; forge repositories each have **one** private mirror at an external host, checked every hour ([Visualisation module](modules/visualisation/README.en.md)); work happens in the forge only, and the default branch of public mirrors is protected against force-push and deletion, and some repositories never get one (transcripts of the coding-assistant sessions). Target: an encrypted backup in Europe for sensitive repositories, mandatory in a professional setting;
+- **scheduled backups: decided, being set up**, not in service yet. Chosen design: restic, encryption inside the cluster before anything is sent, two repositories — a local copy in a dedicated S3 bucket, and a copy on an external storage, pushed from the DMZ by a pod that does not know the key and can neither replace nor delete anything there. Databases go every hour, the rest every night (buckets, forge, messaging, Secrets), with one year of retention. Objectives: a database restored in 15 minutes, the server rebuilt in one day, at most one hour of data lost. Integrity check every night, timed restore test every week, alert when the last success is too old. Rebuilding in one day requires a cluster installation procedure, still to be written. Meanwhile, full manual backups before each operation; forge repositories each have **one** private mirror at an external host, checked every hour ([Visualisation module](modules/visualisation/README.en.md)); work happens in the forge only, and the default branch of public mirrors is protected against force-push and deletion, and some repositories never get one (transcripts of the coding-assistant sessions). In a professional setting, the external copy of sensitive repositories must be hosted in Europe;
 - **minimisation of working notes**: the logs and plans read by coding assistants contain no child's first name and no sensitive data (health, schooling, address), only roles; a pre-commit hook rejects forbidden terms by their fingerprints (HMAC), without ever displaying them; history is not rewritten;
 - audit logging;
 - two-factor authentication: **target**;
@@ -133,7 +133,7 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 - egress control for the agents namespace;
 - access to the applications through the dashboard only, with an exception for the administrator;
 - update and vulnerability watch for pinned images (local scanner, update requests opened without automatic merge, report to the administrator);
-- scheduled, encrypted backups, with a restore test;
+- scheduled, encrypted backups, with a restore test (in progress, see above);
 - two-factor authentication for administration accounts and guardians;
 - mutual TLS between the dispatcher and executors;
 - encrypted volumes.

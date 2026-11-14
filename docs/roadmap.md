@@ -67,7 +67,7 @@ Futur.
 - Refus par défaut dans la mémoire (**en service**) ; règle réseau d'administration et admission des seules images du registre interne dans le développement (le privilège sur le nœud y est déjà retiré)
 - Clusters de développement (en cours : isolement) : un cluster virtuel éphémère par projet, recréé depuis la forge par un workflow, paquets par des relais en lecture seule dans le sas, une clé du routeur par projet limitée au modèle local
 - Volumes chiffrés, isolation complète de la mémoire
-- Sauvegardes planifiées et chiffrées, avec essai de restauration (**reportées** : pas encore de support de sauvegarde) ; double authentification
+- Sauvegardes planifiées et chiffrées, avec essai de restauration (**en cours** : chiffrées dans le cluster, une copie locale et une copie externe, bases toutes les heures, essai de restauration chronométré chaque semaine) ; double authentification
 - Revue du filtre du VPN pour le trafic traduit par le réseau du cluster (adresses externes des services) : en cours
 - Veille des mises à jour et des failles des images figées
 - Conformité (RGPD, AI Act, ISO 27001 visée « certifiable ») : état des lieux mesuré, plan d'action, suivi (conçu, [module Visualisation](modules/visualisation/README.md))

@@ -97,7 +97,7 @@ SophIA est une architecture expérimentale en construction. Nous distinguons ce 
 - Clusters de développement : un cluster virtuel éphémère par projet (décidé, à construire).
 - Mémoire, reprise en priorité : service mémoire en service (originaux dans un seau versionné, textes validés dans la forge, validation par une seule personne, extraction des fichiers isolée), page « Mémoire » du dashboard déployée, puis façade des agents et pipeline d'ingestion ; dimension graphe bloquée.
 - Développement assisté (vibe coding) : étude en cours (maquettes visuelles des projets de chacun, suivi des agents).
-- Veille des failles, conformité (RGPD, AI Act, ISO 27001) ; sauvegardes planifiées **reportées**, faute de support.
+- Veille des failles, conformité (RGPD, AI Act, ISO 27001) ; sauvegardes planifiées et chiffrées **en cours de mise en place**.
 
 **Prévu**
 
