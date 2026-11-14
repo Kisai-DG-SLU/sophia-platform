@@ -63,3 +63,14 @@ The development cycle revolves around an internal Git platform and its CI/CD sys
 1. The validation branch is functionally tested by the user.
 2. A final validation merges to the main branch.
 3. Only validated branches are pushed to the public mirror. The AI's work history remains on the private infrastructure.
+
+## 6. Working rules independent of the assistant
+
+The platform aims to be model-independent: what guides the work must not live in a coding assistant's files, which would leave with it.
+
+- **The only references** are each project's plan (steps and statuses) and its **session logs** (decisions and reasoning, one file per day), versioned in a private notes repository.
+- **The rules common** to all working sessions are a versioned document in the same repository, read at the start of each session.
+- **The assistant's own configuration and memory** only contain the pointer to these documents: nothing else is written there.
+- **Pace**: each decision is written in the day's log, each completed step in the plan, with its commit, without waiting for the end of the session. A new rule goes first into the day's log, then into the common rules.
+
+Changing assistant or model therefore loses nothing: the next one reads the same documents.

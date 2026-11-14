@@ -63,3 +63,14 @@ Le cycle de développement s'articule autour d'une plateforme Git interne et de 
 1. La branche de validation est testée fonctionnellement par l'utilisateur.
 2. Une validation finale fusionne vers la branche principale.
 3. Seules les branches validées sont poussées vers le miroir public. L'historique de travail de l'IA reste sur l'infrastructure privée.
+
+## 6. Règles de travail indépendantes de l'assistant
+
+La plateforme se veut indépendante du modèle : ce qui guide le travail ne doit pas vivre dans les fichiers d'un assistant de code, qui partiraient avec lui.
+
+- **Seuls font foi** le plan de chaque projet (étapes et statuts) et ses **suivis de session** (décisions et raisonnement, un fichier par jour), versionnés dans un dépôt de notes privé.
+- **Les règles communes** à toutes les sessions de travail sont un document versionné du même dépôt, lu au début de chaque session.
+- **La configuration et la mémoire propres à l'assistant** ne contiennent que le renvoi à ces documents : rien d'autre ne s'y écrit.
+- **Rythme** : chaque décision est écrite dans le suivi du jour, chaque étape terminée dans le plan, avec son commit, sans attendre la fin de la session. Une règle nouvelle va d'abord dans le suivi du jour, puis dans les règles communes.
+
+Changer d'assistant ou de modèle ne fait donc rien perdre : le suivant relit les mêmes documents.
