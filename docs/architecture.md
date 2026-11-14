@@ -113,6 +113,20 @@ Acquisition web sécurisée : extraction, nettoyage, mécanismes anti-traçage.
 
 ---
 
+## Données partagées entre applications
+
+Quand plusieurs applications ont besoin des mêmes données (clients, factures, encaissements), elles les lisent dans **une base commune par domaine d'activité**, sur l'instance PostgreSQL partagée, **sans API ni copie** entre elles :
+
+- **chaque écrivain est propriétaire de son schéma** et en définit seul la structure, dans son propre dépôt ; il n'y a ni dépôt commun ni migration centrale ;
+- ce qu'un autre lit passe par des **vues et fonctions versionnées** (`<objet>_v1`), qui sont **le contrat** ; un changement incompatible donne une `_v2` à côté, et la `_v1` n'est retirée qu'une fois tous ses lecteurs passés ;
+- le contrat tient en trois couches : **PostgreSQL** refuse de retirer ou de retyper une colonne dont une vue dépend ; **l'écrivain** éprouve chaque objet partagé contre son fichier de contrat et ses exemples ; **le lecteur** vérifie le contrat au démarrage et à chaque échec de lecture, et ne rend indisponible que la fonction touchée, sans jamais refuser de démarrer ;
+- chaque donnée lue d'un autre passe un contrôle déterministe ; une ligne non conforme est écartée et comptée, jamais corrigée ;
+- une application garde ses données propres dans sa propre base.
+
+En service pour les applications de gestion (clients, facturation, finances). Prévu sur le même modèle : une base commune du foyer (lieux, plus tard les membres), écrite par le dashboard et lue par les modules. Recette : [PostgreSQL 18](../deploy/okd/core/postgres18/README.md#base-commune-dun-domaine).
+
+---
+
 ## Zones de développement et d'exécution
 
 | Namespace | Rôle |

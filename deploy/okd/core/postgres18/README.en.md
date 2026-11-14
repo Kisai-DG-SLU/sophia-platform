@@ -85,6 +85,22 @@ The [Communication module](../../../../docs/modules/communication/documentation.
 
 For each: `REVOKE CONNECT ON DATABASE … FROM PUBLIC`, so a role only connects to its own database; port 5432 ingress opened to the chat namespace only, following `03-network.yaml`. Check: each role connects to its database, and is refused the other one.
 
+### Shared database of a domain
+
+Several applications that share data read it from one database, with no API and no copy (principle: [architecture](../../../../docs/architecture.en.md#data-shared-between-applications)).
+
+| Object | Rule |
+|---|---|
+| Database | one database per business domain; its shared schemas, plus the private schemas of an application that lives there |
+| Schema | one per writer, **owned by its role**: it alone creates and evolves it, through its own `schema.sql` replayed at startup |
+| Application roles | `CONNECT` on the database, **no `CREATE`**: a role can neither create nor rename a schema; `PUBLIC` without any right |
+| Reading | one **non-login** role per shared schema (`lit_<schema>_v1`), with rights on the `_v1` views and functions only; it is granted to the reading applications' roles |
+| Contract | `<object>_v1` views and functions; PostgreSQL refuses to drop or retype one of their columns; the writer tests them, the reader checks them and only cuts the affected function |
+
+Administration block (the administrator): database, schemas, reading roles and rights; checked by reading the rights, role by role.
+
+**Switching an application** to the shared database, first rehearsed twice locally on fabricated databases of the same shape: backup; application stopped; a switchover Job that copies the tables and compares, table by table, the row count and a fingerprint on both sides (any difference stops the switchover); the application restarts on the shared database; the old database becomes **read-only**, intact. Rollback: the application goes back to the old database, whose read-only flag is lifted; writes made in the meantime, journaled, are listed and re-entered.
+
 ## Lessons
 
 - **Check egress as much as ingress.** An application went into `CrashLoopBackOff` (`PoolTimeout`) when switched: the new instance's ingress was ready, but the application's **egress** rule only opened the old one. Hence step 0 and the real TCP connection. Fixed forward (egress widened), without loss: the application had written nothing.

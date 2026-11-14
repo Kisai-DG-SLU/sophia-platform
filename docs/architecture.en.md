@@ -113,6 +113,20 @@ Secure web acquisition: extraction, sanitization, anti-tracking mechanisms.
 
 ---
 
+# Data Shared Between Applications
+
+When several applications need the same data (customers, invoices, payments received), they read it from **one shared database per business domain**, on the shared PostgreSQL instance, **with no API and no copy** between them:
+
+- **each writer owns its schema** and alone defines its structure, in its own repository; there is no shared repository and no central migration;
+- what another application reads goes through **versioned views and functions** (`<object>_v1`), which are **the contract**; an incompatible change gives a `_v2` alongside, and the `_v1` is only removed once all its readers have moved;
+- the contract holds in three layers: **PostgreSQL** refuses to drop or retype a column a view depends on; **the writer** tests each shared object against its contract file and its examples; **the reader** checks the contract at startup and on each read failure, and only makes the affected function unavailable, never refusing to start;
+- every piece of data read from another application goes through a deterministic check; a non-compliant row is set aside and counted, never corrected;
+- an application keeps its own data in its own database.
+
+In service for the business applications (customers, invoicing, finances). Planned on the same model: a shared household database (places, later the members), written by the dashboard and read by the modules. Recipe: [PostgreSQL 18](../deploy/okd/core/postgres18/README.en.md#shared-database-of-a-domain).
+
+---
+
 # Development and Runtime Zones
 
 | Namespace | Role |

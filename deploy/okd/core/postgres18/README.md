@@ -85,6 +85,22 @@ Le [module Communication](../../../../docs/modules/communication/documentation.m
 
 Pour chacune : `REVOKE CONNECT ON DATABASE … FROM PUBLIC`, si bien qu'un rôle ne se connecte qu'à sa propre base ; entrée de 5432 ouverte au seul namespace du chat, sur le modèle de `03-network.yaml`. Contrôle : chaque rôle se connecte à sa base, et se voit refuser l'autre.
 
+### Base commune d'un domaine
+
+Plusieurs applications qui partagent des données les lisent dans une même base, sans API ni copie (principe : [architecture](../../../../docs/architecture.md#données-partagées-entre-applications)).
+
+| Objet | Règle |
+|---|---|
+| Base | une base par domaine d'activité ; ses schémas partagés, plus les schémas privés d'une application qui y vit |
+| Schéma | un par écrivain, **possédé par son rôle** : lui seul le crée et le fait évoluer, par son propre `schema.sql` rejoué au démarrage |
+| Rôles d'application | `CONNECT` sur la base, **pas de `CREATE`** : un rôle ne peut ni créer ni renommer un schéma ; `PUBLIC` sans aucun droit |
+| Lecture | un rôle **sans connexion** par schéma partagé (`lit_<schéma>_v1`), qui n'a droit qu'aux vues et fonctions `_v1` ; il est donné aux rôles des applications lectrices |
+| Contrat | vues et fonctions `<objet>_v1` ; PostgreSQL refuse de leur retirer ou de leur retyper une colonne ; l'écrivain les éprouve, le lecteur les vérifie et ne coupe que la fonction touchée |
+
+Bloc d'administration (l'administrateur) : base, schémas, rôles de lecture et droits ; contrôle par la lecture des droits, rôle par rôle.
+
+**Bascule d'une application** vers la base commune, répétée d'abord deux fois en local sur des bases fabriquées de même forme : sauvegarde ; application arrêtée ; Job de bascule qui copie les tables et compare, table par table, le nombre de lignes et une empreinte des deux côtés (un écart arrête la bascule) ; l'application repart sur la base commune ; l'ancienne base passe en **lecture seule**, intacte. Retour arrière : l'application revient sur l'ancienne base, dont on lève la lecture seule ; les écritures faites entre-temps, journalisées, sont listées et ressaisies.
+
 ## Leçons
 
 - **Contrôler la sortie autant que l'entrée.** Une application est partie en `CrashLoopBackOff` (`PoolTimeout`) à sa bascule : l'entrée de la nouvelle instance était prête, mais la règle de **sortie** de l'application n'ouvrait que l'ancienne. D'où l'étape 0 et la connexion TCP réelle. Correctif en avant (sortie élargie), sans perte : l'application n'avait rien écrit.
