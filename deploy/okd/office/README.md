@@ -176,7 +176,7 @@ Recette de la messagerie du [module Communication](../../../docs/modules/communi
 
 | Pod | Conteneur | Rôle |
 |---|---|---|
-| `prosody` (1 réplique, `Recreate`) | `prosody` | Prosody de l'image publique de Jitsi, figée par empreinte, lancé seul (sans l'init de l'image) ; configuration et modules montés depuis des ConfigMaps ; connexion par le jeton du fournisseur d'identité seulement (SASL OAUTHBEARER, userinfo par le Service interne) ; salon « Famille » créé d'office ; données sur un volume local `Retain` |
+| `prosody` (1 réplique, `Recreate`) | `prosody` | Prosody de l'image publique de Jitsi, figée par empreinte, lancé seul (sans l'init de l'image) ; configuration et modules montés depuis des ConfigMaps ; connexion par le jeton du fournisseur d'identité seulement (SASL OAUTHBEARER, userinfo par le Service interne) ; salon « Famille » créé d'office ; **chiffrement de bout en bout refusé** par un module du foyer (ci-dessous) ; données sur un volume local `Retain` |
 | | `passerelle` | notifications Android (XEP-0357 → ntfy, « Nouveau message », ni texte ni expéditeur) ; relais de « dis à » sur un port à lui, seul port ouvert au chat ; composant XEP-0114 en boucle locale du pod |
 | `messagerie-web` (1 réplique, `Recreate`) | `nginx` | image construite dans le cluster : Converse.js (archive npm à l'empreinte vérifiée avant le build), page et greffons du foyer ; contrôle de session par `auth_request`, remise du jeton à Converse.js (`/credentials`), sujet ntfy de la personne (`/push.json`), relais du WebSocket et des fichiers vers Prosody ; affichable dans le seul dashboard |
 | | `oauth2-proxy` | n'écoute que sur `127.0.0.1` ; client `messagerie` ; groupes du foyer seulement (`--allowed-group` répété), jamais les invités ; jeton relayé (`--pass-access-token`, `--cookie-refresh=4m` sous la vie de 5 min du jeton) |
@@ -232,6 +232,19 @@ Valeurs tirées au hasard et passées par un tube, jamais affichées ; contrôle
 8. **« Dis à »** : la route du relais n'est ouverte qu'au pod de l'interface ; chaque personne doit s'être connectée une fois à la messagerie depuis la mise à jour (son compte porte alors son statut dans le foyer) ; sinon « dis à » répond par un motif fermé (expéditeur, destinataire sans compte). Voir l'[interface](../apps/chat-interface/README.md).
 
 **Piège rencontré** : un module de Prosody absent de la liste des fichiers de son ConfigMap faisait démarrer Prosody sans lui (« Unable to load module »), sans arrêter la messagerie. Le banc monte désormais la configuration depuis le rendu réel, et le contrôle d'après application cherche cette ligne au journal.
+
+### Chiffrement refusé côté serveur
+
+Choix du foyer : la messagerie n'est pas chiffrée de bout en bout. Retirer le greffon de chiffrement de Converse.js ne suffisait pas : tout autre client XMPP pouvait chiffrer. Un module de Prosody le refuse donc côté serveur.
+
+- **Message chiffré refusé** (OMEMO, ancien et v2 ; OpenPGP ; EME ; OTR) à l'entrée du routage des stanzas, avant les copies carbone, l'archive, la remise et la notification : erreur `not-acceptable` avec un texte pour la personne. Le message n'est ni remis, ni archivé, ni copié, ni notifié. Sans serveur à serveur, les messages des salons passent aussi par là.
+- **Marques de protocole seulement** : le module ne lit jamais le texte d'un message, hormis le préfixe d'OTR.
+- **Clés non publiables** : la publication des clés OMEMO et OpenPGP est refusée, si bien que les clients ne proposent même pas le chiffrement ; pep reste actif (marque-pages des salons, avatars).
+- **Limite** : un lien vers un fichier chiffré (`aesgcm://`) n'est pas refusé ; sa clé passe en clair dans le message archivé.
+- **Avant l'application** : vérifier, en lecture seule dans le pod, qu'aucune clé ni archive chiffrée n'est déjà sur le volume. **Après** : aucune ligne « Unable to load module » au journal (piège ci-dessus).
+- **Essai** sur un faux local, avec l'image figée et le rendu réel : rouge sans le module, vert avec, et des mutants du module tous détectés.
+
+État : **en service, en recette**. Retour arrière : réappliquer le rendu d'avant, sans le module.
 
 ### Départ d'un membre
 

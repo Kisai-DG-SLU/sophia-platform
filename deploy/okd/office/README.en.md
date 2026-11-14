@@ -176,7 +176,7 @@ Status: **in service, under acceptance testing**; "tell" in service; Matrix take
 
 | Pod | Container | Role |
 |---|---|---|
-| `prosody` (1 replica, `Recreate`) | `prosody` | Prosody from Jitsi's public image, pinned by digest, started on its own (without the image's init); configuration and modules mounted from ConfigMaps; sign-in with the identity provider's token only (SASL OAUTHBEARER, userinfo through the internal Service); "Family" room created from the start; data on a local `Retain` volume |
+| `prosody` (1 replica, `Recreate`) | `prosody` | Prosody from Jitsi's public image, pinned by digest, started on its own (without the image's init); configuration and modules mounted from ConfigMaps; sign-in with the identity provider's token only (SASL OAUTHBEARER, userinfo through the internal Service); "Family" room created from the start; **end-to-end encryption refused** by a household module (below); data on a local `Retain` volume |
 | | `passerelle` | Android notifications (XEP-0357 → ntfy, "New message", neither text nor sender); "tell" relay on a port of its own, the only port open to the chat; XEP-0114 component over the pod's loopback |
 | `messagerie-web` (1 replica, `Recreate`) | `nginx` | image built in the cluster: Converse.js (npm archive whose digest is checked before the build), the household's page and plugins; session check through `auth_request`, token handed to Converse.js (`/credentials`), the person's ntfy topic (`/push.json`), WebSocket and file relay to Prosody; displayable in the dashboard only |
 | | `oauth2-proxy` | listens on `127.0.0.1` only; `messagerie` client; household groups only (repeated `--allowed-group`), never guests; relayed token (`--pass-access-token`, `--cookie-refresh=4m` under the token's 5-minute life) |
@@ -232,6 +232,19 @@ Values drawn at random and passed through a pipe, never displayed; checked by le
 8. **"Tell"**: the relay route is open to the interface pod only; each person must have signed in to the messaging once since the update (their account then carries their household status); otherwise "tell" answers with a closed reason (sender, recipient without an account). See the [interface](../apps/chat-interface/README.en.md).
 
 **Pitfall encountered**: a Prosody module missing from its ConfigMap's file list made Prosody start without it ("Unable to load module"), without stopping the messaging. The bench now mounts the configuration from the real render, and the post-apply check looks for that line in the log.
+
+### Encryption refused on the server side
+
+A household choice: messaging is not end-to-end encrypted. Removing Converse.js's encryption plugin was not enough: any other XMPP client could encrypt. A Prosody module therefore refuses it on the server side.
+
+- **Encrypted message refused** (OMEMO, legacy and v2; OpenPGP; EME; OTR) at the entry of stanza routing, before carbon copies, archiving, delivery and notification: a `not-acceptable` error with a text for the person. The message is neither delivered, archived, copied nor notified. With no server-to-server, room messages go through the same point.
+- **Protocol markers only**: the module never reads a message's text, apart from OTR's prefix.
+- **Keys cannot be published**: publishing OMEMO and OpenPGP keys is refused, so clients do not even offer encryption; pep stays active (room bookmarks, avatars).
+- **Limit**: a link to an encrypted file (`aesgcm://`) is not refused; its key travels in clear in the archived message.
+- **Before applying**: check, read-only inside the pod, that no key or encrypted archive is already on the volume. **After**: no "Unable to load module" line in the log (pitfall above).
+- **Test** on a local fake, with the pinned image and the real render: red without the module, green with it, and every mutant of the module caught.
+
+Status: **in service, under acceptance testing**. Rollback: re-apply the previous render, without the module.
 
 ### A member leaving
 

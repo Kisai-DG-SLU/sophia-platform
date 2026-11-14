@@ -102,6 +102,7 @@ In the messaging namespace, next to Matrix, until the end of acceptance testing:
 | Prosody | 13.0.7, image pinned by digest; data on a **persistent local volume** (`Retain`); room archives kept | messaging is the household's written memory |
 | Accounts | identity taken from the token's userinfo (OAUTHBEARER, `preferred_username`), never from a password; a Prosody module refuses at sign-in **any account outside the household groups**, on top of the page's oauth2-proxy | group control does not rest on a single layer |
 | Openings | no server-to-server, no registration, no TCP client: the WebSocket only, behind oauth2-proxy; closed NetworkPolicies, Prosody reachable from the web pod only (and from the "tell" relay) | nothing gets in or out outside the intended path |
+| Encryption | **refused on the server side**: a Prosody module refuses any encrypted message (OMEMO, OpenPGP, EME, OTR) before archiving and delivery, and the publication of keys; Converse.js's encryption plugin is removed ([recipe](../../../deploy/okd/office/README.en.md#encryption-refused-on-the-server-side)) | household choice; removing the client plugin was not enough, any other client could encrypt |
 | Web | nginx (Converse.js 14, served by the image, digest checked; household plugins) and oauth2-proxy; strict content security policy, framable **by the dashboard only**; shared files served with `sandbox` and `nosniff` | no third-party resource; a received file cannot run in the page |
 | Contacts | **nothing by default**: everyone adds their contacts by address, or goes through the Family room | household's choice |
 | "Family" room | created by default for the whole home, guests excluded; **owners: the adults**; membership by default, no voluntary leaving; a child may create other rooms; absent members are visible to owners only | a guaranteed common place, run by the adults |
@@ -186,7 +187,7 @@ While Matrix stays readable: the **first sign-in** to the Matrix chat goes throu
 ## Privacy and limits
 
 - **Home only**: chat and video are reached through the VPN only.
-- **No end-to-end encryption**, neither in the chat nor in video calls: the system administrator can read the rooms. No room is therefore "private".
+- **No end-to-end encryption**, neither in the chat nor in video calls: the system administrator can read the rooms. The messaging server refuses any encrypted message (in service, under acceptance testing). No room is therefore "private".
 - **Chat media without backup.**
 - **Video rooms not private between household members**: the video token is valid for any room, and a one-to-one room name can be recomputed; a third household member could join it, and would be seen. People outside the household are refused. Closing this limit needs tokens restricted to one room: later, on request.
 - **Idle presence**: after the page is closed, the session stays idle for up to 72 h for notifications; the person appears present in rooms meanwhile. A choice the household accepts.

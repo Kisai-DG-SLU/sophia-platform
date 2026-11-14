@@ -102,6 +102,7 @@ Dans le namespace de la messagerie, à côté de Matrix, jusqu'à la fin de la r
 | Prosody | 13.0.7, image figée par empreinte ; données sur un **volume local persistant** (`Retain`) ; archives des salons gardées | la messagerie est la mémoire écrite du foyer |
 | Comptes | identité tirée de l'userinfo du jeton (OAUTHBEARER, `preferred_username`), jamais d'un mot de passe ; un module de Prosody refuse à la connexion **tout compte hors des groupes du foyer**, en plus de l'oauth2-proxy de la page | le contrôle par groupe ne dépend pas d'une seule couche |
 | Ouvertures | ni serveur à serveur, ni inscription, ni client en TCP : le WebSocket seul, derrière oauth2-proxy ; NetworkPolicy fermées, Prosody joignable du seul pod web (et du relais « dis à ») | rien n'entre ni ne sort hors du chemin prévu |
+| Chiffrement | **refusé côté serveur** : un module de Prosody refuse tout message chiffré (OMEMO, OpenPGP, EME, OTR) avant l'archive et la remise, et la publication des clés ; le greffon de chiffrement de Converse.js est retiré ([recette](../../../deploy/okd/office/README.md#chiffrement-refusé-côté-serveur)) | choix du foyer ; retirer le greffon du client ne suffisait pas, tout autre client pouvait chiffrer |
 | Web | nginx (Converse.js 14, servi par l'image, empreinte vérifiée ; greffons du foyer) et oauth2-proxy ; politique de sécurité du contenu stricte, affichable dans le **seul dashboard** ; fichiers partagés servis en `sandbox` et `nosniff` | aucune ressource tierce ; un fichier reçu ne peut pas s'exécuter dans la page |
 | Contacts | **rien d'office** : chacun ajoute ses contacts par leur adresse, ou passe par le salon Famille | choix du foyer |
 | Salon « Famille » | créé d'office pour toute la maison, invités exclus ; **propriétaires : les adultes** ; membre d'office, sans départ volontaire ; un enfant peut créer d'autres salons ; les membres absents ne sont visibles que des propriétaires | un lieu commun garanti, administré par les adultes |
@@ -186,7 +187,7 @@ Tant que Matrix reste lisible : la **première connexion** au chat Matrix passe 
 ## Confidentialité et limites
 
 - **Maison seule** : chat et visio ne se joignent que par le VPN.
-- **Pas de chiffrement de bout en bout**, ni dans le chat ni dans la visio : l'administrateur du système peut lire les salons. Aucun salon n'est donc « intime ».
+- **Pas de chiffrement de bout en bout**, ni dans le chat ni dans la visio : l'administrateur du système peut lire les salons. Le serveur de la messagerie refuse tout message chiffré (en service, en recette). Aucun salon n'est donc « intime ».
 - **Médias du chat sans sauvegarde.**
 - **Salles de visio non privées entre membres du foyer** : le jeton de visio vaut pour toute salle, et le nom d'une salle à deux se recalcule ; un troisième membre du foyer pourrait y entrer, et serait vu. Les personnes hors du foyer sont refusées. Fermer cette limite demande des jetons limités à une salle : plus tard, à la demande.
 - **Présence en veille** : après la fermeture de la page, la session reste en veille jusqu'à 72 h pour les notifications ; la personne paraît présente dans les salons pendant ce temps. Choix assumé du foyer.
