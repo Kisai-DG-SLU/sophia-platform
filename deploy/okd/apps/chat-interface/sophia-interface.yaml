@@ -104,6 +104,9 @@ spec:
             - --cookie-secret-file=/etc/oauth2/cookie-secret
             - --cookie-name=_sophia
             - --cookie-secure=true
+            # Cookie Lax : un autre site ne reçoit plus le cookie de session (appel, cadre, formulaire POST) ;
+            # les applications du même site le gardent, un lien aussi. Le cookie CSRF de la connexion suit.
+            - --cookie-samesite=lax
             - --cookie-refresh=4m           # sous les 5 min du jeton d'accès de Keycloak : le jeton relayé reste valide
             - --cookie-expire=2160h          # 90 jours, comme la session Keycloak « Se souvenir de moi »
             - --redirect-url=https://chat.example.org/oauth2/callback
@@ -225,12 +228,14 @@ spec:
             # Cockpit : modules affichés au centre, en cadre (les autres s'ouvrent à part). Chaque module listé
             # doit poser frame-ancestors pour l'origine du chat et envoyer le signal sophia.pret avec cet
             # identifiant exact. Changer la liste : oc apply, sans build. Voir README.md, section Cockpit.
-            - { name: SOPHIA_MODULES_CADRE, value: "cuisine,ecole,workflow,messages,visio,bureau" }
+            - { name: SOPHIA_MODULES_CADRE, value: "cuisine,ecole,workflow,messages,visio,bureau,finance,courrier,courses" }
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
+          # Sonde sans base : base en panne, le pod reste prêt et le dashboard servi ; store-api refuse alors
+          # tout de suite ce qui demande la base. /api/store/health, qui lit la base, n'est plus la sonde.
           readinessProbe:
-            exec: { command: [python3.12, -c, "import urllib.request,sys; r=urllib.request.Request('http://127.0.0.1:8000/api/store/health', headers={'X-Sophia-User':'sonde'}); sys.exit(0 if urllib.request.urlopen(r, timeout=3).status==200 else 1)"] }
+            exec: { command: [python3.12, -c, "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/store/version', timeout=3).status==200 else 1)"] }
             periodSeconds: 15
             timeoutSeconds: 5
           resources:
