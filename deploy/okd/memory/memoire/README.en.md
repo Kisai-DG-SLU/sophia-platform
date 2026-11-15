@@ -12,7 +12,7 @@ Each place has a single role. The registry is written **last**: as long as it do
 |---|---|---|
 | **S3 object storage**, one versioned bucket, never purged (`${MEMOIRE_SEAU}`) | the **original** of each version and its **extracted text**. Under `attente/` (pending), the pending version, erasable. Under `valide/` (validated), the original of each validated version (its text goes to the forge), **protected against any deletion**, even by the service | yes, for originals |
 | **PostgreSQL**, a dedicated schema (`${MEMOIRE_SCHEMA}`) | the **registry**: documents, versions, states, fingerprints, references to S3 and to the forge | yes, for state and references |
-| **Git forge** (Forgejo), a private organisation, **one repository per level** | the **validated text** of each version, in Markdown with a header; **one commit per validated version, never before**; a mirror copy on an external host | yes, for validated texts |
+| **Git forge** (Forgejo), a private organisation, **one repository per level** | the **validated text** of each version, in Markdown with a header; **one commit per validated version, never before**; an off-site copy is possible (see "Limits to be aware of") | yes, for validated texts |
 | **Vector database** (Qdrant) | chunks and their vectors: the validated version of each document, plus the pending version (marked, never returned by a search) | **no**: an index, rebuildable from the registry and the texts |
 | Shared **audit table** (`audit_log`) | every write and every refusal, without content | log |
 
@@ -109,7 +109,7 @@ The rights filter is **added by the service** to every index search, then each r
 
 The rights above are **the service's**, the only intended read path. They do not protect against whoever administers the places themselves:
 - **Forge administrators**: they read all level repositories, `intime` included. In the reference installation, this is a choice made knowingly by the household's head, who knows that a forge administration agent is one of them. The service remains the only holder of a token on these repositories.
-- **External mirror**: each level repository has a private copy on an external Git host (general rule of the installation: every repository has its mirror). All levels are there, `intime` included, readable by anyone who can access that account, even texts the page presents as readable by their author only. It is also an off-site copy, but **of validated texts only**: the originals (S3) and the registry (PostgreSQL) are not there, and the installation's backup is still to be done. For an installation that does not want this exposure: no mirror on the `personnel` and `intime` repositories, or an encrypted mirror.
+- **Off-site copy by mirror**: if the installation copies its repositories elsewhere by mirror, all levels are there, `intime` included, readable by anyone who administers that copy, even texts the page presents as readable by their author only. It is only a copy **of validated texts**: the originals (S3) and the registry (PostgreSQL) belong to the installation's backup. Recommendation: a second forge on a site under your control or at a host in the European Union, and, for the `personnel` and `intime` repositories, no clear-text mirror but the client-side encrypted backup ([sovereign solutions](../../../../docs/security.en.md#backup-and-storage-sovereign-solutions)).
 - **Database and storage administrators**: they read the registry (paths included) and the originals.
 - **Confidentiality towards the validator is a guarantee of the interface**, not of technical administration: the audit and the pod log carry the caller's identifier, the size and the number of chunks of every deposit, whatever its level. Whoever reads these logs links an intimate document to its author, without its content or name.
 
@@ -315,7 +315,7 @@ oc diff -f 07-forge-network.yaml
 oc apply -f 07-forge-network.yaml
 ```
 
-Expected: the Secret, of length `40`; the diff only shows the service's ingress. Mirrors to an external host are added here if the installation wants them (see "Limits to be aware of").
+Expected: the Secret, of length `40`; the diff only shows the service's ingress. An off-site copy by mirror is added here if the installation wants one (see "Limits to be aware of").
 
 **Step 3 — Vector database.** For a new installation, the dedicated volume first (XFS logical volume on the node, as for [PostgreSQL 18](../../core/postgres18/README.en.md)), then the database and its Service; otherwise only the API key (one restart):
 

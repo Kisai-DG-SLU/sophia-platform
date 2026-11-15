@@ -12,7 +12,7 @@ Chaque lieu a un seul rôle. Le registre est écrit **en dernier** : tant qu'il 
 |---|---|---|
 | **Stockage objet S3**, un seau versionné, sans purge (`${MEMOIRE_SEAU}`) | l'**original** de chaque version et son **texte extrait**. Sous `attente/`, la version en attente, effaçable. Sous `valide/`, l'original de chaque version validée (son texte va dans la forge), **protégé contre toute suppression**, même par le service | oui, pour les originaux |
 | **PostgreSQL**, un schéma dédié (`${MEMOIRE_SCHEMA}`) | le **registre** : documents, versions, états, empreintes, références vers S3 et vers la forge | oui, pour l'état et les références |
-| **Forge Git** (Forgejo), une organisation privée, **un dépôt par niveau** | le **texte validé** de chaque version, en Markdown avec un en-tête ; **un commit par version validée, jamais avant** ; une copie miroir sur un hébergeur externe | oui, pour les textes validés |
+| **Forge Git** (Forgejo), une organisation privée, **un dépôt par niveau** | le **texte validé** de chaque version, en Markdown avec un en-tête ; **un commit par version validée, jamais avant** ; une copie hors site possible (voir « Limites ») | oui, pour les textes validés |
 | **Base vectorielle** (Qdrant) | les morceaux et leurs vecteurs : la version validée de chaque document, plus la version en attente (marquée, jamais rendue par une recherche) | **non** : un index, reconstructible depuis le registre et les textes |
 | **Table d'audit** commune (`audit_log`) | chaque écriture et chaque refus, sans contenu | journal |
 
@@ -109,7 +109,7 @@ Le filtre de droits est **ajouté par le service** à toute recherche dans l'ind
 
 Les droits ci-dessus sont ceux **du service**, seule porte de lecture prévue. Ils ne protègent pas de qui administre les lieux eux-mêmes :
 - **Administrateurs de la forge** : ils lisent tous les dépôts de niveau, `intime` compris. Dans l'installation de référence, c'est un choix assumé du responsable du foyer, qui sait qu'un agent d'administration de la forge en fait partie. Le service reste seul à détenir un jeton sur ces dépôts.
-- **Miroir externe** : chaque dépôt de niveau a une copie privée chez un hébergeur Git externe (règle générale de l'installation : tout dépôt a son miroir). Tous les niveaux y sont, `intime` compris, lisibles par quiconque accède à ce compte, même les textes que la page présente comme lisibles par leur seul auteur. C'est aussi une copie hors de la maison, mais **des textes validés seulement** : les originaux (S3) et le registre (PostgreSQL) n'y sont pas, et la sauvegarde de l'installation reste à faire. Pour une installation qui ne veut pas de cette exposition : pas de miroir sur les dépôts `personnel` et `intime`, ou un miroir chiffré.
+- **Copie hors site par miroir** : si l'installation copie ses dépôts ailleurs par miroir, tous les niveaux y sont, `intime` compris, lisibles par quiconque administre cette copie, même les textes que la page présente comme lisibles par leur seul auteur. Ce n'est qu'une copie **des textes validés** : les originaux (S3) et le registre (PostgreSQL) relèvent de la sauvegarde de l'installation. Recommandation : une seconde forge sur un site maîtrisé ou chez un hébergeur de l'Union européenne, et, pour les dépôts `personnel` et `intime`, pas de miroir en clair mais la sauvegarde chiffrée côté client ([solutions souveraines](../../../../docs/security.md#sauvegarde-et-stockage--solutions-souveraines)).
 - **Administrateurs de la base et du stockage** : ils lisent le registre (chemins compris) et les originaux.
 - **La confidentialité devant le valideur est une garantie de l'interface**, pas de l'administration technique : l'audit et le journal du pod portent l'identifiant de l'appelant, le poids et le nombre de morceaux de chaque dépôt, quel que soit son niveau. Qui lit ces journaux relie un document intime à son auteur, sans son contenu ni son nom.
 
@@ -315,7 +315,7 @@ oc diff -f 07-forge-network.yaml
 oc apply -f 07-forge-network.yaml
 ```
 
-Attendu : le Secret, dont la longueur est `40` ; le diff ne montre que l'entrée du service. Des miroirs vers un hébergeur externe s'ajoutent ici si l'installation en veut (voir « Limites »).
+Attendu : le Secret, dont la longueur est `40` ; le diff ne montre que l'entrée du service. Une copie hors site par miroir s'ajoute ici si l'installation en veut (voir « Limites »).
 
 **Étape 3 — Base vectorielle.** Pour une installation neuve, le volume dédié d'abord (volume logique XFS sur le nœud, comme pour [PostgreSQL 18](../../core/postgres18/README.md)), puis la base et son Service ; sinon, seulement la clé d'API (un redémarrage) :
 
