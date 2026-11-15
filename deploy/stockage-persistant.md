@@ -21,12 +21,12 @@ Deux questions distinctes, et la seconde est celle qu'on oublie : le composant a
 | Composant | Namespace | Persistant | Taille | Support | Base de la taille |
 |---|---|---|---|---|---|
 | PostgreSQL 18 (toutes les bases) | `${NS_CORE}` | oui | 20Gi | **volume logique dédié** | environ 190 Mo de données à la migration ; hypothèse haute à un an sous 9 Go sans rétention, environ 2 Go avec ; voir `okd/core/postgres18/` |
-| Qdrant | `${NS_MEMORY}` | oui | 20Gi | **volume logique dédié** | 6 à 8 Ko par segment ; l'optimisation demande jusqu'à deux fois la place ; collection encore vide |
+| Qdrant | `${NS_MEMORY}` | oui | 20Gi | **volume logique dédié** | 6 à 8 Ko par segment ; l'optimisation demande jusqu'à deux fois la place ; collection encore vide ; instantané chaque nuit dans la sauvegarde chiffrée |
 | Stockage objet S3 (SeaweedFS) | `sophia-storage` | oui | 200Gi | **volume logique dédié** | documents de la bureautique et leurs versions (corbeille de 30 jours) ; voir `okd/storage/` |
 | RabbitMQ | `${NS_CORE}` | oui | 5Gi | répertoire du nœud, lié nommément (`claimRef` + `volumeName`) | événements des délégations et lettres mortes ; voir `okd/core/rabbitmq/` |
 | Forgejo | `${NS_GIT}` | oui | 50Gi | **volume logique dédié** | dépôts et base SQLite locale |
 | Médias du chat permanent (Synapse) | `sophia-messagerie` | oui | 10Gi | **volume logique dédié**, PV `Retain` | fichiers de 50 Mo au plus ; **sans sauvegarde**, choix accepté (les messages sont dans PostgreSQL) ; installé, en recette ; voir `okd/office/` |
-| Données de la messagerie XMPP (Prosody) | `sophia-messagerie` | oui | 10Gi | **volume logique dédié**, PV `Retain`, réservé à sa PVC | comptes, salons, archives et fichiers partagés ; **sans sauvegarde** à ce jour (prévue avec la sauvegarde en cours de mise en place) ; en service, en recette ; voir `okd/office/` |
+| Données de la messagerie XMPP (Prosody) | `sophia-messagerie` | oui | 10Gi | **volume logique dédié**, PV `Retain`, réservé à sa PVC | comptes, salons, archives et fichiers partagés ; **export chaque nuit** dans la sauvegarde chiffrée ; en service, en recette ; voir `okd/office/` |
 | Neo4j | `${NS_MEMORY}` | oui | 10Gi | répertoire du nœud, 0 réplique | graphe à construire, aucune donnée ; image figée, en attente |
 | Service d'embedding | `${NS_MEMORY}` | oui | 5Gi | répertoire du nœud | cache et modèle, pas de corpus |
 | Espace de travail | `${NS_APPS}` | oui | 20Gi | répertoire du nœud, consommateur arrêté | préproduction, notebooks, webapps, API |

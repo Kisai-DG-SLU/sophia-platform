@@ -107,7 +107,7 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 - permanent chat and video calls without end-to-end encryption, a deliberate choice: a platform administrator can read the rooms; XMPP messaging refuses any encrypted message on the server side (in service, under acceptance testing); chat media have no backup;
 - tokens masked in the relays' access logs; model-router logs at `INFO`, never `DEBUG` (which would write every full request);
 - retention: the model router's detailed log and workflow history 30 days; object-storage trash 30 days; metrics 15 days; conversations and applications without automatic purge;
-- **scheduled backups: being set up**, not in service yet; meanwhile, full manual backups before each operation. Rebuilding the server requires a cluster installation procedure, still to be written. The recommended solutions, for backups as for copies of the repositories, are described below ([Backup and Storage: Sovereign Solutions](#backup-and-storage-sovereign-solutions));
+- **scheduled, encrypted backups: in service** since 15/11 (first automatic night cycle being checked). A dedicated namespace; restic, encryption inside the cluster before anything is sent, repository in a dedicated bucket of the platform's object storage. Every hour, a dump of each PostgreSQL database by a read role (`pg_read_all_data`), with neither superuser nor row-security bypass; every night, the namespaces' Secrets and the exports prepared in each namespace (forge database and configuration, XMPP messaging, vector database snapshot), dropped by write-only identities. Retention: 48 hours, 7 days, 5 weeks, 12 months. Integrity check every night (2% of the data read back), timed restore test every week, alert when a job is suspended or its last success is too old. Not in this repository: the forge's Git repositories and the object storage of files and memory; an installation plans their copy, as well as the off-site copy of the repository ([Backup and Storage: Sovereign Solutions](#backup-and-storage-sovereign-solutions)). Rebuilding the server requires a cluster installation procedure, still to be written;
 - **minimisation of working notes**: the logs and plans read by coding assistants contain no child's first name and no sensitive data (health, schooling, address), only roles; a pre-commit hook rejects forbidden terms by their fingerprints (HMAC), without ever displaying them; history is not rewritten;
 - audit logging;
 - two-factor authentication: **target**;
@@ -150,7 +150,6 @@ Data that leaves the installation must stay under its control: encrypted before 
 - egress control for the agents namespace;
 - access to the applications through the dashboard only, with an exception for the administrator;
 - update and vulnerability watch for pinned images (local scanner, update requests opened without automatic merge, report to the administrator);
-- scheduled, encrypted backups, with a restore test (in progress, see [sovereign solutions](#backup-and-storage-sovereign-solutions));
 - two-factor authentication for administration accounts and guardians;
 - mutual TLS between the dispatcher and executors;
 - encrypted volumes.

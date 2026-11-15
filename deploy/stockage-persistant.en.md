@@ -21,12 +21,12 @@ State verified on 2026-10-25, by reading the cluster.
 | Component | Namespace | Persistent | Size | Backing | Basis for the size |
 |---|---|---|---|---|---|
 | PostgreSQL 18 (every database) | `${NS_CORE}` | yes | 20Gi | **dedicated logical volume** | about 190 MB of data at migration; high one-year assumption under 9 GB without retention, about 2 GB with it; see `okd/core/postgres18/` |
-| Qdrant | `${NS_MEMORY}` | yes | 20Gi | **dedicated logical volume** | 6 to 8 KB per segment; optimisation needs up to twice the space; collection still empty |
+| Qdrant | `${NS_MEMORY}` | yes | 20Gi | **dedicated logical volume** | 6 to 8 KB per segment; optimisation needs up to twice the space; collection still empty; snapshot every night into the encrypted backup |
 | S3 object storage (SeaweedFS) | `sophia-storage` | yes | 200Gi | **dedicated logical volume** | office suite documents and their versions (30-day trash); see `okd/storage/` |
 | RabbitMQ | `${NS_CORE}` | yes | 5Gi | node directory, bound by name (`claimRef` + `volumeName`) | delegation events and dead letters; see `okd/core/rabbitmq/` |
 | Forgejo | `${NS_GIT}` | yes | 50Gi | **dedicated logical volume** | repositories and local SQLite database |
 | Persistent chat media (Synapse) | `sophia-messagerie` | yes | 10Gi | **dedicated logical volume**, `Retain` PV | files of 50 MB at most; **no backup**, accepted choice (messages are in PostgreSQL); installed, in acceptance testing; see `okd/office/` |
-| XMPP messaging data (Prosody) | `sophia-messagerie` | yes | 10Gi | **dedicated logical volume**, `Retain` PV, reserved to its PVC | accounts, rooms, archives and shared files; **no backup** so far (planned with the backup being set up); in service, under acceptance testing; see `okd/office/` |
+| XMPP messaging data (Prosody) | `sophia-messagerie` | yes | 10Gi | **dedicated logical volume**, `Retain` PV, reserved to its PVC | accounts, rooms, archives and shared files; **exported every night** into the encrypted backup; in service, under acceptance testing; see `okd/office/` |
 | Neo4j | `${NS_MEMORY}` | yes | 10Gi | node directory, 0 replicas | graph to be built, no data; image pinned, on hold |
 | Embedding service | `${NS_MEMORY}` | yes | 5Gi | node directory | cache and model, no corpus |
 | Workspace | `${NS_APPS}` | yes | 20Gi | node directory, consumer down | preproduction, notebooks, webapps, APIs |

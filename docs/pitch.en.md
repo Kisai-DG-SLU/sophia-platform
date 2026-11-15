@@ -97,7 +97,7 @@ SophIA is an experimental architecture under construction. We separate what work
 - Development clusters: one ephemeral virtual cluster per project (decided, to be built).
 - Memory, resumed as a priority: memory service in service (originals in a versioned bucket, validated texts in the forge, validation by a single person, isolated file extraction), the dashboard's "Memory" page deployed, then the agents' façade and the ingestion pipeline; graph dimension blocked.
 - Assisted development (vibe coding): study in progress (visual mock-ups of each person's projects, following the agents).
-- Vulnerability watch, compliance (GDPR, AI Act, ISO 27001); scheduled, encrypted backups **being set up**.
+- Vulnerability watch, compliance (GDPR, AI Act, ISO 27001); scheduled, encrypted backups **in service**, with a restore test every week.
 
 **Planned**
 

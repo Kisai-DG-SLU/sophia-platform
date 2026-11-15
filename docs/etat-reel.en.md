@@ -117,7 +117,7 @@ A brick is only called deployed if it runs **and** its reproducible recipe, or i
 |---|---|---|---|
 | Minimal monitoring | Deployed | service metrics, alert rules, GPU, volume filling; filtered alerts sent to the administrator outside the platform | [`okd/monitoring/`](../deploy/okd/monitoring/README.en.md), [observability](concepts/10-observabilite.en.md) |
 | "Incident" workflow and incident register | Planned | from the alarm to the approved plan, no automatic action | [observability](concepts/10-observabilite.en.md) |
-| Scheduled, encrypted backup | In progress | not in service yet; recommended solutions: client-side encryption, a local copy and a sovereign off-site copy, restore test | [security](security.en.md#backup-and-storage-sovereign-solutions) |
+| Scheduled, encrypted backup | Deployed | since 15/11: databases every hour, Secrets and exports every night, integrity check, restore test every week, alerts; off-site copy specific to each installation | [security](security.en.md#data-protection) |
 | Reproducible recipes per component | Deployed | templates with variables and procedures published in this repository | [`deploy/`](../deploy/README.en.md) |
 | Portability of an installation | In progress | node names and paths as variables in the templates; choosing the node of each volume remains | [roadmap](roadmap.en.md) |
 | Drift check between the cluster and the repositories | In progress | read-only, deterministic, with an alert | |
