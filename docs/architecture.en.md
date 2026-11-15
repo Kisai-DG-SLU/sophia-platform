@@ -125,6 +125,17 @@ When several applications need the same data (customers, invoices, payments rece
 
 In service for the business applications (customers, invoicing, finances) and for the household: the shared household database holds the places, written by the dashboard and read by the modules (the Cooking module reads the residence there), and the Cooking module's data, which publishes its views there. Planned on the same model: the household members. Recipe: [PostgreSQL 18](../deploy/okd/core/postgres18/README.en.md#shared-database-of-a-domain).
 
+## Receiving Electronic Invoices
+
+The French e-invoicing reform requires every company to receive its supplier invoices through an accredited platform of its choice. A separate module collects them (in service, on trial: real reception starts when switching to production):
+
+- **a dedicated namespace**, with no ingress at all; egress to the shared PostgreSQL database and to the platform's API only, named in the namespace's egress rule, everything else refused; no Kubernetes API token, no privilege, read-only filesystem;
+- **inactive**, with no network call nor database connection, as long as it does not run in that namespace, its credentials are missing or the platform's address is not encrypted;
+- every 5 minutes, it resumes after the last invoice received, downloads each original (PDF or XML) and records it with **the SHA-256 checksum of the bytes received**, one invoice per transaction: a failure stops the run without skipping an invoice, and the uniqueness of the platform's identifier forbids any duplicate;
+- the table is **append-only**: deletion, truncation and modification are refused by the database itself; only the purge of the file, later and only once, will be allowed, and it keeps the checksum;
+- **guard on the token's company**: before each run, the company the platform token belongs to is compared with the company of the invoices already received; if it has changed while invoices of the former one remain, reception stops, rather than mixing two numbering sequences and skipping invoices;
+- received invoices live in the **business activity's shared database**, in the module's schema, and the business applications read them through a versioned view (`receptions_v1`) granted to a read role, following the rules above; the module's role has only the connection and its schema, with no administration power.
+
 ---
 
 # Development and Runtime Zones

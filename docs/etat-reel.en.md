@@ -96,6 +96,7 @@ A brick is only called deployed if it runs **and** its reproducible recipe, or i
 | Shopping | Deployed | product choice according to household rules, express basket; display in the dashboard under acceptance testing | [Shopping](modules/courses/README.en.md) |
 | Visualisation | Deployed | measured state of each component, hourly check of repository mirrors; for the administrator | [Visualisation](modules/visualisation/README.en.md) |
 | Business applications (customers, invoicing, finances) | Deployed | one shared database per domain, no API and no copy between them | [shared data](architecture.en.md#data-shared-between-applications) |
+| Receiving electronic invoices | In progress | in service, on trial before switching to production: separate module in its own namespace, egress limited to the platform's API, checksum of the bytes received, guard on the token's company | [receiving invoices](architecture.en.md#receiving-electronic-invoices) |
 | Shared household database (places, Cooking module; later the members) | Deployed | places written by the dashboard and read by the modules; Cooking module's data and published views | [shared data](architecture.en.md#data-shared-between-applications) |
 | Mail | In progress | display in the dashboard under acceptance testing | [roadmap](roadmap.en.md) |
 | Assisted development (vibe coding) | In progress | study: visual mock-ups of each person's projects, agent tracking | [assisted development](development/opencode-workflow.en.md) |

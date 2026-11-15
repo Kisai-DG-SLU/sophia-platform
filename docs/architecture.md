@@ -125,6 +125,17 @@ Quand plusieurs applications ont besoin des mêmes données (clients, factures, 
 
 En service pour les applications de gestion (clients, facturation, finances) et pour le foyer : la base commune du foyer porte les lieux, écrits par le dashboard et lus par les modules (le module Cuisine y lit la résidence), et les données du module Cuisine, qui y publie ses vues. Prévu sur le même modèle : les membres du foyer. Recette : [PostgreSQL 18](../deploy/okd/core/postgres18/README.md#base-commune-dun-domaine).
 
+### Réception des factures électroniques
+
+La réforme française de la facturation électronique impose à toute entreprise de recevoir ses factures fournisseurs par une plateforme agréée, qu'elle choisit. Un module à part les relève (en service, en essai : la réception réelle commence au passage en production) :
+
+- **un namespace dédié**, sans aucune entrée ; en sortie, la base PostgreSQL partagée et l'API de la plateforme seule, désignée par son nom dans la règle de sortie du namespace, tout le reste refusé ; ni jeton de l'API Kubernetes, ni privilège, système de fichiers en lecture seule ;
+- **inactif**, sans appel réseau ni connexion à la base, tant qu'il ne tourne pas dans ce namespace, que ses identifiants manquent ou que l'adresse de la plateforme n'est pas chiffrée ;
+- toutes les 5 minutes, il repart après la dernière facture reçue, télécharge chaque original (PDF ou XML) et l'inscrit avec **l'empreinte SHA-256 des octets reçus**, une facture par transaction : une panne arrête le passage sans sauter de facture, et l'unicité de l'identifiant de la plateforme interdit tout double ;
+- la table est en **ajout seul** : suppression, troncature et modification sont refusées par la base elle-même ; seule la purge du fichier, plus tard et une seule fois, sera permise, et elle garde l'empreinte ;
+- **garde sur l'entreprise du jeton** : avant chaque passage, l'entreprise à laquelle appartient le jeton de la plateforme est comparée à celle des factures déjà reçues ; si elle a changé et que des factures de l'ancienne restent, la réception s'arrête, plutôt que de mêler deux numérotations et de sauter des factures ;
+- les factures reçues vivent dans la **base commune de l'activité**, dans le schéma du module, et les applications de gestion les lisent par une vue versionnée (`receptions_v1`) accordée à un rôle de lecture, selon les règles ci-dessus ; le rôle du module n'a que la connexion et son schéma, sans pouvoir d'administration.
+
 ---
 
 ## Zones de développement et d'exécution
