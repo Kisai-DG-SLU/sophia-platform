@@ -6,7 +6,7 @@ This card explains **who may talk to which model**, and how the rule is held by 
 
 ## Problem
 
-In a household or a team, not every account is entitled to the same models: a child or a guest must stay on the local model, an adult may choose an online model. Two mistakes must be avoided:
+In a household or a team, not every account is entitled to the same models: a child or a guest must stay on the local model, and online models may be reserved to a few accounts. Two mistakes must be avoided:
 
 - a rule **in the browser**: the selector hides models, but a forged request goes through;
 - **a single key for everything**: every caller (chat, voice, agents, development pods) then sees every model, remote and paid ones included, and the router's master key ends up in pods that have nothing to administer.
@@ -22,7 +22,8 @@ The chat server reads a **role → allowed models** table (`SOPHIA_MODELS_BY_ROL
 | children (protected group) | the local model only |
 | guests | the local model only |
 | account with no known role | treated as a guest |
-| adults | no restriction |
+| guardians (adults) | the local model only (since 15/11 in the reference installation) |
+| administrator | no restriction |
 
 - **Explicit refusal**: a model outside the list sent by the browser gets a **403** ("model not allowed for this account: … only"), and nothing goes to the router. Never a silent substitution: the person would not know which model answered.
 - **Default model** brought back to the first allowed model: a parent may have picked an online model for a child's profile before the rule existed. Saving a model outside the list in a profile answers 400.
@@ -38,7 +39,8 @@ The model router issues **virtual keys**: each has a **closed list of models** a
 
 | Use | Models | Limits |
 |---|---|---|
-| chat | the chat's models | the chat's rate and budget |
+| chat (pod key) | the local model's aliases only | the chat's rate and budget |
+| chat, admin role (administration key, optional, read by the API alone) | all models, external ones included | the same as the chat key |
 | chat voice | speech recognition and synthesis only | its own rate (300 requests per minute), no budget: local models |
 | each agent (`agent-<name>`) | the local model's background alias and embedding | 120 requests per minute, no budget: the closed list prevents any paid call |
 | each development project (planned) | the local model only: the background alias and embedding, like the agents | bounded rate, no budget: the closed list prevents any paid call |

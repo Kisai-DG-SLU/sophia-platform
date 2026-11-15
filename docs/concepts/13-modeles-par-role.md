@@ -6,7 +6,7 @@ Cette fiche dit **qui peut parler à quel modèle**, et comment la règle est te
 
 ## Problème
 
-Dans un foyer ou une équipe, tous les comptes n'ont pas droit aux mêmes modèles : un enfant ou un invité doit rester sur le modèle local, un adulte peut choisir un modèle en ligne. Deux erreurs sont à éviter :
+Dans un foyer ou une équipe, tous les comptes n'ont pas droit aux mêmes modèles : un enfant ou un invité doit rester sur le modèle local, et les modèles en ligne peuvent être réservés à quelques comptes. Deux erreurs sont à éviter :
 
 - une règle **dans le navigateur** : le sélecteur cache les modèles, mais une requête forgée passe ;
 - **une seule clé pour tout** : chaque appelant (chat, voix, agents, pods de développement) voit alors tous les modèles, distants et payants compris, et la clé maître du routeur finit dans des pods qui n'ont rien à administrer.
@@ -22,7 +22,8 @@ Le serveur du chat lit une table **rôle → modèles permis** (`SOPHIA_MODELS_B
 | enfants (groupe protégé) | le modèle local seulement |
 | invités | le modèle local seulement |
 | compte sans rôle connu | traité comme un invité |
-| adultes | sans restriction |
+| responsables (adultes) | le modèle local seulement (depuis le 15/11 dans l'installation de référence) |
+| administrateur | sans restriction |
 
 - **Refus explicite** : un modèle hors liste envoyé par le navigateur reçoit un **403** (« Modèle non autorisé pour ce compte : … seulement »), et rien ne part vers le routeur. Jamais de remplacement silencieux : la personne saurait mal quel modèle a répondu.
 - **Modèle par défaut** ramené au premier modèle permis : un parent a pu choisir un modèle en ligne pour le profil d'un enfant avant la règle. Enregistrer un modèle hors liste dans un profil répond 400.
@@ -38,7 +39,8 @@ Le routeur de modèles délivre des **clés virtuelles** : chacune a une **liste
 
 | Usage | Modèles | Limites |
 |---|---|---|
-| chat | les modèles du chat | débit et budget du chat |
+| chat (clé du pod) | les alias du modèle local seulement | débit et budget du chat |
+| chat, rôle admin (clé d'administration, facultative, lue par l'API seule) | tous les modèles, externes compris | les mêmes que la clé du chat |
 | voix du chat | reconnaissance et synthèse vocales seulement | débit propre (300 requêtes par minute), sans budget : modèles locaux |
 | chaque agent (`agent-<nom>`) | l'alias de fond du modèle local et l'embedding | 120 requêtes par minute, sans budget : la liste fermée empêche tout appel payant |
 | chaque projet de développement (prévu) | le modèle local seul : l'alias de fond et l'embedding, comme les agents | débit borné, sans budget : la liste fermée empêche tout appel payant |

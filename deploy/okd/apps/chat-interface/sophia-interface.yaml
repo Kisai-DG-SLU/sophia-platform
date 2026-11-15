@@ -11,6 +11,9 @@
 #   - secret sophia-interface-litellm : LITELLM_API_KEY = virtual key LiteLLM dédiée à la prod
 #                                       et LITELLM_AUDIO_API_KEY (facultative) = virtual key limitée
 #                                       à sophia-stt et sophia-tts (routes de la voix)
+#                                       et LITELLM_ADMIN_API_KEY (facultative) = virtual key qui ouvre
+#                                       aussi les modèles externes, pour le seul rôle admin, lue par
+#                                       store-api seul
 #   - secret sophia-interface-oauth2  : client-secret (client Keycloak sophia-interface) et cookie-secret
 #   - secret sophia-interface-sessions: password = mot de passe de l'utilisateur d'ACL du chat dans le Valkey
 #                                       des sessions (../../identity/sessions/README.md), créé avant ce manifeste
@@ -202,6 +205,11 @@ spec:
             - secretRef: { name: sophia-chat-db }
             - secretRef: { name: sophia-chat-forgejo, optional: true }
           env:
+            # Clé LiteLLM de l'admin : posée par store-api pour le seul rôle admin ; facultative, absente :
+            # la clé du pod (posée par nginx) pour tous. Jamais dans le conteneur nginx.
+            - name: LITELLM_ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef: { name: sophia-interface-litellm, key: LITELLM_ADMIN_API_KEY, optional: true }
             - { name: SOPHIA_FAMILY_ORG, value: famille }
             - { name: SOPHIA_BRAIN_REPO, value: ORGANISATION/brain }
             - { name: SOPHIA_PROMOTE_TARGETS, value: '{"famille": "Famille", "perso": "Perso"}' }
