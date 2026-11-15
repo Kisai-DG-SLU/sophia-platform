@@ -174,7 +174,7 @@ Ensuite : la copie de sauvegarde de la configuration S3 est supprimée ; le chat
 
 **Au premier dépôt réel**, l'administrateur relit, sans contenu, chemin ni identifiant de personne : les dernières lignes d'audit (`tentative`, puis `ecrit`), le registre (`en_attente`, original et texte présents, pas de commit) ; après validation, l'audit de la décision, le registre (`valide`, original présent, texte dans la forge, un identifiant de commit), le commit `document <id>, version 1` dans le dépôt du niveau, et le dernier envoi des miroirs.
 
-**Retour arrière**, étape par étape, depuis les sauvegardes : règles réseau par `oc diff` puis `apply` de la sauvegarde ; identités S3 depuis la copie gardée dans le cluster (relance du stockage) ; rôles PostgreSQL par `DROP OWNED BY` puis `DROP ROLE` (**supprime tout le registre** ; l'audit déjà écrit reste) ; mappeur d'audience dans la console. À savoir : une copie miroir supprimée chez l'hébergeur externe ne se retrouve pas, et, hors du miroir, le texte validé n'existe que dans la forge ; l'original reste dans S3, d'où le texte se ré-extrait.
+**Retour arrière**, étape par étape, depuis les sauvegardes : règles réseau par `oc diff` puis `apply` de la sauvegarde ; identités S3 depuis la copie gardée dans le cluster (relance du stockage) ; rôles PostgreSQL par `DROP OWNED BY` puis `DROP ROLE` (**supprime tout le registre** ; l'audit déjà écrit reste) ; mappeur d'audience dans la console. À savoir : une copie hors site par miroir, une fois supprimée, ne se retrouve pas, et, hors d'une telle copie, le texte validé n'existe que dans la forge ; l'original reste dans S3, d'où le texte se ré-extrait.
 
 ## Recette : fichiers et commandes
 

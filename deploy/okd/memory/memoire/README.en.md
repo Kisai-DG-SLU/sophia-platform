@@ -174,7 +174,7 @@ Then: the backup copy of the S3 configuration is deleted; the chat receives the 
 
 **At the first real deposit**, the administrator reads, without content, path or person identifier: the last audit lines (`tentative`, then `ecrit`), the registry (`en_attente`, original and text present, no commit); after validation, the decision's audit, the registry (`valide`, original present, text in the forge, a commit identifier), the commit `document <id>, version 1` in the level's repository, and the last mirror push.
 
-**Rollback**, step by step, from the backups: network rules by `oc diff` then `apply` of the backup; S3 identities from the copy kept in the cluster (storage restart); PostgreSQL roles by `DROP OWNED BY` then `DROP ROLE` (**deletes the whole registry**; audit already written remains); audience mapper in the console. Be aware: a mirror copy deleted at the external host cannot be recovered, and, apart from the mirror, the validated text exists only in the forge; the original stays in S3, from which the text can be re-extracted.
+**Rollback**, step by step, from the backups: network rules by `oc diff` then `apply` of the backup; S3 identities from the copy kept in the cluster (storage restart); PostgreSQL roles by `DROP OWNED BY` then `DROP ROLE` (**deletes the whole registry**; audit already written remains); audience mapper in the console. Be aware: an off-site mirror copy, once deleted, cannot be recovered, and, apart from such a copy, the validated text exists only in the forge; the original stays in S3, from which the text can be re-extracted.
 
 ## Recipe: files and commands
 
