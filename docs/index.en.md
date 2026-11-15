@@ -50,3 +50,4 @@ Welcome to the SophIA architecture documentation.
 
 - [Deployment Overview](../deploy/README.en.md) — Reference deployment on OKD
 - [Infrastructure POC](../deploy/infrastructure.en.md) — Proof of Concept infrastructure specification
+- [Components](../deploy/composants.en.md) — Technical description: storage, resources, image, exposure, reason

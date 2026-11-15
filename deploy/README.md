@@ -17,6 +17,7 @@ Ce répertoire a pour but de :
 - documenter l'architecture des namespaces
 - permettre l'expérimentation et la reproduction locale du système
 - dimensionner et préparer le stockage persistant : voir [stockage persistant](stockage-persistant.md)
+- connaître le stockage, les ressources, l'image et l'exposition de chaque composant : voir [composants](composants.md)
 
 Cette configuration n'est pas destinée à être une distribution prête pour la production. Elle sert d'exemple d'infrastructure utilisé pour l'expérimentation et la documentation.
 

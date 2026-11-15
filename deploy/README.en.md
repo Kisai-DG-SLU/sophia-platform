@@ -17,6 +17,7 @@ The goal of this directory is to:
 - document the **namespace architecture**
 - allow experimentation and local reproduction of the system
 - size and prepare persistent storage: see [persistent storage](stockage-persistant.en.md)
+- know each component's storage, resources, image and exposure: see [components](composants.en.md)
 
 This configuration is **not intended to be a production-ready distribution**.
 

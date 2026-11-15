@@ -158,6 +158,7 @@ Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 
 - [Deployment Overview](deploy/README.en.md) — Reference OKD configuration
 - [Infrastructure POC](deploy/infrastructure.en.md) — Proof of Concept specification
+- [Components](deploy/composants.en.md) — Technical description: storage, resources, image, exposure, reason
 
 ---
 

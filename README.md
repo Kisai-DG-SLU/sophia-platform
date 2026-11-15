@@ -149,6 +149,7 @@ La documentation est organisée dans le répertoire [`docs/`](docs/index.md).
 
 - [Exemple de déploiement](deploy/README.md) — Configuration OKD de référence
 - [Infrastructure POC](deploy/infrastructure.md) — Spécification du Proof of Concept
+- [Composants](deploy/composants.md) — Description technique : stockage, ressources, image, exposition, raison
 
 ---
 

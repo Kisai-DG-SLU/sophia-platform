@@ -50,3 +50,4 @@ Bienvenue dans la documentation de l'architecture SophIA.
 
 - [Aperçu du déploiement](../deploy/README.md) — Exemple de déploiement sur OKD
 - [Infrastructure POC](../deploy/infrastructure.md) — Spécification du Proof of Concept
+- [Composants](../deploy/composants.md) — Description technique : stockage, ressources, image, exposition, raison
