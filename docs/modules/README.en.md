@@ -46,6 +46,6 @@ Rollout: by **targeted patches** of oauth2-proxy's arguments and of the network 
 | School | shown in the centre: **in service, verified** on a computer; logging in again on a phone is under acceptance testing; summary and new items computed by the interface; page context (subject and topic) in service, in acceptance testing |
 | Visualisation | shown in the centre, for the administrator only: **in service, verified** on a computer, logging in again on a phone under acceptance testing; token accepted (403 verified); summary route called by the interface: in service, verified |
 | Office, Communication | shown in the centre: in service, under acceptance testing (see their pages) |
-| Shopping | not in the dashboard yet: opened separately |
+| Shopping | added to the centre list: under acceptance testing |
 
 Sophia opening a module on the right page, without a click (school, cooking, visualisation), and each application's "Ask Sophia" panel, with one conversation per application, are in service, in acceptance testing. Planned: access to applications through the dashboard only, with an exception for the administrator (troubleshooting).

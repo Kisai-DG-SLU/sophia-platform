@@ -46,6 +46,6 @@ Mise en service : par **modifications ciblées** des arguments d'oauth2-proxy et
 | École | affichée au centre : **en service, vérifiée** sur ordinateur ; la reconnexion au téléphone est en recette ; résumé et nouveautés calculés par l'interface ; contexte de page (matière et thème) en service, en recette |
 | Visualisation | affichée au centre, pour l'administrateur seul : **en service, vérifiée** sur ordinateur, reconnexion au téléphone en recette ; jeton accepté (403 vérifié) ; route de résumé appelée par l'interface : en service, vérifiée |
 | Bureautique, Communication | affichées au centre : en service, en recette (voir leurs pages) |
-| Courses | pas encore dans le dashboard : ouverte à part |
+| Courses | ajoutée à la liste du centre : en recette |
 
 L'ouverture d'un module sur la bonne page par Sophia, sans clic (école, cuisine, visualisation), et le volet « Demander à Sophia » de chaque application, avec une discussion par application, sont en service, en recette. Prévu : l'accès aux applications par le dashboard seulement, avec une exception pour l'administrateur (dépannage).
