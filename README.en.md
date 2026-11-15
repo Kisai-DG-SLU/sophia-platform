@@ -128,6 +128,7 @@ The project aims to evolve into a **reference architecture for sovereign AI infr
 Documentation is organized in the [`docs/`](docs/index.en.md) directory.
 
 - **[Pitch](docs/pitch.en.md)** — SophIA in one sentence, 30 seconds and 3 minutes
+- **[Actual state](docs/etat-reel.en.md)** — What is deployed, in progress and planned, brick by brick
 - **[Functional scope](docs/functional-scope.en.md)** — What SophIA must do and for whom, with the status of each function
 - **[Architecture](docs/architecture.en.md)** — Principles, components and high-level organization
 - **[Security](docs/security.en.md)** — Security model and isolation

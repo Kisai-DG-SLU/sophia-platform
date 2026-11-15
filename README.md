@@ -119,6 +119,7 @@ Le projet vise à évoluer vers une architecture de référence pour les infrast
 La documentation est organisée dans le répertoire [`docs/`](docs/index.md).
 
 - **[Pitch](docs/pitch.md)** — SophIA en une phrase, 30 secondes et 3 minutes
+- **[État réel](docs/etat-reel.md)** — Ce qui est déployé, en cours et prévu, brique par brique
 - **[Périmètre fonctionnel](docs/functional-scope.md)** — Ce que SophIA doit faire et pour qui, avec l'état de chaque fonction
 - **[Architecture](docs/architecture.md)** — Principes, composants et organisation haut niveau
 - **[Sécurité](docs/security.md)** — Modèle de sécurité et isolation
