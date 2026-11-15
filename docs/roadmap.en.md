@@ -67,7 +67,7 @@ Future work.
 - default deny in memory (**in service**); admin network policy and admission of internal-registry images only in development (privilege on the node already removed there)
 - development clusters (in progress: isolation): one ephemeral virtual cluster per project, recreated from the forge by a workflow, packages through read-only relays in the airlock, one router key per project limited to the local model
 - encrypted volumes, full memory isolation
-- scheduled, encrypted backups, with a restore test (**in progress**: encrypted inside the cluster, a local copy and an external copy, databases every hour, timed restore test every week); two-factor authentication
+- scheduled, encrypted backups, with a restore test (**in progress**; recommended solutions: [sovereign backup and storage](security.en.md#backup-and-storage-sovereign-solutions)); two-factor authentication
 - review of the VPN filter for traffic translated by the cluster network (services' external addresses): in progress
 - update and vulnerability watch for pinned images
 - compliance (GDPR, AI Act, ISO 27001 aimed at "certifiable"): measured status, action plan, follow-up (designed, [Visualisation module](modules/visualisation/README.en.md))

@@ -107,13 +107,30 @@ This prevents malicious scripts and tracking mechanisms from entering the platfo
 - permanent chat and video calls without end-to-end encryption, a deliberate choice: a platform administrator can read the rooms; XMPP messaging refuses any encrypted message on the server side (in service, under acceptance testing); chat media have no backup;
 - tokens masked in the relays' access logs; model-router logs at `INFO`, never `DEBUG` (which would write every full request);
 - retention: the model router's detailed log and workflow history 30 days; object-storage trash 30 days; metrics 15 days; conversations and applications without automatic purge;
-- **scheduled backups: decided, being set up**, not in service yet. Chosen design: restic, encryption inside the cluster before anything is sent, two repositories — a local copy in a dedicated S3 bucket, and a copy on an external storage, pushed from the DMZ by a pod that does not know the key and can neither replace nor delete anything there. Databases go every hour, the rest every night (buckets, forge, messaging, Secrets), with one year of retention. Objectives: a database restored in 15 minutes, the server rebuilt in one day, at most one hour of data lost. Integrity check every night, timed restore test every week, alert when the last success is too old. Rebuilding in one day requires a cluster installation procedure, still to be written. Meanwhile, full manual backups before each operation; forge repositories each have **one** private mirror at an external host, checked every hour ([Visualisation module](modules/visualisation/README.en.md)); work happens in the forge only, and the default branch of public mirrors is protected against force-push and deletion, and some repositories never get one (transcripts of the coding-assistant sessions). In a professional setting, the external copy of sensitive repositories must be hosted in Europe;
+- **scheduled backups: being set up**, not in service yet; meanwhile, full manual backups before each operation. Rebuilding the server requires a cluster installation procedure, still to be written. The recommended solutions, for backups as for copies of the repositories, are described below ([Backup and Storage: Sovereign Solutions](#backup-and-storage-sovereign-solutions));
 - **minimisation of working notes**: the logs and plans read by coding assistants contain no child's first name and no sensitive data (health, schooling, address), only roles; a pre-commit hook rejects forbidden terms by their fingerprints (HMAC), without ever displaying them; history is not rewritten;
 - audit logging;
 - two-factor authentication: **target**;
 - encrypted volumes: **target**, not yet in place (unencrypted local volumes).
 
 Persistent data (vector databases, relational databases, repositories) lives on the server's local volumes; encryption at rest is still to be set up.
+
+---
+
+# Backup and Storage: Sovereign Solutions
+
+Data that leaves the installation must stay under its control: encrypted before it leaves, entrusted to a host subject to European law, through free software that can be replaced. Recommendations, to adapt to each installation:
+
+| Topic | Recommendation |
+|---|---|
+| Storage | **local first**: the platform's free object storage (S3-compatible) for files, memory and modules; each person's files in the office suite's file application (La Suite Drive, free software from the French State's digital suite); encrypted volumes at rest (target, see above) |
+| Encryption | **client-side**, inside the cluster, before anything is sent, by free backup software: restic, BorgBackup or Kopia (dated snapshots, deduplication, authenticated encryption). The host only sees encrypted blocks; the key is kept outside the platform, in several copies |
+| Copies | **3-2-1 rule**: three copies, on two media, one of them off-site. A local copy (a dedicated bucket of the object storage) to restore quickly; an off-site copy to survive the loss of the server or the premises |
+| Off-site copy | S3-compatible object storage at a host established in France or in the European Union, subject to the GDPR, preferably out of reach of extraterritorial laws; for sensitive data in a professional setting, an offer qualified **SecNumCloud** by ANSSI; or a second site under your control (another place, a small server) with free object storage (Garage, SeaweedFS) or an append-only backup server (restic's `rest-server` with `--append-only`, BorgBackup in `append-only` mode) |
+| Protecting the copy | pushed by an account that does not know the key and can **neither replace nor delete** (append-only, S3 object lock): a compromised platform does not destroy its backups |
+| Git repositories | included in the encrypted backup; a live copy, if wanted, on a **second free forge** (Forgejo, Gitea), on a site under your control or at a host in the European Union, through a push mirror. A mirror is not a backup: it copies deletions and force-pushes, cannot go back to a point in time, and is readable in clear by its host |
+| People's files | backed up with the rest, encrypted client-side; any copy to an outside service follows the same rules |
+| Checks | a backup only counts with an automatic check that alerts: integrity verified every night, timed restore test every week, alert when the last success is too old. Written objectives: time to restore a database and the server, amount of data one accepts to lose |
 
 ---
 
@@ -133,7 +150,7 @@ Persistent data (vector databases, relational databases, repositories) lives on 
 - egress control for the agents namespace;
 - access to the applications through the dashboard only, with an exception for the administrator;
 - update and vulnerability watch for pinned images (local scanner, update requests opened without automatic merge, report to the administrator);
-- scheduled, encrypted backups, with a restore test (in progress, see above);
+- scheduled, encrypted backups, with a restore test (in progress, see [sovereign solutions](#backup-and-storage-sovereign-solutions));
 - two-factor authentication for administration accounts and guardians;
 - mutual TLS between the dispatcher and executors;
 - encrypted volumes.

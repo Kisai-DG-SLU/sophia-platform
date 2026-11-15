@@ -107,13 +107,30 @@ Ce mécanisme empêche les scripts malveillants et les mécanismes de traçage d
 - chat permanent et visio sans chiffrement de bout en bout, choix assumé : un administrateur de la plateforme peut lire les salons ; la messagerie XMPP refuse côté serveur tout message chiffré (en service, en recette) ; les médias du chat n'ont pas de sauvegarde ;
 - jetons masqués dans les journaux d'accès des relais ; journaux du routeur de modèles en `INFO`, jamais en `DEBUG` (qui écrirait chaque requête entière) ;
 - rétention : journal détaillé du routeur de modèles et historique des workflows 30 jours ; corbeille du stockage objet 30 jours ; métrologie 15 jours ; conversations et applications sans purge automatique ;
-- **sauvegardes planifiées : décidées, en cours de mise en place**, pas encore en service. Conception retenue : restic, chiffrement dans le cluster avant tout envoi, deux dépôts — une copie locale dans un seau S3 dédié, et une copie sur un stockage externe, poussée depuis la DMZ par un pod qui ne connaît pas la clé et ne peut rien y remplacer ni supprimer. Les bases partent toutes les heures, le reste chaque nuit (seaux, forge, messagerie, Secrets), avec un an de rétention. Objectifs : une base restaurée en 15 minutes, le serveur reconstruit en une journée, au plus une heure de données perdues. Contrôle d'intégrité chaque nuit, essai de restauration chronométré chaque semaine, alerte si la dernière réussite est trop ancienne. La reconstruction en une journée suppose une procédure d'installation du cluster, encore à écrire. En attendant, des sauvegardes complètes manuelles avant chaque opération ; les dépôts de la forge ont chacun **un** miroir privé chez un hébergeur externe, contrôlé toutes les heures ([module Visualisation](modules/visualisation/README.md)) ; le travail se fait dans la forge seulement, et la branche par défaut des miroirs publics est protégée contre la poussée forcée et la suppression, et certains dépôts n'en ont jamais (transcripts des sessions d'assistance au code). Dans un cadre professionnel, la copie externe des dépôts sensibles doit être hébergée en Europe ;
+- **sauvegardes planifiées : en cours de mise en place**, pas encore en service ; en attendant, des sauvegardes complètes manuelles avant chaque opération. La reconstruction du serveur suppose une procédure d'installation du cluster, encore à écrire. Les solutions recommandées, pour la sauvegarde comme pour la copie des dépôts, sont décrites plus bas ([Sauvegarde et stockage : solutions souveraines](#sauvegarde-et-stockage--solutions-souveraines)) ;
 - **minimisation des notes de travail** : les suivis et plans lus par les assistants de code ne contiennent ni prénom d'enfant ni donnée sensible (santé, scolarité, adresse), mais des rôles ; un hook avant commit refuse les termes interdits par leurs empreintes (HMAC), sans jamais les afficher ; l'historique n'est pas réécrit ;
 - journalisation d'audit ;
 - double authentification : **cible** ;
 - volumes chiffrés : **cible**, pas encore en place (volumes locaux non chiffrés).
 
 Les données persistantes (bases vectorielles, bases relationnelles, dépôts) sont sur des volumes locaux du serveur ; leur chiffrement au repos est à mettre en place.
+
+---
+
+## Sauvegarde et stockage : solutions souveraines
+
+Une donnée qui quitte l'installation doit rester sous son contrôle : chiffrée avant de partir, confiée à un hébergeur soumis au droit européen, par des logiciels libres que l'on peut remplacer. Recommandations, à adapter à chaque installation :
+
+| Sujet | Recommandation |
+|---|---|
+| Stockage | **local d'abord** : le stockage objet libre de la plateforme (compatible S3) pour les fichiers, la mémoire et les modules ; les fichiers des personnes dans l'application de fichiers de la bureautique (La Suite Drive, logiciel libre de la suite numérique de l'État) ; volumes chiffrés au repos (cible, voir plus haut) |
+| Chiffrement | **côté client**, dans le cluster, avant tout envoi, par un logiciel libre de sauvegarde : restic, BorgBackup ou Kopia (instantanés datés, dédoublonnage, chiffrement authentifié). L'hébergeur ne voit que des blocs chiffrés ; la clé est gardée hors de la plateforme, en plusieurs exemplaires |
+| Copies | **règle 3-2-1** : trois copies, sur deux supports, dont une hors site. Une copie locale (un seau dédié du stockage objet) pour restaurer vite ; une copie hors site pour survivre à la perte du serveur ou du lieu |
+| Copie hors site | un stockage objet compatible S3 chez un hébergeur établi en France ou dans l'Union européenne, soumis au RGPD, de préférence hors de portée des lois extraterritoriales ; pour des données sensibles dans un cadre professionnel, une offre qualifiée **SecNumCloud** par l'ANSSI ; ou un second site maîtrisé (un autre lieu, un petit serveur) avec un stockage objet libre (Garage, SeaweedFS) ou un serveur de sauvegarde en ajout seul (`rest-server` de restic avec `--append-only`, BorgBackup en mode `append-only`) |
+| Protection de la copie | poussée par un compte qui ne connaît pas la clé et ne peut **ni remplacer ni supprimer** (ajout seul, verrou d'objet S3) : une plateforme compromise ne détruit pas ses sauvegardes |
+| Dépôts Git | inclus dans la sauvegarde chiffrée ; une copie vivante, si on en veut une, sur une **seconde forge libre** (Forgejo, Gitea), sur un site maîtrisé ou chez un hébergeur de l'Union européenne, par miroir en poussée. Un miroir n'est pas une sauvegarde : il recopie les suppressions et les poussées forcées, ne revient pas à un instant donné, et il est lisible en clair par son hébergeur |
+| Fichiers des personnes | sauvegardés avec le reste, chiffrés côté client ; toute copie vers un service extérieur suit les mêmes règles |
+| Contrôles | une sauvegarde n'est acquise qu'avec un contrôle automatique qui alerte : intégrité vérifiée chaque nuit, essai de restauration chronométré chaque semaine, alerte si la dernière réussite est trop ancienne. Des objectifs écrits : délai de restauration d'une base et du serveur, quantité de données que l'on accepte de perdre |
 
 ---
 
@@ -133,7 +150,7 @@ Les données persistantes (bases vectorielles, bases relationnelles, dépôts) s
 - contrôle des sorties du namespace des agents ;
 - accès aux applications par le dashboard seul, exception pour l'administrateur ;
 - veille des mises à jour et des failles des images figées (scanner local, demandes de mise à jour ouvertes sans fusion automatique, rapport à l'administrateur) ;
-- sauvegardes planifiées et chiffrées, avec essai de restauration (en cours, voir plus haut) ;
+- sauvegardes planifiées et chiffrées, avec essai de restauration (en cours, voir [solutions souveraines](#sauvegarde-et-stockage--solutions-souveraines)) ;
 - double authentification pour les comptes d'administration et les responsables ;
 - TLS mutuel entre le répartiteur et les exécutants ;
 - volumes chiffrés.
