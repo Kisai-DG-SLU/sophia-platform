@@ -1,0 +1,15 @@
+# Comptes de service sans aucun droit ni jeton monté. Le service mémoire ne lit rien du cluster ; la vérification
+# des jetons d'agents (TokenReview, system:auth-delegator) viendra avec la façade des agents, pas avant.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sophia-memoire
+  namespace: sophia-memory
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sophia-extraction
+  namespace: sophia-memory
+automountServiceAccountToken: false

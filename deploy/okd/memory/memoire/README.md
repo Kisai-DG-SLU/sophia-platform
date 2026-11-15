@@ -2,7 +2,7 @@
 
 La mémoire du foyer est un **service**, comme le modèle de langage : appelé par l'interface et par les agents, chacun avec ses droits, et **seul rédacteur** de la connaissance. Il reçoit les documents, en extrait le texte dans un pod isolé, les range en versions, les fait valider par une personne désignée, puis les rend cherchables. Le modèle de la connaissance est décrit dans la fiche [RAG 5D](../../../../docs/concepts/03-rag-5d.md) ; la page du dashboard qui l'utilise, dans le [dashboard](../../apps/chat-interface/README.md#page--mémoire-).
 
-**État dans l'installation de référence** : **en service**. Les étapes de mise en service ci-dessous ont toutes été faites, avec leurs deux épreuves conformes (politique du seau, isolement de l'extraction). La page « Mémoire » du dashboard est déployée ; le premier dépôt réel vient avec son contrôle de bout en bout. Le code du service n'est pas fourni ; ce document en donne le contrat, les règles et la recette.
+**État dans l'installation de référence** : **en service**. Les étapes de mise en service ci-dessous ont toutes été faites, avec leurs deux épreuves conformes (politique du seau, isolement de l'extraction). La page « Mémoire » du dashboard est déployée ; le premier dépôt réel vient avec son contrôle de bout en bout. Le code du service n'est pas fourni ; ce document en donne le contrat, les règles et la recette, manifestes compris ([Recette : fichiers et commandes](#recette--fichiers-et-commandes)).
 
 ## Où vit quoi (RAG 5D)
 
@@ -175,6 +175,220 @@ Ensuite : la copie de sauvegarde de la configuration S3 est supprimée ; le chat
 **Au premier dépôt réel**, l'administrateur relit, sans contenu, chemin ni identifiant de personne : les dernières lignes d'audit (`tentative`, puis `ecrit`), le registre (`en_attente`, original et texte présents, pas de commit) ; après validation, l'audit de la décision, le registre (`valide`, original présent, texte dans la forge, un identifiant de commit), le commit `document <id>, version 1` dans le dépôt du niveau, et le dernier envoi des miroirs.
 
 **Retour arrière**, étape par étape, depuis les sauvegardes : règles réseau par `oc diff` puis `apply` de la sauvegarde ; identités S3 depuis la copie gardée dans le cluster (relance du stockage) ; rôles PostgreSQL par `DROP OWNED BY` puis `DROP ROLE` (**supprime tout le registre** ; l'audit déjà écrit reste) ; mappeur d'audience dans la console. À savoir : une copie miroir supprimée chez l'hébergeur externe ne se retrouve pas, et, hors du miroir, le texte validé n'existe que dans la forge ; l'original reste dans S3, d'où le texte se ré-extrait.
+
+## Recette : fichiers et commandes
+
+Les manifestes de la zone, tels qu'ils tournent dans l'installation de référence, rendus génériques. Les noms des namespaces (`sophia-memory`, `sophia-core`, `sophia-identity`, `sophia-storage`, `sophia-git`, `sophia-interface`, `sophia-skills-build`) et des Services sont ceux de la plateforme : les règles d'entrée des voisins les nomment aussi. Les gabarits qui portent des `${…}` se rendent par `envsubst` **avec la liste explicite** de leurs variables : un script ou un SQL du bloc garde ainsi ses propres `$`.
+
+| Fichier | Namespace | Contenu |
+|---|---|---|
+| `00-build.yaml` | `sophia-skills-build` | ImageStreams du service et de la base Python (figée par empreinte), BuildConfig binaire sans déclencheur, droit de tirer l'image pour `sophia-memory` |
+| `01-comptes.yaml` | `sophia-memory` | comptes du service et de l'extraction, sans droit ni jeton monté |
+| `02-memoire.yaml` | `sophia-memory` | Deployment et Service du service mémoire ; ConfigMap de l'autorité de service d'OKD (TLS de la passerelle S3) |
+| `03-extraction.yaml` | `sophia-memory` | Deployment et Service de l'extraction : même image, sans Secret, sans jeton, sans sortie |
+| `04-network.yaml` | `sophia-memory` | refus par défaut en entrée et en sortie, puis une règle par flux |
+| `05-egressfirewall.yaml` | `sophia-memory` | seconde barrière de sortie : réseaux des pods et des Services du cluster, puis refus |
+| `06-seau.yaml` | `sophia-storage` | Job du seau `memoire` : versionnement, politique `ProtegerSeau` et `ProtegerValide`, aucun cycle de vie |
+| `07-forge-network.yaml` | `sophia-git` | entrée du seul pod du service sur la forge |
+| [`../qdrant/`](../qdrant/) | `sophia-memory` | volume dédié, base vectorielle avec clé d'API et télémétrie coupée, son Service |
+| `role-scram.py` | — | ordre `CREATE ROLE` avec un vérificateur SCRAM-SHA-256 calculé hors du serveur |
+| `essai-audit.sql`, `essai-registre.sql` | — | contrôle des droits des deux rôles, par TCP avec mot de passe |
+| `epreuve-seau.py`, `epreuve-extraction.py` | — | les deux épreuves, lancées dans les pods du service et de l'extraction |
+
+Les entrées de la zone chez les voisins sont déjà dans leurs fichiers : PostgreSQL ([`../../core/postgres18/03-network.yaml`](../../core/postgres18/03-network.yaml)), passerelle S3 ([`../../storage/03-network.yaml`](../../storage/03-network.yaml)), fournisseur d'identité ([`../../identity/02-network.yaml`](../../identity/02-network.yaml) et la liste de [`../../identity/03-keycloak.yaml`](../../identity/03-keycloak.yaml)). Le routeur de modèles admet déjà `sophia-memory` ([`../../core/litellm/network-policy.yaml`](../../core/litellm/network-policy.yaml)).
+
+Variables des gabarits et des commandes (les réglages lus par le service sont dans « Variables », plus bas) :
+
+| Variable | Rôle | Exemple |
+|---|---|---|
+| `${MEMOIRE_CODE_DIR}` | dossier du code du service dans son dépôt, envoyé au build | `services/memoire` |
+| `${MEMOIRE_IMAGE_DIGEST}` | empreinte de l'image construite, relue après le build | `sha256:…` |
+| `${IDP_HOST}` | nom public du fournisseur d'identité (émetteur des jetons) | `auth.apps.example.org` |
+| `${SERVICE_NETWORK}`, `${POD_NETWORK}` | réseaux des Services et des pods du cluster | `172.30.0.0/16`, `10.128.0.0/14` (défauts d'OKD) |
+| `${AWSCLI_VERSION}`, `${AWSCLI_DIGEST}` | image du client S3 du Job, comme pour le [stockage](../../storage/README.md) | `2.37.9`, `sha256:…` |
+| `${QDRANT_MOUNT_POINT}`, `${QDRANT_SIZE}` | point de montage du volume logique de la base vectorielle, et sa taille | `/var/mnt/qdrant`, `20Gi` |
+| `${NODE_NAME}` | nœud qui porte le volume local | `node-1` |
+| `${MEMOIRE_FORGEJO_COMPTE}` | compte du service dans la forge ; il ne peut pas porter le nom de l'organisation | `compte-memoire` |
+| `${MEMOIRE_FORGEJO_ORG}` | organisation des dépôts de niveau, celle que fixe le code du service | `memoire` |
+| `${FORGE_MAIL_DOMAIN}` | domaine de l'adresse de courriel exigée par la création d'un compte | `git.example.org` |
+
+Commandes depuis ce dossier. Chaque contrôle se relit avant l'étape suivante.
+
+**Étape 0 — Table d'audit commune** (lecture seule) :
+
+```bash
+oc -n sophia-core exec deploy/postgres-sophia-18 -- psql -d sophia_rag -c '\d sophia.audit_log'
+oc -n sophia-core exec deploy/postgres-sophia-18 -- psql -d sophia_rag -Atc 'select count(*) from sophia.tenants'
+```
+
+Attendu : les colonnes de la table, puis `1`.
+
+**Étape 1 — Image.** Rendu, contrôle, geste, puis le build du code commité seul :
+
+```bash
+envsubst '${MEMOIRE_CODE_DIR}' < 00-build.yaml | oc apply --dry-run=server -f -
+envsubst '${MEMOIRE_CODE_DIR}' < 00-build.yaml | oc apply -f -
+oc -n sophia-skills-build get istag python:3.13.17-slim-trixie
+git archive --format=tar.gz -o /tmp/sophia-memoire.tar.gz HEAD "${MEMOIRE_CODE_DIR}"
+oc -n sophia-skills-build start-build sophia-memoire --from-archive=/tmp/sophia-memoire.tar.gz --follow --wait
+oc -n sophia-skills-build get istag sophia-memoire:latest -o jsonpath='{.image.metadata.name}{"\n"}'
+```
+
+Attendu : quatre `created`, l'ImageStreamTag de la base (OKD importe l'image de l'architecture du nœud), `Push successful`, puis l'empreinte `sha256:…` de l'image : c'est `${MEMOIRE_IMAGE_DIGEST}`.
+
+**Étape 2 — Secrets et valideur** (`sophia-memory`). Aucun secret à l'écran ni dans une variable du terminal :
+
+```bash
+openssl rand -hex 32 | tr -d '\n' | oc -n sophia-memory create secret generic qdrant-cle --from-file=cle=/dev/stdin
+oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-memoire --modeles sophia-embedder --rpm 600 --dry-run < ../../core/litellm/create-virtual-key.py
+oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-memoire --modeles sophia-embedder --rpm 600 --tube < ../../core/litellm/create-virtual-key.py | oc -n sophia-memory create secret generic sophia-memoire-litellm --from-file=cle=/dev/stdin
+oc exec -i -n sophia-core deploy/litellm -- python3 - --info sophia-memoire < ../../core/litellm/create-virtual-key.py
+oc -n sophia-memory get secret sophia-memoire-litellm -o jsonpath='{.data.cle}' | base64 -d | sha256sum | cut -c1-12
+```
+
+Attendu : le Secret de la clé de la base vectorielle ; la clé du routeur, limitée à l'alias d'embedding et à 600 requêtes par minute ; puis la même empreinte des deux côtés. Si la création de la clé échoue, le shell crée quand même un Secret vide, que l'empreinte de la chaîne vide (`e3b0c44298fc`) trahit : le supprimer avant de recommencer.
+
+Le valideur est l'**identifiant technique** (UUID) d'un compte du fournisseur d'identité, lu dans sa console (fiche de l'utilisateur), jamais un prénom. L'installation de référence le lit par un script en lecture seule, à partir du nom de connexion, et l'envoie par un tube :
+
+```bash
+printf '%s' "<identifiant-technique>" | oc -n sophia-memory create configmap sophia-memoire-valideur --from-file=valideur=/dev/stdin
+oc -n sophia-memory get configmap sophia-memoire-valideur -o jsonpath='{.data.valideur}' | wc -c
+```
+
+Attendu : `36`. Une valeur vide ou mal formée arrête le service au démarrage, sans autre effet.
+
+**Étape 2 bis — PostgreSQL 18.** Le tenant de l'audit, refusé s'il n'y a pas exactement une ligne ; puis, pour chaque rôle, le Secret d'abord et le rôle par son vérificateur ensuite ; enfin le schéma et les droits :
+
+```bash
+oc -n sophia-core exec deploy/postgres-sophia-18 -- psql -d sophia_rag -Atc "select id from sophia.tenants" | python3 -c 'import sys, uuid; l = sys.stdin.read().split(); sys.exit("tenants : %d ligne(s), une seule exigée" % len(l)) if len(l) - 1 else print(uuid.UUID(l[0]), end="")' | oc -n sophia-memory create configmap sophia-memoire-audit-tenant --from-file=tenant=/dev/stdin
+openssl rand -hex 24 | tr -d '\n' | oc -n sophia-memory create secret generic sophia-memoire-audit --from-file=password=/dev/stdin && oc -n sophia-memory get secret sophia-memoire-audit -o jsonpath='{.data.password}' | base64 -d | python3 role-scram.py memoire_audit | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1
+openssl rand -hex 24 | tr -d '\n' | oc -n sophia-memory create secret generic sophia-memoire-registre --from-file=password=/dev/stdin && oc -n sophia-memory get secret sophia-memoire-registre -o jsonpath='{.data.password}' | base64 -d | python3 role-scram.py memoire | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1
+printf 'GRANT CONNECT ON DATABASE sophia_rag TO memoire_audit, memoire;\nGRANT USAGE ON SCHEMA sophia TO memoire_audit;\nGRANT INSERT ON sophia.audit_log TO memoire_audit;\nCREATE SCHEMA memoire AUTHORIZATION memoire;\n' | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- psql -d sophia_rag -v ON_ERROR_STOP=1
+```
+
+Attendu : la ConfigMap ; deux fois `vérificateur SCRAM-SHA-256 calculé localement` et `CREATE ROLE` ; trois `GRANT` et `CREATE SCHEMA`. Le contrôle passe **par le Service, donc avec mot de passe** (en local, le serveur peut être en `trust` et n'éprouverait rien) :
+
+```bash
+{ oc -n sophia-memory get secret sophia-memoire-audit -o jsonpath='{.data.password}' | base64 -d; echo; oc -n sophia-memory get configmap sophia-memoire-audit-tenant -o jsonpath='{.data.tenant}'; echo; cat essai-audit.sql; } | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- sh -c 'read -r PGPASSWORD; read -r T; export PGPASSWORD; psql -h postgres-sophia-18 -U memoire_audit -d sophia_rag -At -v t="$T" -f -'
+{ oc -n sophia-memory get secret sophia-memoire-registre -o jsonpath='{.data.password}' | base64 -d; echo; cat essai-registre.sql; } | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- sh -c 'read -r PGPASSWORD; export PGPASSWORD; psql -h postgres-sophia-18 -U memoire -d sophia_rag -At -f -'
+```
+
+Attendu : pour l'audit, `INSERT 0 1` puis `ROLLBACK`, puis cinq refus `permission denied` ; pour le registre, `CREATE TABLE` puis `ROLLBACK`, puis deux refus. L'entrée du service sur PostgreSQL : `oc diff`, puis `oc apply` de [`../../core/postgres18/03-network.yaml`](../../core/postgres18/03-network.yaml).
+
+**Étape 2 ter — Seau S3.** D'abord une copie de sauvegarde de la configuration des identités, **dans le cluster** (jamais sur le poste) ; puis le Secret du service ; puis l'identité `memoire` tirée de ce Secret, ajoutée à la configuration par des fichiers temporaires privés effacés dans le même bloc :
+
+```bash
+oc -n sophia-storage get secret s3-config -o json | python3 -c 'import json, sys; d = json.load(sys.stdin); d["metadata"] = {"name": "s3-config-avant-memoire", "namespace": d["metadata"]["namespace"]}; d.pop("status", None); print(json.dumps(d))' | oc create -f -
+{ printf 'cle='; openssl rand -hex 12; printf 'secret='; openssl rand -hex 24; } | oc -n sophia-memory create secret generic sophia-memoire-s3 --from-env-file=/dev/stdin
+( umask 077; T=$(mktemp -d); oc -n sophia-storage get secret s3-config -o jsonpath='{.data.s3\.json}' | base64 -d > "$T/s3.json" && oc -n sophia-memory get secret sophia-memoire-s3 -o json > "$T/memoire.json" && python3 -c 'import base64, json, sys; c = json.load(open(sys.argv[1])); d = json.load(open(sys.argv[2]))["data"]; k, s = (base64.b64decode(d[x]).decode() for x in ("cle", "secret")); assert len(k) == 24 and len(s) == 48, "clés inattendues"; noms = [i["name"] for i in c["identities"]]; assert "memoire" not in noms, "identité memoire déjà présente"; c["identities"].append({"name": "memoire", "credentials": [{"accessKey": k, "secretKey": s}], "actions": ["Read:memoire/*", "List:memoire", "Write:memoire/attente/*", "Write:memoire/valide/*"]}); json.dump(c, open(sys.argv[3], "w")); print("identités :", noms, "+ memoire")' "$T/s3.json" "$T/memoire.json" "$T/nouveau.json" && oc -n sophia-storage set data secret/s3-config --from-file=s3.json="$T/nouveau.json"; rm -rf "$T" )
+```
+
+Attendu : la copie, le Secret, puis la liste des identités suivie de `+ memoire` et `data updated`. Ensuite l'entrée du service sur la passerelle S3 ([`../../storage/03-network.yaml`](../../storage/03-network.yaml), `oc diff` puis `oc apply`), la relance du stockage, qui ne lit sa configuration qu'au démarrage (**elle coupe le service de fichiers environ une minute**), et le Job du seau :
+
+```bash
+oc -n sophia-storage rollout restart deploy/s3
+oc -n sophia-storage rollout status deploy/s3 --timeout=5m
+envsubst '${AWSCLI_VERSION} ${AWSCLI_DIGEST}' < 06-seau.yaml | oc apply -f -
+oc -n sophia-storage wait --for=condition=complete job/s3-init-memoire --timeout=5m
+oc -n sophia-storage logs job/s3-init-memoire
+```
+
+Attendu dans le journal : `"Status": "Enabled"`, une erreur `NoSuchLifecycleConfiguration` (aucun cycle de vie, c'est voulu), la politique avec `ProtegerSeau` et `ProtegerValide`, le seau `memoire` dans la liste.
+
+**Étape 2 quater — Forge.** Le compte du service, par la CLI de Forgejo dans son pod ; le mot de passe tiré au hasard est jeté, le compte ne s'en sert jamais :
+
+```bash
+oc -n sophia-git exec deploy/forgejo -- forgejo admin user create --username "${MEMOIRE_FORGEJO_COMPTE}" --email "${MEMOIRE_FORGEJO_COMPTE}@${FORGE_MAIL_DOMAIN}" --random-password --must-change-password=false > /dev/null
+```
+
+Puis, par l'API, avec un jeton **temporaire** d'administration (portées `write:admin`, `write:organization`, `write:repository`), lu depuis un fichier privé et supprimé à la fin dans l'interface :
+- `PATCH /admin/users/<compte>` : `restricted: true`, `max_repo_creation: 0`, `allow_create_organization: false`, `admin: false` ;
+- `POST /orgs` : l'organisation `${MEMOIRE_FORGEJO_ORG}`, privée, `repo_admin_change_team_access: false` ;
+- `POST /orgs/<organisation>/repos` : un dépôt privé par niveau, `auto_init`, branche `main` (noms fixés par la table du code) ;
+- `POST /orgs/<organisation>/teams` : une équipe en `write`, unité `repo.code` seule, `includes_all_repositories: false`, `can_create_org_repo: false` ; puis le compte comme membre et les dépôts de niveau.
+
+Le jeton du service, versé directement dans son Secret, et l'entrée du seul pod du service sur la forge :
+
+```bash
+oc -n sophia-git exec deploy/forgejo -- forgejo admin user generate-access-token --username "${MEMOIRE_FORGEJO_COMPTE}" --token-name sophia-memoire --scopes write:repository --raw | tr -d '\n' | oc -n sophia-memory create secret generic sophia-memoire-forgejo --from-file=jeton=/dev/stdin
+oc diff -f 07-forge-network.yaml
+oc apply -f 07-forge-network.yaml
+```
+
+Attendu : le Secret, dont la longueur est `40` ; le diff ne montre que l'entrée du service. Des miroirs vers un hébergeur externe s'ajoutent ici si l'installation en veut (voir « Limites »).
+
+**Étape 3 — Base vectorielle.** Pour une installation neuve, le volume dédié d'abord (volume logique XFS sur le nœud, comme pour [PostgreSQL 18](../../core/postgres18/README.md)), puis la base et son Service ; sinon, seulement la clé d'API (un redémarrage) :
+
+```bash
+envsubst '${QDRANT_MOUNT_POINT} ${QDRANT_SIZE} ${NODE_NAME}' < ../qdrant/01-volume.yaml | oc apply -f -
+oc diff -f ../qdrant/02-qdrant.yaml
+oc apply -f ../qdrant/02-qdrant.yaml
+oc -n sophia-memory rollout status deploy/qdrant --timeout=180s
+```
+
+Puis, dans un second terminal, le tunnel `oc -n sophia-memory port-forward svc/qdrant-svc 16333:6333`, et dans le premier :
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:16333/collections
+oc -n sophia-memory get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d | python3 ../qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin --apply
+```
+
+Attendu : `401` sans clé ; puis la collection et ses index (les 17 étiquettes et les trois du registre, `document`, `depot`, `rang`), `(créé)` pour ceux qui manquaient.
+
+**Étape 4 — Fournisseur d'identité.** L'audience personnalisée du service dans les jetons d'accès du client du chat ([`../../identity/`](../../identity/README.md#audiences-du-jeton-relayé-par-linterface)) :
+
+```bash
+python3 ../../identity/ajouter-mappeur-audience.py sophia-interface sophia-memoire --personnalisee --dry-run
+python3 ../../identity/ajouter-mappeur-audience.py sophia-interface sophia-memoire --personnalisee
+```
+
+Attendu : `ajouté`, puis `existe, non modifié` à la relance. L'entrée du service sur le fournisseur d'identité : `oc diff`, puis `oc apply` de `02-network.yaml` et du rendu de `03-keycloak.yaml` ; le pod du fournisseur garde son âge.
+
+**Étape 5 — Service, extraction, réseau :**
+
+```bash
+oc apply --dry-run=server -f 01-comptes.yaml
+envsubst '${MEMOIRE_IMAGE_DIGEST}' < 03-extraction.yaml | oc apply --dry-run=server -f -
+envsubst '${IDP_HOST} ${MEMOIRE_IMAGE_DIGEST}' < 02-memoire.yaml | oc apply --dry-run=server -f -
+oc apply --dry-run=server -f 04-network.yaml
+envsubst '${SERVICE_NETWORK} ${POD_NETWORK}' < 05-egressfirewall.yaml | oc apply --dry-run=server -f -
+```
+
+Attendu : treize `created (server dry run)` (2 comptes, 2 Deployments, 2 Services, 1 ConfigMap, 5 NetworkPolicies, 1 EgressFirewall). Puis les mêmes commandes sans `--dry-run=server`, et :
+
+```bash
+oc -n sophia-memory get egressfirewall default -o jsonpath='{.status.status}{"\n"}'
+oc -n sophia-memory rollout status deploy/sophia-extraction --timeout=180s
+oc -n sophia-memory rollout status deploy/sophia-memoire --timeout=180s
+```
+
+Attendu : `EgressFirewall Rules applied`, puis deux `successfully rolled out`. Le démarrage est lui-même une épreuve par le vrai chemin : le service ouvre ses deux connexions à PostgreSQL, vérifie que le rôle d'audit n'a qu'`INSERT` et crée le registre. Un pod en erreur signale un réglage ou un droit manquant ; son journal ne contient aucune valeur.
+
+**Étape 5 bis — Épreuve du seau**, avant tout dépôt :
+
+```bash
+oc -n sophia-memory exec -i deploy/sophia-memoire -- python3 - < epreuve-seau.py
+```
+
+Attendu : sous `valide/`, écrire permis, supprimer une version (simple et groupée) et poser un marqueur refusés, témoin toujours là ; versionnement, cycle de vie et politique refusés ; sous `attente/`, écrire et supprimer permis ; enfin `politique du seau : conforme`. Toute ligne `ÉCART` : s'arrêter et passer à deux seaux.
+
+**Étape 5 ter — L'embedding reste joignable par le routeur :**
+
+```bash
+oc -n sophia-core exec deploy/litellm -- python3 -c 'import urllib.request; print(urllib.request.urlopen("http://sophia-embedding-svc.sophia-memory.svc.cluster.local:8080/health", timeout=5).status)'
+```
+
+Attendu : `200`.
+
+**Étape 6 — Épreuve de l'isolement de l'extraction.** Les adresses à essayer sans DNS sont lues par `oc` au moment de l'épreuve :
+
+```bash
+oc -n sophia-memory exec -i deploy/sophia-extraction -- python3 - $(oc -n sophia-memory get svc qdrant-svc -o jsonpath='{.spec.clusterIP}:6333') $(oc -n sophia-memory get svc sophia-memoire -o jsonpath='{.spec.clusterIP}:8080') $(oc -n sophia-identity get svc sophia-keycloak-service -o jsonpath='{.spec.clusterIP}:8080') $(oc -n sophia-core get svc litellm-svc -o jsonpath='{.spec.clusterIP}:4000') $(oc -n sophia-core get svc postgres-sophia-18 -o jsonpath='{.spec.clusterIP}:5432') $(oc -n sophia-storage get svc s3 -o jsonpath='{.spec.clusterIP}:9000') $(oc -n sophia-git get svc forgejo-svc -o jsonpath='{.spec.clusterIP}:3000') $(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}:6443') $(oc -n default get svc kubernetes -o jsonpath='{.spec.clusterIP}:443') $(oc -n openshift-dns get svc dns-default -o jsonpath='{.spec.clusterIP}:53') < epreuve-extraction.py
+```
+
+Attendu : des noms de variables sans aucun nom sensible, aucun jeton monté, dix essais par adresse, chaque essai `injoignable : ok`, et `D2 : conforme`, en une minute environ.
+
+**Retour arrière**, étape par étape, à rebours : `oc delete` des manifestes de l'étape 5 (la zone se rouvre, à ne faire qu'en connaissance de cause) ; mappeur d'audience dans la console ; Deployment de la base vectorielle depuis sa sauvegarde, sans la clé ; règle `07-forge-network.yaml` depuis la règle sauvegardée, jeton et compte du service, organisation et dépôts (les textes validés y seraient perdus, hors miroir) ; identités S3 depuis `s3-config-avant-memoire` puis relance du stockage, Secret du service, et le seau, qui ne se supprime que vide, versions comprises ; rôles PostgreSQL par `DROP OWNED BY` puis `DROP ROLE` (**supprime tout le registre** ; l'audit déjà écrit reste) ; Secrets et ConfigMaps de l'étape 2, et la clé du routeur dans son interface d'administration ; enfin `00-build.yaml`. La copie `s3-config-avant-memoire` se supprime une fois l'étape 5 bis conforme.
 
 ## Variables
 

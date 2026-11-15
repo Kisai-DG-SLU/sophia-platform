@@ -34,7 +34,9 @@ Port 8080, sans authentification : le service ne doit être joignable que depuis
 | `00-namespace-guardrails.yaml` | quota du namespace sur les limits (8 CPU, 16 Gi, 10 pods) et valeurs par défaut des conteneurs |
 | `01-embedding-deployment.yaml` | Deployment du service ; valeurs par défaut entre `${…:-…}` |
 | `01-memory-metadata.sql` | schéma `sophia.memory_metadata` : métadonnées de chaque souvenir (propriétaire, type, projet, confidentialité, provenance, validation), à côté du point dans la base vectorielle. **Sans usage** depuis le service mémoire, dont le registre a son propre schéma ; à retirer ou à réaligner |
-| `qdrant-schema.py` | collection et index de payload de la base vectorielle ; idempotent, ne supprime ni ne modifie rien |
+| `qdrant-schema.py` | collection et index de payload de la base vectorielle, clé d'API lue sur l'entrée standard ; idempotent, ne supprime ni ne modifie rien |
+| [`qdrant/`](qdrant/) | base vectorielle : volume dédié (`01-volume.yaml`), Deployment avec clé d'API et télémétrie coupée, et son Service (`02-qdrant.yaml`) |
+| [`memoire/`](memoire/README.md) | service mémoire et extraction : build, comptes, Deployments, réseau de la zone, seau, entrée sur la forge, épreuves ([recette](memoire/README.md#recette--fichiers-et-commandes)) |
 
 ## Variables
 
@@ -57,7 +59,7 @@ Port 8080, sans authentification : le service ne doit être joignable que depuis
 
 ## Schéma de la collection vectorielle
 
-Une collection (1 024 dimensions, distance cosinus, celles du modèle d'embedding) et un index de payload par étiquette. Le schéma compte **18 étiquettes, sous leur nom français** ; 17 sont indexées :
+Une collection (1 024 dimensions, distance cosinus, celles du modèle d'embedding) et un index de payload par étiquette. Le schéma compte **18 étiquettes, sous leur nom français** ; 17 sont indexées, plus trois index du registre du service mémoire (`document`, `depot` en `keyword`, `rang` en `integer`) :
 
 | Type d'index | Étiquettes |
 |---|---|
@@ -68,7 +70,7 @@ Une collection (1 024 dimensions, distance cosinus, celles du modèle d'embeddin
 
 `source`, champ libre, n'est pas indexée. Qdrant n'impose pas de schéma : l'index accélère le filtre, il ne valide rien. La **validation des valeurs** (listes fermées, cohérence des dates) revient au service mémoire, seul rédacteur prévu.
 
-`qdrant-schema.py` (bibliothèque standard seule) lit d'abord, puis, avec `--apply`, crée ce qui manque. Un index déjà présent avec un autre type est signalé (code de sortie 1), jamais changé. Il s'arrête si la collection a d'autres dimensions.
+`qdrant-schema.py` (bibliothèque standard seule) lit d'abord, puis, avec `--apply`, crée ce qui manque. Un index déjà présent avec un autre type est signalé (code de sortie 1), jamais changé. Il s'arrête si la collection a d'autres dimensions. La base vectorielle exige une clé d'API : elle arrive par l'entrée standard (`--cle-stdin`), jamais par une variable du terminal ; sans elle, le script s'arrête sur le 401.
 
 ```bash
 oc -n ${SOPHIA_MEMORY_NAMESPACE} port-forward svc/${QDRANT_SERVICE} 16333:6333
@@ -77,11 +79,11 @@ oc -n ${SOPHIA_MEMORY_NAMESPACE} port-forward svc/${QDRANT_SERVICE} 16333:6333
 Dans un second terminal :
 
 ```bash
-python3 qdrant-schema.py --url http://127.0.0.1:16333
-python3 qdrant-schema.py --url http://127.0.0.1:16333 --apply
+oc -n ${SOPHIA_MEMORY_NAMESPACE} get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d | python3 qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin
+oc -n ${SOPHIA_MEMORY_NAMESPACE} get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d | python3 qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin --apply
 ```
 
-Attendu : la collection, puis 17 lignes `[à faire]` ; avec `--apply`, 17 lignes `(créé)` ; une relance ne change rien. Retour arrière, sans perte sur une collection vide : `DELETE /collections/<collection>/index/<champ>` pour chaque champ.
+Attendu : la collection, puis 20 lignes `[à faire]` ; avec `--apply`, 20 lignes `(créé)` ; une relance ne change rien. Retour arrière, sans perte sur une collection vide : `DELETE /collections/<collection>/index/<champ>` pour chaque champ.
 
 ## Accès par le routeur de modèles
 

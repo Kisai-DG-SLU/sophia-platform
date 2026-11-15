@@ -2,7 +2,7 @@
 
 The household's memory is a **service**, like the language model: called by the interface and by the agents, each with its own rights, and the **only writer** of knowledge. It receives documents, extracts their text in an isolated pod, stores them as versions, has them validated by a designated person, then makes them searchable. The knowledge model is described in the [RAG 5D](../../../../docs/concepts/03-rag-5d.en.md) page; the dashboard page that uses it, in the [dashboard](../../apps/chat-interface/README.en.md#memory-page).
 
-**State in the reference installation**: **in service**. All the rollout steps below have been done, with both their proofs passing (bucket policy, extraction isolation). The dashboard's "Memory" page is deployed; the first real deposit comes with its end-to-end check. The service code is not provided; this document gives its contract, its rules and its recipe.
+**State in the reference installation**: **in service**. All the rollout steps below have been done, with both their proofs passing (bucket policy, extraction isolation). The dashboard's "Memory" page is deployed; the first real deposit comes with its end-to-end check. The service code is not provided; this document gives its contract, its rules and its recipe, manifests included ([Recipe: files and commands](#recipe-files-and-commands)).
 
 ## What lives where (RAG 5D)
 
@@ -175,6 +175,220 @@ Then: the backup copy of the S3 configuration is deleted; the chat receives the 
 **At the first real deposit**, the administrator reads, without content, path or person identifier: the last audit lines (`tentative`, then `ecrit`), the registry (`en_attente`, original and text present, no commit); after validation, the decision's audit, the registry (`valide`, original present, text in the forge, a commit identifier), the commit `document <id>, version 1` in the level's repository, and the last mirror push.
 
 **Rollback**, step by step, from the backups: network rules by `oc diff` then `apply` of the backup; S3 identities from the copy kept in the cluster (storage restart); PostgreSQL roles by `DROP OWNED BY` then `DROP ROLE` (**deletes the whole registry**; audit already written remains); audience mapper in the console. Be aware: a mirror copy deleted at the external host cannot be recovered, and, apart from the mirror, the validated text exists only in the forge; the original stays in S3, from which the text can be re-extracted.
+
+## Recipe: files and commands
+
+The zone's manifests, as they run in the reference installation, made generic. The namespace names (`sophia-memory`, `sophia-core`, `sophia-identity`, `sophia-storage`, `sophia-git`, `sophia-interface`, `sophia-skills-build`) and the Service names are the platform's: the neighbours' ingress rules name them too. Templates that carry `${…}` are rendered by `envsubst` **with the explicit list** of their variables, so a script or SQL inside the block keeps its own `$`.
+
+| File | Namespace | Content |
+|---|---|---|
+| `00-build.yaml` | `sophia-skills-build` | ImageStreams of the service and of the Python base (pinned by digest), binary BuildConfig with no trigger, image pull right for `sophia-memory` |
+| `01-comptes.yaml` | `sophia-memory` | service and extraction accounts, with no rights and no mounted token |
+| `02-memoire.yaml` | `sophia-memory` | memory service Deployment and Service; ConfigMap of OKD's service certificate authority (TLS of the S3 gateway) |
+| `03-extraction.yaml` | `sophia-memory` | extraction Deployment and Service: same image, no Secret, no token, no egress |
+| `04-network.yaml` | `sophia-memory` | default deny on ingress and egress, then one rule per flow |
+| `05-egressfirewall.yaml` | `sophia-memory` | second egress barrier: cluster pod and Service networks, then deny |
+| `06-seau.yaml` | `sophia-storage` | Job of the `memoire` bucket: versioning, `ProtegerSeau` and `ProtegerValide` policy, no lifecycle |
+| `07-forge-network.yaml` | `sophia-git` | ingress of the service's pod alone on the forge |
+| [`../qdrant/`](../qdrant/) | `sophia-memory` | dedicated volume, vector database with API key and telemetry off, its Service |
+| `role-scram.py` | — | `CREATE ROLE` statement with a SCRAM-SHA-256 verifier computed outside the server |
+| `essai-audit.sql`, `essai-registre.sql` | — | check of both roles' rights, over TCP with a password |
+| `epreuve-seau.py`, `epreuve-extraction.py` | — | the two proofs, run inside the service and extraction pods |
+
+The zone's ingress entries at the neighbours are already in their files: PostgreSQL ([`../../core/postgres18/03-network.yaml`](../../core/postgres18/03-network.yaml)), S3 gateway ([`../../storage/03-network.yaml`](../../storage/03-network.yaml)), identity provider ([`../../identity/02-network.yaml`](../../identity/02-network.yaml) and the list in [`../../identity/03-keycloak.yaml`](../../identity/03-keycloak.yaml)). The model router already admits `sophia-memory` ([`../../core/litellm/network-policy.yaml`](../../core/litellm/network-policy.yaml)).
+
+Template and command variables (the settings read by the service are under "Variables", below):
+
+| Variable | Role | Example |
+|---|---|---|
+| `${MEMOIRE_CODE_DIR}` | directory of the service's code in its repository, sent to the build | `services/memoire` |
+| `${MEMOIRE_IMAGE_DIGEST}` | digest of the built image, read back after the build | `sha256:…` |
+| `${IDP_HOST}` | public name of the identity provider (token issuer) | `auth.apps.example.org` |
+| `${SERVICE_NETWORK}`, `${POD_NETWORK}` | cluster Service and pod networks | `172.30.0.0/16`, `10.128.0.0/14` (OKD defaults) |
+| `${AWSCLI_VERSION}`, `${AWSCLI_DIGEST}` | image of the Job's S3 client, as for [storage](../../storage/README.en.md) | `2.37.9`, `sha256:…` |
+| `${QDRANT_MOUNT_POINT}`, `${QDRANT_SIZE}` | mount point of the vector database's logical volume, and its size | `/var/mnt/qdrant`, `20Gi` |
+| `${NODE_NAME}` | node that holds the local volume | `node-1` |
+| `${MEMOIRE_FORGEJO_COMPTE}` | the service's account in the forge; it cannot bear the organisation's name | `compte-memoire` |
+| `${MEMOIRE_FORGEJO_ORG}` | organisation of the level repositories, the one set by the service's code | `memoire` |
+| `${FORGE_MAIL_DOMAIN}` | domain of the email address required to create an account | `git.example.org` |
+
+Commands from this directory. Each check is read before the next step.
+
+**Step 0 — Shared audit table** (read-only):
+
+```bash
+oc -n sophia-core exec deploy/postgres-sophia-18 -- psql -d sophia_rag -c '\d sophia.audit_log'
+oc -n sophia-core exec deploy/postgres-sophia-18 -- psql -d sophia_rag -Atc 'select count(*) from sophia.tenants'
+```
+
+Expected: the table's columns, then `1`.
+
+**Step 1 — Image.** Render, check, apply, then build the committed code only:
+
+```bash
+envsubst '${MEMOIRE_CODE_DIR}' < 00-build.yaml | oc apply --dry-run=server -f -
+envsubst '${MEMOIRE_CODE_DIR}' < 00-build.yaml | oc apply -f -
+oc -n sophia-skills-build get istag python:3.13.17-slim-trixie
+git archive --format=tar.gz -o /tmp/sophia-memoire.tar.gz HEAD "${MEMOIRE_CODE_DIR}"
+oc -n sophia-skills-build start-build sophia-memoire --from-archive=/tmp/sophia-memoire.tar.gz --follow --wait
+oc -n sophia-skills-build get istag sophia-memoire:latest -o jsonpath='{.image.metadata.name}{"\n"}'
+```
+
+Expected: four `created`, the base's ImageStreamTag (OKD imports the image for the node's architecture), `Push successful`, then the image digest `sha256:…`: that is `${MEMOIRE_IMAGE_DIGEST}`.
+
+**Step 2 — Secrets and validator** (`sophia-memory`). No secret on screen or in a terminal variable:
+
+```bash
+openssl rand -hex 32 | tr -d '\n' | oc -n sophia-memory create secret generic qdrant-cle --from-file=cle=/dev/stdin
+oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-memoire --modeles sophia-embedder --rpm 600 --dry-run < ../../core/litellm/create-virtual-key.py
+oc exec -i -n sophia-core deploy/litellm -- python3 - sophia-memoire --modeles sophia-embedder --rpm 600 --tube < ../../core/litellm/create-virtual-key.py | oc -n sophia-memory create secret generic sophia-memoire-litellm --from-file=cle=/dev/stdin
+oc exec -i -n sophia-core deploy/litellm -- python3 - --info sophia-memoire < ../../core/litellm/create-virtual-key.py
+oc -n sophia-memory get secret sophia-memoire-litellm -o jsonpath='{.data.cle}' | base64 -d | sha256sum | cut -c1-12
+```
+
+Expected: the vector database key's Secret; the router key, limited to the embedding alias and 600 requests per minute; then the same fingerprint on both sides. If the key creation fails, the shell still creates an empty Secret, betrayed by the empty string's fingerprint (`e3b0c44298fc`): delete it before trying again.
+
+The validator is the **technical identifier** (UUID) of an identity provider account, read in its console (the user's page), never a first name. The reference installation reads it with a read-only script, from the login name, and sends it through a pipe:
+
+```bash
+printf '%s' "<technical-identifier>" | oc -n sophia-memory create configmap sophia-memoire-valideur --from-file=valideur=/dev/stdin
+oc -n sophia-memory get configmap sophia-memoire-valideur -o jsonpath='{.data.valideur}' | wc -c
+```
+
+Expected: `36`. An empty or malformed value stops the service at startup, with no other effect.
+
+**Step 2 bis — PostgreSQL 18.** The audit tenant, refused unless there is exactly one row; then, for each role, the Secret first and the role by its verifier afterwards; finally the schema and the grants:
+
+```bash
+oc -n sophia-core exec deploy/postgres-sophia-18 -- psql -d sophia_rag -Atc "select id from sophia.tenants" | python3 -c 'import sys, uuid; l = sys.stdin.read().split(); sys.exit("tenants : %d ligne(s), une seule exigée" % len(l)) if len(l) - 1 else print(uuid.UUID(l[0]), end="")' | oc -n sophia-memory create configmap sophia-memoire-audit-tenant --from-file=tenant=/dev/stdin
+openssl rand -hex 24 | tr -d '\n' | oc -n sophia-memory create secret generic sophia-memoire-audit --from-file=password=/dev/stdin && oc -n sophia-memory get secret sophia-memoire-audit -o jsonpath='{.data.password}' | base64 -d | python3 role-scram.py memoire_audit | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1
+openssl rand -hex 24 | tr -d '\n' | oc -n sophia-memory create secret generic sophia-memoire-registre --from-file=password=/dev/stdin && oc -n sophia-memory get secret sophia-memoire-registre -o jsonpath='{.data.password}' | base64 -d | python3 role-scram.py memoire | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- psql -v ON_ERROR_STOP=1
+printf 'GRANT CONNECT ON DATABASE sophia_rag TO memoire_audit, memoire;\nGRANT USAGE ON SCHEMA sophia TO memoire_audit;\nGRANT INSERT ON sophia.audit_log TO memoire_audit;\nCREATE SCHEMA memoire AUTHORIZATION memoire;\n' | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- psql -d sophia_rag -v ON_ERROR_STOP=1
+```
+
+Expected: the ConfigMap; twice `vérificateur SCRAM-SHA-256 calculé localement` and `CREATE ROLE`; three `GRANT` and `CREATE SCHEMA`. The check goes **through the Service, hence with a password** (locally, the server may be in `trust` and would prove nothing):
+
+```bash
+{ oc -n sophia-memory get secret sophia-memoire-audit -o jsonpath='{.data.password}' | base64 -d; echo; oc -n sophia-memory get configmap sophia-memoire-audit-tenant -o jsonpath='{.data.tenant}'; echo; cat essai-audit.sql; } | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- sh -c 'read -r PGPASSWORD; read -r T; export PGPASSWORD; psql -h postgres-sophia-18 -U memoire_audit -d sophia_rag -At -v t="$T" -f -'
+{ oc -n sophia-memory get secret sophia-memoire-registre -o jsonpath='{.data.password}' | base64 -d; echo; cat essai-registre.sql; } | oc -n sophia-core exec -i deploy/postgres-sophia-18 -- sh -c 'read -r PGPASSWORD; export PGPASSWORD; psql -h postgres-sophia-18 -U memoire -d sophia_rag -At -f -'
+```
+
+Expected: for the audit, `INSERT 0 1` then `ROLLBACK`, then five `permission denied` refusals; for the registry, `CREATE TABLE` then `ROLLBACK`, then two refusals. The service's ingress on PostgreSQL: `oc diff`, then `oc apply` of [`../../core/postgres18/03-network.yaml`](../../core/postgres18/03-network.yaml).
+
+**Step 2 ter — S3 bucket.** First a backup copy of the identity configuration, **inside the cluster** (never on the workstation); then the service's Secret; then the `memoire` identity derived from that Secret, added to the configuration through private temporary files erased in the same block:
+
+```bash
+oc -n sophia-storage get secret s3-config -o json | python3 -c 'import json, sys; d = json.load(sys.stdin); d["metadata"] = {"name": "s3-config-avant-memoire", "namespace": d["metadata"]["namespace"]}; d.pop("status", None); print(json.dumps(d))' | oc create -f -
+{ printf 'cle='; openssl rand -hex 12; printf 'secret='; openssl rand -hex 24; } | oc -n sophia-memory create secret generic sophia-memoire-s3 --from-env-file=/dev/stdin
+( umask 077; T=$(mktemp -d); oc -n sophia-storage get secret s3-config -o jsonpath='{.data.s3\.json}' | base64 -d > "$T/s3.json" && oc -n sophia-memory get secret sophia-memoire-s3 -o json > "$T/memoire.json" && python3 -c 'import base64, json, sys; c = json.load(open(sys.argv[1])); d = json.load(open(sys.argv[2]))["data"]; k, s = (base64.b64decode(d[x]).decode() for x in ("cle", "secret")); assert len(k) == 24 and len(s) == 48, "clés inattendues"; noms = [i["name"] for i in c["identities"]]; assert "memoire" not in noms, "identité memoire déjà présente"; c["identities"].append({"name": "memoire", "credentials": [{"accessKey": k, "secretKey": s}], "actions": ["Read:memoire/*", "List:memoire", "Write:memoire/attente/*", "Write:memoire/valide/*"]}); json.dump(c, open(sys.argv[3], "w")); print("identités :", noms, "+ memoire")' "$T/s3.json" "$T/memoire.json" "$T/nouveau.json" && oc -n sophia-storage set data secret/s3-config --from-file=s3.json="$T/nouveau.json"; rm -rf "$T" )
+```
+
+Expected: the copy, the Secret, then the list of identities followed by `+ memoire` and `data updated`. Then the service's ingress on the S3 gateway ([`../../storage/03-network.yaml`](../../storage/03-network.yaml), `oc diff` then `oc apply`), the storage restart, since it only reads its configuration at startup (**it cuts the file service for about a minute**), and the bucket Job:
+
+```bash
+oc -n sophia-storage rollout restart deploy/s3
+oc -n sophia-storage rollout status deploy/s3 --timeout=5m
+envsubst '${AWSCLI_VERSION} ${AWSCLI_DIGEST}' < 06-seau.yaml | oc apply -f -
+oc -n sophia-storage wait --for=condition=complete job/s3-init-memoire --timeout=5m
+oc -n sophia-storage logs job/s3-init-memoire
+```
+
+Expected in the log: `"Status": "Enabled"`, a `NoSuchLifecycleConfiguration` error (no lifecycle, on purpose), the policy with `ProtegerSeau` and `ProtegerValide`, the `memoire` bucket in the list.
+
+**Step 2 quater — Forge.** The service's account, through Forgejo's CLI in its pod; the random password is thrown away, the account never uses it:
+
+```bash
+oc -n sophia-git exec deploy/forgejo -- forgejo admin user create --username "${MEMOIRE_FORGEJO_COMPTE}" --email "${MEMOIRE_FORGEJO_COMPTE}@${FORGE_MAIL_DOMAIN}" --random-password --must-change-password=false > /dev/null
+```
+
+Then, through the API, with a **temporary** administration token (scopes `write:admin`, `write:organization`, `write:repository`), read from a private file and deleted at the end in the web interface:
+- `PATCH /admin/users/<account>`: `restricted: true`, `max_repo_creation: 0`, `allow_create_organization: false`, `admin: false`;
+- `POST /orgs`: the organisation `${MEMOIRE_FORGEJO_ORG}`, private, `repo_admin_change_team_access: false`;
+- `POST /orgs/<organisation>/repos`: one private repository per level, `auto_init`, `main` branch (names set by the code's table);
+- `POST /orgs/<organisation>/teams`: a `write` team, `repo.code` unit only, `includes_all_repositories: false`, `can_create_org_repo: false`; then the account as a member, and the level repositories.
+
+The service's token, poured straight into its Secret, and the ingress of the service's pod alone on the forge:
+
+```bash
+oc -n sophia-git exec deploy/forgejo -- forgejo admin user generate-access-token --username "${MEMOIRE_FORGEJO_COMPTE}" --token-name sophia-memoire --scopes write:repository --raw | tr -d '\n' | oc -n sophia-memory create secret generic sophia-memoire-forgejo --from-file=jeton=/dev/stdin
+oc diff -f 07-forge-network.yaml
+oc apply -f 07-forge-network.yaml
+```
+
+Expected: the Secret, of length `40`; the diff only shows the service's ingress. Mirrors to an external host are added here if the installation wants them (see "Limits to be aware of").
+
+**Step 3 — Vector database.** For a new installation, the dedicated volume first (XFS logical volume on the node, as for [PostgreSQL 18](../../core/postgres18/README.en.md)), then the database and its Service; otherwise only the API key (one restart):
+
+```bash
+envsubst '${QDRANT_MOUNT_POINT} ${QDRANT_SIZE} ${NODE_NAME}' < ../qdrant/01-volume.yaml | oc apply -f -
+oc diff -f ../qdrant/02-qdrant.yaml
+oc apply -f ../qdrant/02-qdrant.yaml
+oc -n sophia-memory rollout status deploy/qdrant --timeout=180s
+```
+
+Then, in a second terminal, the tunnel `oc -n sophia-memory port-forward svc/qdrant-svc 16333:6333`, and in the first one:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:16333/collections
+oc -n sophia-memory get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d | python3 ../qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin --apply
+```
+
+Expected: `401` without a key; then the collection and its indexes (the 17 tags and the registry's three, `document`, `depot`, `rang`), `(créé)` for those that were missing.
+
+**Step 4 — Identity provider.** The service's custom audience in the access tokens of the chat's client ([`../../identity/`](../../identity/README.en.md#audiences-of-the-token-relayed-by-the-interface)):
+
+```bash
+python3 ../../identity/ajouter-mappeur-audience.py sophia-interface sophia-memoire --personnalisee --dry-run
+python3 ../../identity/ajouter-mappeur-audience.py sophia-interface sophia-memoire --personnalisee
+```
+
+Expected: `ajouté`, then `existe, non modifié` when replayed. The service's ingress on the identity provider: `oc diff`, then `oc apply` of `02-network.yaml` and of the rendered `03-keycloak.yaml`; the provider's pod keeps its age.
+
+**Step 5 — Service, extraction, network:**
+
+```bash
+oc apply --dry-run=server -f 01-comptes.yaml
+envsubst '${MEMOIRE_IMAGE_DIGEST}' < 03-extraction.yaml | oc apply --dry-run=server -f -
+envsubst '${IDP_HOST} ${MEMOIRE_IMAGE_DIGEST}' < 02-memoire.yaml | oc apply --dry-run=server -f -
+oc apply --dry-run=server -f 04-network.yaml
+envsubst '${SERVICE_NETWORK} ${POD_NETWORK}' < 05-egressfirewall.yaml | oc apply --dry-run=server -f -
+```
+
+Expected: thirteen `created (server dry run)` (2 accounts, 2 Deployments, 2 Services, 1 ConfigMap, 5 NetworkPolicies, 1 EgressFirewall). Then the same commands without `--dry-run=server`, and:
+
+```bash
+oc -n sophia-memory get egressfirewall default -o jsonpath='{.status.status}{"\n"}'
+oc -n sophia-memory rollout status deploy/sophia-extraction --timeout=180s
+oc -n sophia-memory rollout status deploy/sophia-memoire --timeout=180s
+```
+
+Expected: `EgressFirewall Rules applied`, then two `successfully rolled out`. Startup is itself a proof through the real path: the service opens its two connections to PostgreSQL, checks that the audit role only has `INSERT`, and creates the registry. A pod in error points to a missing setting or right; its log contains no value.
+
+**Step 5 bis — Bucket proof**, before any deposit:
+
+```bash
+oc -n sophia-memory exec -i deploy/sophia-memoire -- python3 - < epreuve-seau.py
+```
+
+Expected: under `valide/`, writing allowed, deleting a version (single and batch) and placing a delete marker refused, witness still there; versioning, lifecycle and policy refused; under `attente/`, writing and deleting allowed; finally `politique du seau : conforme`. Any `ÉCART` line: stop and switch to two buckets.
+
+**Step 5 ter — Embedding still reachable by the router:**
+
+```bash
+oc -n sophia-core exec deploy/litellm -- python3 -c 'import urllib.request; print(urllib.request.urlopen("http://sophia-embedding-svc.sophia-memory.svc.cluster.local:8080/health", timeout=5).status)'
+```
+
+Expected: `200`.
+
+**Step 6 — Extraction isolation proof.** The addresses to try without DNS are read by `oc` at proof time:
+
+```bash
+oc -n sophia-memory exec -i deploy/sophia-extraction -- python3 - $(oc -n sophia-memory get svc qdrant-svc -o jsonpath='{.spec.clusterIP}:6333') $(oc -n sophia-memory get svc sophia-memoire -o jsonpath='{.spec.clusterIP}:8080') $(oc -n sophia-identity get svc sophia-keycloak-service -o jsonpath='{.spec.clusterIP}:8080') $(oc -n sophia-core get svc litellm-svc -o jsonpath='{.spec.clusterIP}:4000') $(oc -n sophia-core get svc postgres-sophia-18 -o jsonpath='{.spec.clusterIP}:5432') $(oc -n sophia-storage get svc s3 -o jsonpath='{.spec.clusterIP}:9000') $(oc -n sophia-git get svc forgejo-svc -o jsonpath='{.spec.clusterIP}:3000') $(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}:6443') $(oc -n default get svc kubernetes -o jsonpath='{.spec.clusterIP}:443') $(oc -n openshift-dns get svc dns-default -o jsonpath='{.spec.clusterIP}:53') < epreuve-extraction.py
+```
+
+Expected: variable names with no sensitive name, no mounted token, ten tries by address, each try `injoignable : ok`, and `D2 : conforme`, in about a minute.
+
+**Rollback**, step by step, in reverse: `oc delete` of the step 5 manifests (the zone reopens, only do it knowingly); audience mapper in the console; vector database Deployment from its backup, without the key; `07-forge-network.yaml` rule from the saved rule, the service's token and account, organisation and repositories (validated texts would be lost there, outside a mirror); S3 identities from `s3-config-avant-memoire` then storage restart, the service's Secret, and the bucket, which can only be deleted empty, versions included; PostgreSQL roles by `DROP OWNED BY` then `DROP ROLE` (**deletes the whole registry**; audit already written stays); step 2 Secrets and ConfigMaps, and the router key in its administration interface; finally `00-build.yaml`. The `s3-config-avant-memoire` copy is deleted once step 5 bis is compliant.
 
 ## Variables
 

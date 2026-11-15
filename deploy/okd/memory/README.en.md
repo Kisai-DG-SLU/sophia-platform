@@ -34,7 +34,9 @@ Port 8080, without authentication: the service must only be reachable from the r
 | `00-namespace-guardrails.yaml` | namespace quota on limits (8 CPU, 16 Gi, 10 pods) and container defaults |
 | `01-embedding-deployment.yaml` | service Deployment; defaults inside `${…:-…}` |
 | `01-memory-metadata.sql` | `sophia.memory_metadata` schema: metadata of each memory item (owner, type, project, confidentiality, provenance, validation), next to the point in the vector database. **Unused** since the memory service, whose registry has its own schema; to be removed or realigned |
-| `qdrant-schema.py` | collection and payload indexes of the vector database; idempotent, deletes or changes nothing |
+| `qdrant-schema.py` | collection and payload indexes of the vector database, API key read from standard input; idempotent, deletes or changes nothing |
+| [`qdrant/`](qdrant/) | vector database: dedicated volume (`01-volume.yaml`), Deployment with API key and telemetry off, and its Service (`02-qdrant.yaml`) |
+| [`memoire/`](memoire/README.en.md) | memory service and extraction: build, accounts, Deployments, zone network, bucket, forge ingress, proofs ([recipe](memoire/README.en.md#recipe-files-and-commands)) |
 
 ## Variables
 
@@ -57,7 +59,7 @@ Port 8080, without authentication: the service must only be reachable from the r
 
 ## Vector collection schema
 
-One collection (1,024 dimensions, cosine distance, those of the embedding model) and one payload index per tag. The schema has **18 tags, under their French names**; 17 are indexed:
+One collection (1,024 dimensions, cosine distance, those of the embedding model) and one payload index per tag. The schema has **18 tags, under their French names**; 17 are indexed, plus three indexes of the memory service's registry (`document`, `depot` as `keyword`, `rang` as `integer`):
 
 | Index type | Tags |
 |---|---|
@@ -68,7 +70,7 @@ One collection (1,024 dimensions, cosine distance, those of the embedding model)
 
 `source`, a free field, is not indexed. Qdrant enforces no schema: the index speeds up filtering, it validates nothing. **Value validation** (closed lists, date consistency) belongs to the memory service, the only planned writer.
 
-`qdrant-schema.py` (standard library only) reads first, then, with `--apply`, creates what is missing. An index already present with another type is reported (exit code 1), never changed. It stops if the collection has other dimensions.
+`qdrant-schema.py` (standard library only) reads first, then, with `--apply`, creates what is missing. An index already present with another type is reported (exit code 1), never changed. It stops if the collection has other dimensions. The vector database requires an API key: it comes through standard input (`--cle-stdin`), never through a terminal variable; without it, the script stops on the 401.
 
 ```bash
 oc -n ${SOPHIA_MEMORY_NAMESPACE} port-forward svc/${QDRANT_SERVICE} 16333:6333
@@ -77,11 +79,11 @@ oc -n ${SOPHIA_MEMORY_NAMESPACE} port-forward svc/${QDRANT_SERVICE} 16333:6333
 In a second terminal:
 
 ```bash
-python3 qdrant-schema.py --url http://127.0.0.1:16333
-python3 qdrant-schema.py --url http://127.0.0.1:16333 --apply
+oc -n ${SOPHIA_MEMORY_NAMESPACE} get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d | python3 qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin
+oc -n ${SOPHIA_MEMORY_NAMESPACE} get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d | python3 qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin --apply
 ```
 
-Expected: the collection, then 17 `[à faire]` lines; with `--apply`, 17 `(créé)` lines; running it again changes nothing. Rollback, lossless on an empty collection: `DELETE /collections/<collection>/index/<field>` for each field.
+Expected: the collection, then 20 `[à faire]` lines; with `--apply`, 20 `(créé)` lines; running it again changes nothing. Rollback, lossless on an empty collection: `DELETE /collections/<collection>/index/<field>` for each field.
 
 ## Access through the model router
 

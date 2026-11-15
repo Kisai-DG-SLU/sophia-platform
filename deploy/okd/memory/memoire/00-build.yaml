@@ -1,0 +1,67 @@
+# Image du service mémoire et du service d'extraction : une image, deux commandes. Construite dans le namespace
+# des builds des serveurs MCP (sophia-skills-build), dont la sortie est limitée aux index de paquets ; aucun
+# RoleBinding vers un agent : le service reçoit les jetons des personnes, aucun agent ne doit pouvoir changer son build.
+# Aucun déclencheur : un build se lance à la main, après revue du code. Entrée : une archive du code commité seul
+# (« git archive HEAD <dossier du service> »), sans sous-module.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: sophia-memoire
+  namespace: sophia-skills-build
+---
+# Base du Containerfile, importée par l'API et figée par empreinte d'index ; servie par le registre interne
+# (referencePolicy Local) : le pod de build n'a pas à joindre le registre public.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: python
+  namespace: sophia-skills-build
+spec:
+  tags:
+    - name: 3.13.17-slim-trixie
+      from:
+        kind: DockerImage
+        name: docker.io/library/python@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
+      referencePolicy:
+        type: Local
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: sophia-memoire
+  namespace: sophia-skills-build
+spec:
+  source:
+    type: Binary
+    binary: {}
+    contextDir: ${MEMOIRE_CODE_DIR}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+      # Remplace le FROM du Containerfile (même image, même empreinte) par l'ImageStreamTag ci-dessus
+      from:
+        kind: ImageStreamTag
+        name: python:3.13.17-slim-trixie
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  output:
+    to:
+      kind: ImageStreamTag
+      name: sophia-memoire:latest
+---
+# Les pods de sophia-memory tirent l'image de sophia-skills-build.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sophia-memory-image-puller
+  namespace: sophia-skills-build
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:serviceaccounts:sophia-memory

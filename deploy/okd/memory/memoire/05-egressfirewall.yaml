@@ -1,0 +1,20 @@
+# Sortie de sophia-memory : seconde barrière derrière les NetworkPolicy (04-network.yaml). Rien ne sort du réseau
+# du cluster, même si une règle s'ouvrait par erreur. Toutes les sorties prévues visent des pods ou des Services
+# (DNS, base vectorielle, extraction, routeur de modèles, fournisseur d'identité, PostgreSQL, S3, forge).
+# Aucune vers un nœud : ni l'API du cluster (la vérification des jetons d'agents l'ajoutera, avec une règle
+# nodeSelector sur le plan de contrôle, port 6443), ni Internet.
+# Les builds ne se font pas dans ce namespace (sophia-skills-build).
+# Rendu par envsubst, avec la seule liste des variables SERVICE_NETWORK et POD_NETWORK (README.md).
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: sophia-memory
+spec:
+  egress:
+    - type: Allow
+      to: { cidrSelector: ${SERVICE_NETWORK} }
+    - type: Allow
+      to: { cidrSelector: ${POD_NETWORK} }
+    - type: Deny
+      to: { cidrSelector: 0.0.0.0/0 }

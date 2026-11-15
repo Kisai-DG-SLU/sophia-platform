@@ -1,0 +1,63 @@
+# Service d'extraction : lit les fichiers déposés dans un pod qui n'a ni Secret, ni variable sensible, ni jeton de
+# compte de service, ni sortie réseau (04-network.yaml), et ne partage pas les processus du service mémoire.
+# Seul le service mémoire peut l'appeler.
+# Rendu par envsubst, avec la seule variable MEMOIRE_IMAGE_DIGEST (README.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-extraction
+  namespace: sophia-memory
+  labels: { app: sophia-extraction }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: sophia-extraction }
+  template:
+    metadata:
+      labels: { app: sophia-extraction }
+    spec:
+      priorityClassName: sophia-agents
+      serviceAccountName: sophia-extraction
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: extraction
+          # Même image que le service mémoire (même empreinte), autre commande.
+          image: image-registry.openshift-image-registry.svc:5000/sophia-skills-build/sophia-memoire@${MEMOIRE_IMAGE_DIGEST}
+          imagePullPolicy: IfNotPresent
+          command: ["python", "service_extraction.py"]
+          ports:
+            - { name: http, containerPort: 8081 }
+          env:
+            - { name: PORT, value: "8081" }
+          # Deux sous-processus de 512 Mio au plus, deux fichiers de 50 Mio en mémoire.
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 1536Mi }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-extraction
+  namespace: sophia-memory
+  labels: { app: sophia-extraction }
+spec:
+  selector: { app: sophia-extraction }
+  ports:
+    - { name: http, port: 8081, targetPort: http }

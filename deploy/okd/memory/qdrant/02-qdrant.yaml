@@ -1,0 +1,68 @@
+# Base vectorielle (Qdrant) : image figée par empreinte (index multi-architecture de v1.13.4), volume dédié
+# (01-volume.yaml), Recreate (volume local RWO : jamais deux pods), classe de priorité des agents.
+# Clé d'API exigée pour toute requête, sauf /, /healthz, /readyz et /livez (liste blanche de Qdrant v1.13.4) :
+# les sondes restent valables. Télémétrie coupée.
+# Mémoire : 2 Gi au plus ; avec des vecteurs en mémoire, la limite tombe vers 400 000 segments. Au-delà, vecteurs
+# sur disque (on_disk) ou quantification int8.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  namespace: sophia-memory
+  labels: { app: qdrant, component: vector-store }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: qdrant }
+  template:
+    metadata:
+      labels: { app: qdrant, component: vector-store }
+    spec:
+      priorityClassName: sophia-agents
+      enableServiceLinks: false
+      containers:
+        - name: qdrant
+          image: docker.io/qdrant/qdrant:v1.13.4@sha256:318c11b72aaab96b36e9662ad244de3cabd0653a1b942d4e8191f18296c81af0
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: QDRANT__STORAGE__SNAPSHOTS_PATH, value: /qdrant/storage/snapshots }
+            - { name: QDRANT__STORAGE__PERFORMANCE__ASYNC_SCORER, value: "true" }
+            # Secret qdrant-cle créé avant l'apply (README.md du service mémoire, étape 2).
+            - name: QDRANT__SERVICE__API_KEY
+              valueFrom: { secretKeyRef: { name: qdrant-cle, key: cle } }
+            # Aucune sortie : pas de télémétrie vers l'éditeur (la NetworkPolicy la bloquerait de toute façon).
+            - { name: QDRANT__TELEMETRY_DISABLED, value: "true" }
+          ports:
+            - { name: http, containerPort: 6333, protocol: TCP }
+            - { name: grpc, containerPort: 6334, protocol: TCP }
+          readinessProbe:
+            httpGet: { path: /readyz, port: 6333 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /livez, port: 6333 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          volumeMounts:
+            - { name: storage, mountPath: /qdrant/storage }
+      volumes:
+        - name: storage
+          persistentVolumeClaim: { claimName: qdrant-data }
+---
+# Relevé dans le cluster de l'installation de référence (le Service n'y était pas versionné).
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-svc
+  namespace: sophia-memory
+  labels: { app: qdrant }
+spec:
+  type: ClusterIP
+  selector: { app: qdrant }
+  ports:
+    - { name: http, port: 6333, targetPort: 6333, protocol: TCP }
+    - { name: grpc, port: 6334, targetPort: 6334, protocol: TCP }

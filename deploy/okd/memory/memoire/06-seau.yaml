@@ -1,0 +1,66 @@
+# Seau memoire du service mémoire (originaux et textes des versions), par l'API S3 (rejouable), avec l'identité admin
+# du Secret s3-admin. VERSIONNÉ, SANS cycle de vie : aucune version ne disparaît d'elle-même. Deux préfixes : attente/
+# (version en attente, effaçable par le service) et valide/ (versions validées). La politique interdit à l'identité
+# memoire de défaire le versionnement, la politique, le cycle de vie, la CORS ou le verrouillage, et toute
+# suppression sous valide/. Pas de CORS : seul le service y accède.
+# Un seul seau suffit si le stockage évalue la politique clé par clé, suppression groupée comprise : l'épreuve
+# (epreuve-seau.py, depuis le pod du service) l'exige avant tout dépôt ; sinon, deux seaux.
+# Même namespace et mêmes règles réseau que le Job d'initialisation du stockage (../../storage/05-init-job.yaml).
+# Rejouer : supprimer le Job s3-init-memoire, puis l'appliquer de nouveau.
+# Rendu par envsubst, avec la seule liste des variables AWSCLI_VERSION et AWSCLI_DIGEST (README.md).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-init-memoire
+  namespace: sophia-storage
+  # app: s3-init : mêmes règles réseau que le Job du stockage (../../storage/03-network.yaml)
+  labels: { app: s3-init }
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: s3-init }
+    spec:
+      enableServiceLinks: false
+      restartPolicy: Never
+      containers:
+        - name: init
+          image: docker.io/amazon/aws-cli:${AWSCLI_VERSION}@${AWSCLI_DIGEST}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              A="aws --endpoint-url https://s3.sophia-storage.svc:9000"
+              $A s3api head-bucket --bucket memoire 2>/dev/null || $A s3api create-bucket --bucket memoire
+              $A s3api put-bucket-versioning --bucket memoire --versioning-configuration Status=Enabled
+              $A s3api put-bucket-policy --bucket memoire --policy '{"Version":"2012-10-17","Statement":[{"Sid":"ProtegerSeau","Effect":"Deny","Principal":{"AWS":["arn:aws:iam::*:user/memoire"]},"Action":["s3:PutBucketVersioning","s3:PutBucketCors","s3:DeleteBucketCors","s3:PutBucketLifecycleConfiguration","s3:PutLifecycleConfiguration","s3:DeleteBucketLifecycle","s3:PutBucketPolicy","s3:DeleteBucketPolicy","s3:PutBucketObjectLockConfiguration","s3:DeleteBucket"],"Resource":["arn:aws:s3:::memoire","arn:aws:s3:::memoire/*"]},{"Sid":"ProtegerValide","Effect":"Deny","Principal":{"AWS":["arn:aws:iam::*:user/memoire"]},"Action":["s3:DeleteObject","s3:DeleteObjectVersion"],"Resource":["arn:aws:s3:::memoire/valide/*"]}]}'
+              echo "versioning (Enabled attendu) :"; $A s3api get-bucket-versioning --bucket memoire
+              echo "cycle de vie (aucun attendu) :"; $A s3api get-bucket-lifecycle-configuration --bucket memoire 2>&1 | tail -1
+              echo "politique :"; $A s3api get-bucket-policy --bucket memoire
+              echo "seaux :"; $A s3api list-buckets --query 'Buckets[].Name' --output text
+          env:
+            - { name: HOME, value: /tmp }
+            - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+            - { name: AWS_CA_BUNDLE, value: /etc/ca/service-ca.crt }
+            - { name: AWS_REQUEST_CHECKSUM_CALCULATION, value: when_required }
+            - { name: AWS_RESPONSE_CHECKSUM_VALIDATION, value: when_required }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: s3-admin, key: access-key } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: s3-admin, key: secret-key } }
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: ca, mountPath: /etc/ca, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: ca
+          configMap: { name: service-ca }
+        - name: tmp
+          emptyDir: {}

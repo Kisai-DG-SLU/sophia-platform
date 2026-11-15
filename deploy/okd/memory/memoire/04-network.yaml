@@ -1,0 +1,141 @@
+# Réseau de sophia-memory : refus par défaut en entrée et en sortie, puis une règle par flux.
+# Avant de l'appliquer, faire l'inventaire de ce qui joint la zone (README.md, « Réseau de la zone ») : dans
+# l'installation de référence, des agents recevaient l'adresse de la base vectorielle et de l'embedding sans s'en
+# servir, et une ingestion suspendue écrivait en direct dans la base vectorielle.
+# Les sondes du kubelet ne sont pas concernées (OVN-Kubernetes les admet).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: refus-par-defaut
+  namespace: sophia-memory
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Base vectorielle : le service mémoire seul.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qdrant-depuis-memoire
+  namespace: sophia-memory
+spec:
+  podSelector:
+    matchLabels: { app: qdrant }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: sophia-memoire }
+      ports:
+        - { protocol: TCP, port: 6333 }
+---
+# Embedding : le routeur de modèles seul (alias d'embedding).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: embedding-depuis-litellm
+  namespace: sophia-memory
+spec:
+  podSelector:
+    matchLabels: { app: sophia-embedding }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: litellm }
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+# Service mémoire : entrée du chat (pod app=sophia-interface) ; les agents viendront avec leur façade.
+# Sorties : DNS, base vectorielle, extraction, routeur de modèles (vecteurs), fournisseur d'identité (clés du realm),
+# PostgreSQL 18 (audit et registre), passerelle S3 (seau de la mémoire) et forge (textes validés).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: memoire
+  namespace: sophia-memory
+spec:
+  podSelector:
+    matchLabels: { app: sophia-memoire }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-interface }
+          podSelector:
+            matchLabels: { app: sophia-interface }
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - podSelector:
+            matchLabels: { app: qdrant }
+      ports:
+        - { protocol: TCP, port: 6333 }
+    - to:
+        - podSelector:
+            matchLabels: { app: sophia-extraction }
+      ports:
+        - { protocol: TCP, port: 8081 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: litellm }
+      ports:
+        - { protocol: TCP, port: 4000 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-identity }
+          podSelector:
+            matchLabels: { app: keycloak }
+      ports:
+        - { protocol: TCP, port: 8080 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: postgres-sophia-18 }
+      ports:
+        - { protocol: TCP, port: 5432 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-storage }
+          podSelector:
+            matchLabels: { app: s3 }
+      ports:
+        - { protocol: TCP, port: 8443 }
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-git }
+          podSelector:
+            matchLabels: { app: forgejo }
+      ports:
+        - { protocol: TCP, port: 3000 }
+---
+# Extraction : le service mémoire seul en entrée ; aucune sortie, pas même le DNS (refus-par-defaut).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: extraction-depuis-memoire
+  namespace: sophia-memory
+spec:
+  podSelector:
+    matchLabels: { app: sophia-extraction }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: sophia-memoire }
+      ports:
+        - { protocol: TCP, port: 8081 }

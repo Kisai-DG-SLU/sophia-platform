@@ -5,10 +5,12 @@ Un index par étiquette du schéma de la mémoire, sous son nom français. Idemp
 ce qui manque, ne supprime ni ne modifie rien. Un champ déjà indexé avec un autre type est signalé
 (code de sortie 1), jamais changé. Bibliothèque standard seule.
 
-Par un tunnel vers le Service de Qdrant :
+Par un tunnel vers le Service de Qdrant. La clé d'API arrive par l'entrée standard (--cle-stdin),
+jamais par une variable du terminal :
     oc -n ${SOPHIA_MEMORY_NAMESPACE} port-forward svc/${QDRANT_SERVICE} 16333:6333
-    python3 qdrant-schema.py --url http://127.0.0.1:16333            (lecture seule)
-    python3 qdrant-schema.py --url http://127.0.0.1:16333 --apply
+    oc -n ${SOPHIA_MEMORY_NAMESPACE} get secret qdrant-cle -o jsonpath='{.data.cle}' | base64 -d \
+        | python3 qdrant-schema.py --url http://127.0.0.1:16333 --cle-stdin      (lecture seule)
+    (même commande avec --apply pour créer ce qui manque)
 """
 import argparse
 import json
@@ -38,13 +40,18 @@ INDEX = {
     "date_maj": "datetime",
     "date_validation": "datetime",
     "date_expiration": "datetime",
+    # Dépôt de documents par le service mémoire : morceaux d'un document et de son lot.
+    "document": "keyword",
+    "depot": "keyword",
+    "rang": "integer",
 }
+CLE = None
 
 
 def appel(base, methode, chemin, corps=None):
     req = urllib.request.Request(base.rstrip("/") + chemin, method=methode,
                                  data=None if corps is None else json.dumps(corps).encode(),
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json", **({"api-key": CLE} if CLE else {})})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.status, json.load(r)
@@ -53,13 +60,18 @@ def appel(base, methode, chemin, corps=None):
 
 
 def main():
-    global COLLECTION
+    global COLLECTION, CLE
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--url", required=True)
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--collection", default=COLLECTION)
+    ap.add_argument("--cle-stdin", action="store_true", help="clé d'API de Qdrant lue sur l'entrée standard")
     a = ap.parse_args()
     COLLECTION = a.collection
+    if a.cle_stdin:
+        CLE = sys.stdin.read().strip()
+        if not CLE:
+            sys.exit("--cle-stdin : clé vide")
     code, info = appel(a.url, "GET", f"/collections/{COLLECTION}")
     if code == 404:
         print(f"[à faire] collection {COLLECTION} {VECTEURS}")
@@ -77,6 +89,8 @@ def main():
             sys.exit(f"collection {COLLECTION} : vecteurs {v}, attendu {VECTEURS} — arrêt, rien n'est modifié")
         print(f"✓ collection {COLLECTION} : {v}, {r.get('points_count')} points")
         existant = r.get("payload_schema") or {}
+    elif code == 401:
+        sys.exit("Qdrant : HTTP 401, clé d'API absente ou fausse (--cle-stdin)")
     else:
         sys.exit(f"Qdrant : HTTP {code}")
     ecarts = 0

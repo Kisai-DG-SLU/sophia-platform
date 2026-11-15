@@ -1,0 +1,38 @@
+# Volume dédié de la base vectorielle. Préalable sur le nœud (README.md) : volume logique XFS dédié, monté par
+# fstab sur ${QDRANT_MOUNT_POINT}, étiqueté container_file_t. Extensible à chaud (lvextend -r).
+# PV local lié à ce seul PVC (claimRef), Retain : supprimer le PV ne touche pas aux données.
+# Rendu par envsubst, avec la seule liste des variables QDRANT_MOUNT_POINT, QDRANT_SIZE et NODE_NAME.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sophia-qdrant-lv
+  labels: { app: qdrant }
+spec:
+  capacity: { storage: "${QDRANT_SIZE}" }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  local:
+    path: ${QDRANT_MOUNT_POINT}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: ["${NODE_NAME}"] }
+  claimRef:
+    namespace: sophia-memory
+    name: qdrant-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-data
+  namespace: sophia-memory
+  labels: { app: qdrant }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-storage
+  volumeName: pv-sophia-qdrant-lv
+  resources:
+    requests: { storage: "${QDRANT_SIZE}" }

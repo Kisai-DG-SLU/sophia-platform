@@ -1,0 +1,20 @@
+# Entrée du service mémoire sur la forge (textes validés de la mémoire). À part des applications.
+# Seul le pod du service mémoire entre, pas tout son namespace. Dans l'installation de référence, elle a remplacé,
+# sous le même nom, une règle posée à la main qui admettait tout sophia-memory.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-memory
+  namespace: sophia-git
+spec:
+  podSelector:
+    matchLabels: { app: forgejo }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-memory }
+          podSelector:
+            matchLabels: { app: sophia-memoire }
+      ports:
+        - { protocol: TCP, port: 3000 }

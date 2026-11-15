@@ -1,0 +1,117 @@
+# Service mémoire : seul rédacteur de la mémoire, appelé par le chat avec le jeton de la personne.
+# Une réplique : les verrous par personne et le sémaphore des envois sont en mémoire.
+# Prérequis (README.md) : Secrets qdrant-cle, sophia-memoire-litellm, sophia-memoire-audit, sophia-memoire-registre,
+# sophia-memoire-s3 et sophia-memoire-forgejo ; ConfigMaps sophia-memoire-valideur et sophia-memoire-audit-tenant.
+# Rendu par envsubst, avec la seule liste des variables IDP_HOST et MEMOIRE_IMAGE_DIGEST (README.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sophia-memoire
+  namespace: sophia-memory
+  labels: { app: sophia-memoire }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: sophia-memoire }
+  template:
+    metadata:
+      labels: { app: sophia-memoire }
+    spec:
+      priorityClassName: sophia-agents
+      serviceAccountName: sophia-memoire
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: memoire
+          # Image du build de 00-build.yaml, figée par empreinte : reportée ici après le build, avant l'apply.
+          image: image-registry.openshift-image-registry.svc:5000/sophia-skills-build/sophia-memoire@${MEMOIRE_IMAGE_DIGEST}
+          imagePullPolicy: IfNotPresent
+          command: ["python", "app.py"]
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: PORT, value: "8080" }
+            # Émetteur public, comparé au jeton ; clés du realm par l'adresse interne du fournisseur d'identité.
+            - { name: OIDC_ISSUER, value: "https://${IDP_HOST}/realms/sophia" }
+            - name: JWKS_URL
+              value: http://sophia-keycloak-service.sophia-identity.svc.cluster.local:8080/realms/sophia/protocol/openid-connect/certs
+            - { name: AZP_PERMIS, value: sophia-interface }
+            - { name: QDRANT_URL, value: "http://qdrant-svc.sophia-memory.svc.cluster.local:6333" }
+            - name: QDRANT_CLE
+              valueFrom: { secretKeyRef: { name: qdrant-cle, key: cle } }
+            - { name: LITELLM_URL, value: "http://litellm-svc.sophia-core.svc.cluster.local:4000" }
+            - name: LITELLM_CLE
+              valueFrom: { secretKeyRef: { name: sophia-memoire-litellm, key: cle } }
+            - { name: EXTRACTION_URL, value: "http://sophia-extraction.sophia-memory.svc.cluster.local:8081" }
+            # Identifiant technique du seul valideur (UUID du fournisseur d'identité, jamais un prénom).
+            - name: VALIDEUR
+              valueFrom: { configMapKeyRef: { name: sophia-memoire-valideur, key: valideur } }
+            # PostgreSQL 18 : deux rôles. memoire_audit n'a qu'INSERT sur sophia.audit_log (vérifié au démarrage) ;
+            # memoire est propriétaire du schéma memoire (registre des documents et des versions).
+            - { name: PG_HOST, value: postgres-sophia-18.sophia-core.svc.cluster.local }
+            - { name: PG_BASE, value: sophia_rag }
+            - { name: PG_AUDIT_ROLE, value: memoire_audit }
+            - name: PG_AUDIT_MOT_DE_PASSE
+              valueFrom: { secretKeyRef: { name: sophia-memoire-audit, key: password } }
+            - { name: PG_REGISTRE_ROLE, value: memoire }
+            - name: PG_REGISTRE_MOT_DE_PASSE
+              valueFrom: { secretKeyRef: { name: sophia-memoire-registre, key: password } }
+            # Le seul tenant de sophia.tenants (ConfigMap remplie par un tube, une ligne exigée).
+            - name: AUDIT_TENANT
+              valueFrom: { configMapKeyRef: { name: sophia-memoire-audit-tenant, key: tenant } }
+            # Seau S3 (SeaweedFS) : attente/ effaçable par le service, valide/ protégé par la politique.
+            - { name: S3_URL, value: "https://s3.sophia-storage.svc:9000" }
+            - { name: S3_CA, value: /etc/ca/service-ca.crt }
+            - name: S3_CLE
+              valueFrom: { secretKeyRef: { name: sophia-memoire-s3, key: cle } }
+            - name: S3_SECRET
+              valueFrom: { secretKeyRef: { name: sophia-memoire-s3, key: secret } }
+            # Forge : une organisation privée, un dépôt par niveau, écrits par ce seul compte.
+            - { name: FORGEJO_URL, value: "http://forgejo-svc.sophia-git.svc.cluster.local:3000" }
+            - name: FORGEJO_JETON
+              valueFrom: { secretKeyRef: { name: sophia-memoire-forgejo, key: jeton } }
+          volumeMounts:
+            - { name: service-ca, mountPath: /etc/ca, readOnly: true }
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+      volumes:
+        # Autorité de service d'OKD (TLS de la passerelle S3), injectée par le cluster dans la ConfigMap ci-dessous.
+        - name: service-ca
+          configMap: { name: sophia-memoire-service-ca }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sophia-memoire-service-ca
+  namespace: sophia-memory
+  labels: { app: sophia-memoire }
+  annotations: { service.beta.openshift.io/inject-cabundle: "true" }
+---
+# Joignable par le seul chat (04-network.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: sophia-memoire
+  namespace: sophia-memory
+  labels: { app: sophia-memoire }
+spec:
+  selector: { app: sophia-memoire }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
