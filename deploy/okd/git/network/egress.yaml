@@ -6,10 +6,10 @@ metadata:
 spec:
   egress:
   - to:
-      dnsName: github.com
+      dnsName: ${FORGE_MIROIR_DNS}   # Copie hors site des dépôts par miroir : une seconde forge, sur un site maîtrisé ou chez un hébergeur de l'UE
     type: Allow
   - to:
-      dnsName: smtp.gmail.com
+      dnsName: ${FORGE_SMTP_DNS}     # Relais SMTP des notifications de la forge
     type: Allow
   - to:
       cidrSelector: 172.30.0.0/16 # Autorise la communication avec les autres services OKD
