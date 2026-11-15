@@ -123,7 +123,7 @@ When several applications need the same data (customers, invoices, payments rece
 - every piece of data read from another application goes through a deterministic check; a non-compliant row is set aside and counted, never corrected;
 - an application keeps its own data in its own database.
 
-In service for the business applications (customers, invoicing, finances). Planned on the same model: a shared household database (places, later the members), written by the dashboard and read by the modules. Recipe: [PostgreSQL 18](../deploy/okd/core/postgres18/README.en.md#shared-database-of-a-domain).
+In service for the business applications (customers, invoicing, finances) and for the household: the shared household database holds the places, written by the dashboard and read by the modules (the Cooking module reads the residence there), and the Cooking module's data, which publishes its views there. Planned on the same model: the household members. Recipe: [PostgreSQL 18](../deploy/okd/core/postgres18/README.en.md#shared-database-of-a-domain).
 
 ---
 

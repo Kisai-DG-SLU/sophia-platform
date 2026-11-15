@@ -96,7 +96,7 @@ Une brique n'est dite déployée que si elle tourne **et** que sa recette reprod
 | Courses | Déployé | choix des produits selon les règles du foyer, panier express ; affichage dans le dashboard en recette | [Courses](modules/courses/README.md) |
 | Visualisation | Déployé | état mesuré de chaque composant, contrôle horaire des miroirs des dépôts ; pour l'administrateur | [Visualisation](modules/visualisation/README.md) |
 | Applications de gestion (clients, facturation, finances) | Déployé | base commune par domaine, sans API ni copie entre elles | [données partagées](architecture.md#données-partagées-entre-applications) |
-| Base commune du foyer (lieux, plus tard les membres) | Prévu | écrite par le dashboard, lue par les modules | [données partagées](architecture.md#données-partagées-entre-applications) |
+| Base commune du foyer (lieux, module Cuisine ; plus tard les membres) | Déployé | lieux écrits par le dashboard et lus par les modules ; données et vues publiées du module Cuisine | [données partagées](architecture.md#données-partagées-entre-applications) |
 | Courrier | En cours | affichage dans le dashboard en recette | [feuille de route](roadmap.md) |
 | Développement assisté (vibe coding) | En cours | étude : maquettes visuelles des projets de chacun, suivi des agents | [développement assisté](development/opencode-workflow.md) |
 

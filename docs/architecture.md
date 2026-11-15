@@ -123,7 +123,7 @@ Quand plusieurs applications ont besoin des mêmes données (clients, factures, 
 - chaque donnée lue d'un autre passe un contrôle déterministe ; une ligne non conforme est écartée et comptée, jamais corrigée ;
 - une application garde ses données propres dans sa propre base.
 
-En service pour les applications de gestion (clients, facturation, finances). Prévu sur le même modèle : une base commune du foyer (lieux, plus tard les membres), écrite par le dashboard et lue par les modules. Recette : [PostgreSQL 18](../deploy/okd/core/postgres18/README.md#base-commune-dun-domaine).
+En service pour les applications de gestion (clients, facturation, finances) et pour le foyer : la base commune du foyer porte les lieux, écrits par le dashboard et lus par les modules (le module Cuisine y lit la résidence), et les données du module Cuisine, qui y publie ses vues. Prévu sur le même modèle : les membres du foyer. Recette : [PostgreSQL 18](../deploy/okd/core/postgres18/README.md#base-commune-dun-domaine).
 
 ---
 
