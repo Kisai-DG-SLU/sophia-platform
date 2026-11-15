@@ -5,6 +5,7 @@ Every Route presents a **Let's Encrypt certificate** obtained through **DNS-01**
 | Choice | Value | Reason |
 |---|---|---|
 | Issuance | cert-manager, ACME Let's Encrypt, DNS-01 | nothing exposed; wildcard possible |
+| Version | cert-manager **1.21.3**, official static manifest, checksum verified before any apply | only the last two minor versions are maintained, and only they cover the cluster's version |
 | Scope | one certificate: `*.apps` + names outside the wildcard, as the router's default certificate | a single item to renew, no Route to change |
 | Renewal | automatic, 30 days before expiry (90 days) | no manual operation |
 | Names | **public** A records pointing to the server's **VPN address** | no local DNS server to maintain; without the VPN, the address is unreachable |
@@ -33,6 +34,17 @@ Every Route presents a **Let's Encrypt certificate** obtained through **DNS-01**
    Rollback: `oc patch ingresscontroller default -n openshift-ingress-operator --type=json -p '[{"op":"remove","path":"/spec/defaultCertificate"}]'`.
 6. **Names**: at the DNS provider, A records (not proxied, short TTL) pointing to the server's VPN address, for `*.apps`, the names outside the wildcard and the cluster API.
 7. **Devices**: one WireGuard peer per device, `AllowedIPs` limited to the VPN network, "always on" connection on phones and tablets. Server, adding devices and node-side filtering: `../host/wireguard/`.
+
+## Upgrading cert-manager
+
+Done on 15/11 in the reference installation, from 1.14.4 to 1.21.3, without interrupting ingress.
+
+1. **One minor version at a time**, at the latest patch of each (official path): 1.15.5, 1.16.5, 1.17.4, 1.18.6, 1.19.6 (never 1.19.0, which reissues certificates for no reason), 1.20.5, 1.21.3.
+2. **Before**: back up the objects outside any repository (issuers' Secrets included); router certificate `READY True`; no challenge in progress; CRDs stored in `v1` (`status.storedVersions`).
+3. **At each version**: manifest downloaded, compared with its SHA-256 checksum measured beforehand (the static manifest is not signed), `--dry-run=server`, apply, three deployments ready, server-side dry run of a Certificate (webhook and cainjector answer), router certificate still ready.
+4. **After**: test issuance on the staging issuer, then cleanup: `apply` prunes nothing, and the RBAC objects added in 1.16, renamed in 1.19 then removed in 1.21, stay orphaned until deleted.
+
+The router's Secret is not owned by the Certificate: even with cert-manager stopped, the router keeps serving the current certificate until it expires.
 
 ## Verification
 
