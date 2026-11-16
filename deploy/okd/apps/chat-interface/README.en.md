@@ -17,7 +17,7 @@ Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversati
 
 | File | Role |
 |---|---|
-| `Containerfile` | UBI 9 minimal, system nginx and python3, arbitrary UID (OpenShift), logs to stdout/stderr; Python 3.12 and the conversation API's dependencies (same image, sidecar container) |
+| `Containerfile` | UBI 9 minimal (9.8, pinned by digest), system nginx and python3, arbitrary UID (OpenShift), logs to stdout/stderr; Python 3.12 and the conversation API's dependencies (same image, sidecar container) |
 | `entrypoint.sh` | renders the configuration, refreshes prices in the background (every 30 s while the router is unreachable, then every 10 min), runs nginx in the foreground |
 | `render-config.py` | injects the router key and the voice key into `nginx.conf` (mode 600), never printed; rejects a malformed key; without a voice key, falls back to the pod's key and says so |
 | `render-pricing.py` | reads the router's prices server-side and writes `pricing.json` (atomic write) for cost display in the front |

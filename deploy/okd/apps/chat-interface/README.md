@@ -17,7 +17,7 @@ Navigateur → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ API des
 
 | Fichier | Rôle |
 |---|---|
-| `Containerfile` | UBI 9 minimal, nginx et python3 du système, UID arbitraire (OpenShift), journaux sur stdout/stderr ; Python 3.12 et dépendances de l'API des discussions (même image, conteneur voisin) |
+| `Containerfile` | UBI 9 minimal (9.8, figée par empreinte), nginx et python3 du système, UID arbitraire (OpenShift), journaux sur stdout/stderr ; Python 3.12 et dépendances de l'API des discussions (même image, conteneur voisin) |
 | `entrypoint.sh` | rendu de la configuration, tarifs relus en tâche de fond (30 s tant que le routeur ne répond pas, puis 10 min), nginx au premier plan |
 | `render-config.py` | injecte la clé du routeur et la clé de la voix dans `nginx.conf` (mode 600), jamais affichées ; refuse une clé mal formée ; sans clé de voix, reprend la clé du pod et l'annonce |
 | `render-pricing.py` | lit les tarifs du routeur côté serveur et écrit `pricing.json` (écriture atomique) pour le calcul du coût dans le front |

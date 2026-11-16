@@ -28,6 +28,11 @@ spec:
     dockerStrategy: { dockerfilePath: Containerfile.sd }
   output:
     to: { kind: ImageStreamTag, name: "sophia-image-sd:latest" }
+  # Compilation C++ de stable-diffusion.cpp en 8 tâches : 8 CPU, 2 Gio par tâche. Sans ces valeurs, le pod de build
+  # reçoit celles du LimitRange de sophia-apps (par exemple 2 CPU, 4 Gio) et le compilateur est tué faute de mémoire.
+  resources:
+    requests: { cpu: "2", memory: 4Gi }
+    limits: { cpu: "8", memory: 16Gi }
   runPolicy: Serial
   successfulBuildsHistoryLimit: 2
   failedBuildsHistoryLimit: 2
