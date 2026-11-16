@@ -14,8 +14,8 @@ agents ───────────────────────┴�
 | File | Content |
 |---|---|
 | `00-searxng.yaml` | SearXNG metasearch: selected engines, JSON output, private instance (no limiter), moderate SafeSearch, strict for protected users (per request) |
-| `01-sophia-web.yaml` | `sophia-web` MCP + REST server: ImageStream and BuildConfig in the applications namespace, Deployment and Service in the airlock |
-| `02-network.yaml` | NetworkPolicies: deny by default; Internet egress on 80/443 outside private ranges, DNS; ingress to `sophia-web` from the interface, the agents and the Cooking module only; SearXNG reachable from `sophia-web` only |
+| `01-sophia-web.yaml` | `sophia-web` MCP + REST server: ImageStream and BuildConfig in the applications namespace, Deployment (`sophia-web` and `cook` containers) and Service in the airlock |
+| `02-network.yaml` | NetworkPolicies: deny by default; Internet egress on 80/443 outside private ranges, DNS; ingress to `sophia-web` from the interface, the agents and the Cooking module only, and to its port 8001 from the Cooking module alone; SearXNG reachable from `sophia-web` only |
 
 ## The `sophia-web` service
 
@@ -38,6 +38,17 @@ Interface-side rules: search is triggered by default for any information request
 - every 3 hours, the service preloads D to D+3 for each municipality and keeps the last successful answer, **in memory only**: nothing links a municipality to a person, neither on disk nor in a log;
 - if the online source fails, the cached forecast is returned with the time it was obtained, so that the answer says so;
 - the time zone database is a pinned dependency, checked at build time.
+
+**Downloads for the Cooking module** (in service): a second application of the same service, in a separate container of the pod, on **port 8001**. A NetworkPolicy (`sophia-web-cook-ingress`) lets only the Cooking module in; port 8000, used by the chat and the agents, does not have these routes, and no model sees them.
+
+| REST (port 8001) | Role |
+|---|---|
+| `POST /telecharger` | downloads a **public PDF**: recognised by its first bytes (`%PDF-`), whatever type is announced; 10 MB at most, reading stopped beyond |
+| `POST /liens` | returns the links of an HTML page: 2 MB at most, read without executing anything, absolute http(s) addresses, 300 at most |
+
+- **Closed list of exact host names**, chosen by the installation (ConfigMap `sophia-web-cook`, key `hotes`, comma-separated); missing or empty, everything is refused. It is checked at **every** redirect hop (3 at most).
+- Same network guard as `fetch_page`: https only, no internal address, connection to the checked address.
+- No file written, nothing logged; a refusal carries a reason from a closed list.
 
 ## Procedure (administrator)
 

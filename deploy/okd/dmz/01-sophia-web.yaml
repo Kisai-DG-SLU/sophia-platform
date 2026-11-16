@@ -39,7 +39,7 @@ metadata:
   namespace: sophia-dmz
   labels: { app: sophia-web }
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-web:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sophia-web\")].image"}]'
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"sophia-web:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sophia-web\")].image"},{"from":{"kind":"ImageStreamTag","name":"sophia-web:latest","namespace":"sophia-apps"},"fieldPath":"spec.template.spec.containers[?(@.name==\"cook\")].image"}]'
 spec:
   replicas: 1
   selector: { matchLabels: { app: sophia-web } }
@@ -70,6 +70,28 @@ spec:
           resources:
             requests: { cpu: 20m, memory: 320Mi }
             limits: { cpu: "1", memory: 768Mi }
+        # Téléchargement pour le module Cuisine (routes /telecharger et /liens), sur le port 8001, que seule la
+        # NetworkPolicy sophia-web-cook-ingress (02-network.yaml) laisse entrer, depuis le module Cuisine.
+        # Même image, autre application (cook:app) : le port 8000 n'a pas ces routes, aucun modèle ne les voit.
+        - name: cook
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/sophia-web:latest
+          command: [python3.12, -m, uvicorn, "cook:app", --host, 0.0.0.0, --port, "8001", --no-access-log]
+          ports: [{ name: cook, containerPort: 8001 }]
+          env:
+            # Liste fermée des noms d'hôte exacts admis, séparés par des virgules (ConfigMap de l'administrateur) ;
+            # absente ou vide : tout est refusé.
+            - name: SOPHIA_WEB_TELECHARGEMENT_HOTES
+              valueFrom: { configMapKeyRef: { name: sophia-web-cook, key: hotes, optional: true } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /health, port: cook }
+            periodSeconds: 15
+          # Un PDF de 10 Mo et son base64 tiennent largement ; Python et uvicorn seuls font environ 60 Mio.
+          resources:
+            requests: { cpu: 10m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
 ---
 apiVersion: v1
 kind: Service
@@ -79,4 +101,6 @@ metadata:
   labels: { app: sophia-web }
 spec:
   selector: { app: sophia-web }
-  ports: [{ name: http, port: 8000, targetPort: http }]
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+    - { name: cook, port: 8001, targetPort: cook }

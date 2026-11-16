@@ -14,8 +14,8 @@ agents ────────────────────────�
 | Fichier | Contenu |
 |---|---|
 | `00-searxng.yaml` | métamoteur SearXNG : moteurs choisis, sortie JSON, instance privée (pas de limiteur), SafeSearch modéré, strict pour les utilisateurs protégés (par requête) |
-| `01-sophia-web.yaml` | serveur MCP + REST `sophia-web` : ImageStream et BuildConfig dans le namespace des applications, Deployment et Service dans le sas |
-| `02-network.yaml` | NetworkPolicies : tout refusé par défaut ; sortie Internet 80/443 hors plages privées, DNS ; entrée de `sophia-web` depuis l'interface, les agents et le module Cuisine seulement ; SearXNG joignable par `sophia-web` seulement |
+| `01-sophia-web.yaml` | serveur MCP + REST `sophia-web` : ImageStream et BuildConfig dans le namespace des applications, Deployment (conteneurs `sophia-web` et `cook`) et Service dans le sas |
+| `02-network.yaml` | NetworkPolicies : tout refusé par défaut ; sortie Internet 80/443 hors plages privées, DNS ; entrée de `sophia-web` depuis l'interface, les agents et le module Cuisine seulement, et de son port 8001 depuis le module Cuisine seul ; SearXNG joignable par `sophia-web` seulement |
 
 ## Le service `sophia-web`
 
@@ -38,6 +38,17 @@ Règles côté interface : la recherche est déclenchée par défaut pour toute 
 - toutes les 3 heures, le service précharge J à J+3 pour chaque commune et garde la dernière réponse réussie, **en mémoire seulement** : rien ne relie une commune à une personne, ni sur disque ni dans un journal ;
 - si la source en ligne échoue, la prévision en cache est rendue avec l'heure à laquelle elle a été obtenue, pour que la réponse le dise ;
 - la base des fuseaux horaires est une dépendance figée, contrôlée au build.
+
+**Téléchargement pour le module Cuisine** (en service) : une seconde application du même service, dans un conteneur à part du pod, sur le **port 8001**. Une NetworkPolicy (`sophia-web-cook-ingress`) n'y laisse entrer que le module Cuisine ; le port 8000, celui du chat et des agents, n'a pas ces routes, et aucun modèle ne les voit.
+
+| REST (port 8001) | Rôle |
+|---|---|
+| `POST /telecharger` | télécharge un **PDF public** : reconnu à ses premiers octets (`%PDF-`), quel que soit le type annoncé ; 10 Mo au plus, lecture arrêtée au-delà |
+| `POST /liens` | rend les liens d'une page HTML : 2 Mo au plus, lue sans rien exécuter, adresses absolues en http(s), 300 au plus |
+
+- **Liste fermée de noms d'hôte exacts**, choisie par l'installation (ConfigMap `sophia-web-cook`, clé `hotes`, séparés par des virgules) ; absente ou vide, tout est refusé. Elle est contrôlée à **chaque saut** de redirection (3 au plus).
+- Même garde réseau que `fetch_page` : https seulement, aucune adresse interne, connexion à l'adresse vérifiée.
+- Aucun fichier écrit, rien au journal ; un refus porte un motif d'une liste fermée.
 
 ## Procédure (l'administrateur)
 

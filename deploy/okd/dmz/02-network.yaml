@@ -1,7 +1,8 @@
 # NetworkPolicies du sas (sophia-dmz).
 # Le sas sort sur Internet (80, 443) et vers le DNS du cluster, JAMAIS vers les réseaux
 # internes : un modèle trompé par une page ne peut pas faire lire l'intérieur du cluster.
-# Entrées : sophia-web ← interface (sophia-apps) et agents (hermes-system) ; SearXNG ← sophia-web.
+# Entrées : sophia-web ← interface (sophia-interface), agents (hermes-system) et module Cuisine ; port 8001 de
+# sophia-web ← module Cuisine seul ; SearXNG ← sophia-web.
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -81,3 +82,18 @@ spec:
     - from:
         - podSelector: { matchLabels: { app: sophia-web } }
       ports: [{ protocol: TCP, port: 8080 }]
+---
+# Port 8001 de sophia-web (routes /telecharger et /liens), pour le module Cuisine seul. Le port 8000 garde ses entrées.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sophia-web-cook-ingress
+  namespace: sophia-dmz
+spec:
+  podSelector: { matchLabels: { app: sophia-web } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: sophia-apps } }
+          podSelector: { matchLabels: { app: recettes } }
+      ports: [{ protocol: TCP, port: 8001 }]
