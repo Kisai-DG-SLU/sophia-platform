@@ -26,6 +26,11 @@ spec:
                 - SYS_CHROOT
           ports:
             - containerPort: 2222
+          # Disponible quand le serveur SSH écoute : pas de trafic vers un pod neuf avant.
+          readinessProbe:
+            tcpSocket: { port: 2222 }
+            periodSeconds: 10
+            timeoutSeconds: 3
           volumeMounts:
             - name: ssh-pubkey
               mountPath: /tmp/ssh-pubkey

@@ -146,6 +146,6 @@ They are documented by a recipe (components, prerequisites, network, variables, 
 | Component | Recipe |
 |---|---|
 | Office suite (Files, Collabora), persistent chat, video calls, XMPP messaging | [`okd/office/`](okd/office/README.en.md) |
-| Git forge | only the namespace's egress filter is published ([`okd/git/network/egress.yaml`](okd/git/network/egress.yaml)) |
+| Git forge | only the namespace's egress filter is published ([`okd/git/network/egress.yaml`](okd/git/network/egress.yaml)); in the reference installation, Forgejo has a readiness probe on `/api/healthz` (HTTP port), a quota and default values ([quotas](okd/cluster/README.en.md#quotas-in-the-reference-install)) |
 
 The June 2026 base (`docker/`, `okd/workspaces/notebook/`, `okd/pod-bases/runner/`) is **historical, not maintained**: it is not described here.

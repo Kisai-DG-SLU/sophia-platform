@@ -146,6 +146,6 @@ Ils sont documentés par une recette (composants, prérequis, réseau, variables
 | Composant | Recette |
 |---|---|
 | Bureautique (Fichiers, Collabora), chat permanent, visio, messagerie XMPP | [`okd/office/`](okd/office/README.md) |
-| Forge Git | seul le filtre de sortie du namespace est publié ([`okd/git/network/egress.yaml`](okd/git/network/egress.yaml)) |
+| Forge Git | seul le filtre de sortie du namespace est publié ([`okd/git/network/egress.yaml`](okd/git/network/egress.yaml)) ; dans l'installation de référence, Forgejo a une sonde de disponibilité sur `/api/healthz` (port HTTP), un quota et des valeurs par défaut ([quotas](okd/cluster/README.md#quotas-de-linstallation-de-référence)) |
 
 Le socle de juin 2026 (`docker/`, `okd/workspaces/notebook/`, `okd/pod-bases/runner/`) est **historique, non maintenu** : il n'est pas décrit ici.
