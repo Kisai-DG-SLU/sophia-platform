@@ -7,12 +7,12 @@
 # Politique à part de celle de l'application (sophia-interface.yaml) : les règles s'additionnent, celle-ci
 # n'ouvre que ces sorties. Chaque application ouvre de son côté l'entrée correspondante depuis ce namespace.
 # Une application sans données propres (site statique) n'a pas de route : son résumé est calculé par le chat.
-# Une application sans oauth2-proxy qui vérifie elle-même le jeton (ici, le module de résumé de la messagerie)
-# est jointe sur son propre port. Une application dont le résumé passe par un serveur MCP déjà joint
-# (bureautique) n'ajoute rien ici.
+# Une application dont le résumé passe par un serveur MCP déjà joint (bureautique) n'ajoute rien ici. La
+# messagerie n'a pas de résumé.
 #
 # Variables : ${MODULE_A_NAMESPACE}, ${MODULE_A_APP} (label app du pod de l'application, oauth2-proxy en
-# sidecar sur 4180) ; ajouter un bloc par application qui fournit un résumé.
+# sidecar sur 4180) ; ajouter un bloc identique par application qui fournit un résumé (dans l'installation de
+# référence : cuisine, finances, courses et deux applications de gestion, en plus de la visualisation).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -40,11 +40,3 @@ spec:
             matchLabels: { app: sophia-workflow-collecteur }
       ports:
         - { protocol: TCP, port: 4180 }
-    # Messagerie : route de résumé du module monté dans Synapse (port HTTP de Synapse)
-    - to:
-        - namespaceSelector:
-            matchLabels: { kubernetes.io/metadata.name: sophia-messagerie }
-          podSelector:
-            matchLabels: { app: synapse }
-      ports:
-        - { protocol: TCP, port: 8008 }

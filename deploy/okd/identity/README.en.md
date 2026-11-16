@@ -52,7 +52,7 @@ When the chat interface relays the person's access token (see [Identity relay](.
 |---|---|---|
 | MCP server that exchanges the token (files) | signature, then exchange on behalf of its client | client audience (`included.client.audience`) |
 | an application's oauth2-proxy, for its dashboard summary route | `--skip-jwt-bearer-tokens`: the provider's main verifier, the application's `client-id` required in `aud` | client audience, equal to the application's `client-id` |
-| a module that checks the signature itself, without a client of its own (messaging summary, memory service) | signature with the realm keys, issuer, audience, originating client, groups | **custom audience** (`included.custom.audience`, `--personnalisee` option): no Keycloak client is created, since it would only serve introspection or exchange |
+| a module that checks the signature itself, without a client of its own (memory service) | signature with the realm keys, issuer, audience, originating client, groups | **custom audience** (`included.custom.audience`, `--personnalisee` option): no Keycloak client is created, since it would only serve introspection or exchange |
 
 ```bash
 python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <application-client> --dry-run

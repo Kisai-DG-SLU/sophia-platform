@@ -23,7 +23,7 @@ Navigateur → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ API des
 | `render-pricing.py` | lit les tarifs du routeur côté serveur et écrit `pricing.json` (écriture atomique) pour le calcul du coût dans le front |
 | `nginx.conf.in` | gabarit : **liste blanche** des fichiers servis et des routes relayées vers le routeur, en-têtes d'identité imposés, jeton de la personne relayé sur deux routes seulement (discussion, « Quoi de neuf ? »), CORS pour la seule origine de l'école |
 | `sophia-interface.yaml` | namespace dédié `sophia-interface` : ImageStream, BuildConfig (clé de déploiement en lecture), Deployment (oauth2-proxy + nginx + API des discussions, classe `sophia-chat`), Service, NetworkPolicy |
-| `sophia-interface-cockpit-egress.yaml` | sorties propres au dashboard, dans une politique à part qui s'ajoute à celle de l'application : vers l'oauth2-proxy des applications qui fournissent un résumé, et vers la route de résumé de la messagerie |
+| `sophia-interface-cockpit-egress.yaml` | sorties propres au dashboard, dans une politique à part qui s'ajoute à celle de l'application : vers l'oauth2-proxy des applications qui fournissent un résumé |
 | `sophia-interface-route.yaml` | Route de production, appliquée à la bascule |
 | `sophia-interface-essai.yaml` | Route d'essai avant bascule, joignable par le VPN seulement, supprimée ensuite |
 
@@ -172,13 +172,13 @@ L'application de fichiers ouvre l'éditeur dans un nouvel onglet. Dans le dashbo
 ### « Quoi de neuf ? »
 
 - Volet de l'accueil, en trois groupes : à faire, notifications, nouveautés ; chaque ligne porte l'avatar et la couleur de son application.
-- **Calculé par le serveur du chat**, pour que le volet soit complet sur un appareil neuf : le navigateur n'interroge aucune application. Le serveur appelle en parallèle les routes de résumé des seuls modules permis à la personne (cuisine, visualisation, messagerie, fichiers, finances ; pour une tuile réservée à un groupe, seulement à ses membres), 2 s chacune, avec le jeton relayé ; une source en panne, refusée (401, 403), absente (503) ou trop grosse est omise. Cache de 60 s, sans le jeton ; le jeton n'est jamais journalisé, et nginx ne le transmet que sur la route de discussion et sur celle de « Quoi de neuf ? ».
+- **Calculé par le serveur du chat**, pour que le volet soit complet sur un appareil neuf : le navigateur n'interroge aucune application. Le serveur appelle en parallèle les routes de résumé des seuls modules permis à la personne (cuisine, visualisation, fichiers, finances, courses, applications de gestion ; pour une tuile réservée à un groupe, seulement à ses membres), 2 s chacune, avec le jeton relayé ; une source en panne, refusée (401, 403), absente (503) ou trop grosse est omise. Cache de 60 s, sans le jeton ; le jeton n'est jamais journalisé, et nginx ne le transmet que sur la route de discussion et sur celle de « Quoi de neuf ? ».
 - **Contrat** : chaque application expose `GET /api/resume`, déterministe, sans modèle de langage, au plus 20 éléments `{id, groupe, titre, detail, date, expire, lien relatif, priorite}` ; `503` signifie « absente pour l'instant ». Le chat valide le schéma, n'affiche jamais un texte en HTML et reconstruit chaque lien sur la base de la liste fermée.
 - **Titre seul** pour les finances : le chat écarte le `detail`, qui peut porter des montants, et ne garde que le titre (liste fermée côté chat, sans changement de l'application). Le volet peut être lu par-dessus l'épaule ; le détail reste dans l'application, à un clic. Un résumé ne va jamais à un modèle.
 - **Identité** : le serveur du chat relaie le jeton d'accès de la personne (voir [Relais de l'identité](../../../../docs/concepts/12-relais-identite.md#vers-les-routes-de-résumé)).
 - Une application sans données propres (l'école, site statique) n'a pas de route : son résumé et la date de première apparition de ses nouveautés sont calculés par le chat dans sa base.
 
-État : en service, vérifié par l'administrateur sur le vrai chemin : appels aux quatre routes de résumé (cuisine, visualisation, messagerie, fichiers), aucune source absente ; résumé de l'école et nouveautés du contenu calculés par le chat, en recette ; finances branchées, appel vérifié au journal (200, jeton porteur accepté), affichage d'un élément à constater.
+État : en service, vérifié par l'administrateur sur le vrai chemin : appels aux routes de résumé de la cuisine, de la visualisation et des fichiers, aucune source absente ; la messagerie n'a plus de résumé ; résumé de l'école et nouveautés du contenu calculés par le chat, en recette ; finances branchées, appel vérifié au journal (200, jeton porteur accepté), affichage d'un élément à constater ; applications de gestion et courses branchées (sorties ouvertes, audiences ajoutées), affichage en recette.
 
 ### Page « Mémoire »
 

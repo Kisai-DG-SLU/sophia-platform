@@ -23,7 +23,7 @@ Browser → Route (TLS) → oauth2-proxy :4180 → nginx :8080 ─→ conversati
 | `render-pricing.py` | reads the router's prices server-side and writes `pricing.json` (atomic write) for cost display in the front |
 | `nginx.conf.in` | template: **allow-list** of served files and of routes relayed to the router, enforced identity headers, the person's token relayed on two routes only (chat, "What's new?"), CORS for the school's origin only |
 | `sophia-interface.yaml` | dedicated `sophia-interface` namespace: ImageStream, BuildConfig (read-only deploy key), Deployment (oauth2-proxy + nginx + conversation API, `sophia-chat` class), Service, NetworkPolicy |
-| `sophia-interface-cockpit-egress.yaml` | dashboard-specific egress, in a separate policy added to the application's own: to the oauth2-proxy of the applications that provide a summary, and to the messaging summary route |
+| `sophia-interface-cockpit-egress.yaml` | dashboard-specific egress, in a separate policy added to the application's own: to the oauth2-proxy of the applications that provide a summary |
 | `sophia-interface-route.yaml` | production Route, applied at switchover |
 | `sophia-interface-essai.yaml` | trial Route before switchover, reachable through the VPN only, removed afterwards |
 
@@ -172,13 +172,13 @@ The files application opens the editor in a new tab. In the dashboard, the small
 ### "What's new?"
 
 - Home page panel, in three groups: to do, notifications, news; each line carries its application's avatar and colour.
-- **Computed by the chat server**, so that the panel is complete on a new device: the browser queries no application. The server calls in parallel the summary routes of the modules permitted to the person only (cooking, visualisation, messaging, files, finances; for a tile reserved to a group, only for its members), 2 s each, with the relayed token; a source that fails, is refused (401, 403), absent (503) or too large is left out. 60 s cache, without the token; the token is never logged, and nginx only forwards it on the chat route and the "What's new?" route.
+- **Computed by the chat server**, so that the panel is complete on a new device: the browser queries no application. The server calls in parallel the summary routes of the modules permitted to the person only (cooking, visualisation, files, finances, shopping, business applications; for a tile reserved to a group, only for its members), 2 s each, with the relayed token; a source that fails, is refused (401, 403), absent (503) or too large is left out. 60 s cache, without the token; the token is never logged, and nginx only forwards it on the chat route and the "What's new?" route.
 - **Contract**: each application exposes `GET /api/resume`, deterministic, with no language model, at most 20 items `{id, groupe, titre, detail, date, expire, relative link, priorite}`; `503` means "absent for now". The chat validates the schema, never renders a text as HTML and rebuilds each link on the closed list's base.
 - **Title only** for the finances: the chat drops the `detail`, which may carry amounts, and keeps only the title (a closed list on the chat side, with no change to the application). The panel can be read over someone's shoulder; the detail stays in the application, one click away. A summary never goes to a model.
 - **Identity**: the chat server relays the person's access token (see [Identity relay](../../../../docs/concepts/12-relais-identite.en.md#to-the-summary-routes)).
 - An application with no data of its own (the school, a static site) has no route: its summary and the first-appearance date of its news are computed by the chat in its database.
 
-Status: in service, verified by the administrator on the real path: calls to the four summary routes (cooking, visualisation, messaging, files), no source missing; school summary and content news computed by the chat, under acceptance testing; finances wired, call checked in the log (200, bearer token accepted), display of an item still to be seen.
+Status: in service, verified by the administrator on the real path: calls to the summary routes of cooking, visualisation and files, no source missing; messaging no longer has a summary; school summary and content news computed by the chat, under acceptance testing; finances wired, call checked in the log (200, bearer token accepted), display of an item still to be seen; business applications and shopping wired (egress opened, audiences added), display under acceptance testing.
 
 ### "Memory" page
 

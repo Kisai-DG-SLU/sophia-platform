@@ -52,7 +52,7 @@ Quand l'interface de discussion relaie le jeton d'accès de la personne (voir [R
 |---|---|---|
 | serveur MCP qui échange le jeton (fichiers) | signature, puis échange au nom de son client | audience de client (`included.client.audience`) |
 | oauth2-proxy d'une application, pour sa route de résumé du dashboard | `--skip-jwt-bearer-tokens` : vérificateur principal du fournisseur, `client-id` de l'application exigé dans `aud` | audience de client, égale au `client-id` de l'application |
-| module qui vérifie lui-même la signature, sans client propre (résumé de la messagerie, service mémoire) | signature par les clés du realm, émetteur, audience, client d'origine, groupes | **audience personnalisée** (`included.custom.audience`, option `--personnalisee`) : aucun client Keycloak n'est créé, puisqu'il ne servirait qu'à l'introspection ou à l'échange |
+| module qui vérifie lui-même la signature, sans client propre (service mémoire) | signature par les clés du realm, émetteur, audience, client d'origine, groupes | **audience personnalisée** (`included.custom.audience`, option `--personnalisee`) : aucun client Keycloak n'est créé, puisqu'il ne servirait qu'à l'introspection ou à l'échange |
 
 ```bash
 python3 deploy/okd/identity/ajouter-mappeur-audience.py sophia-interface <client-de-l-application> --dry-run

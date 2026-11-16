@@ -74,7 +74,7 @@ Le volet « Quoi de neuf ? » du dashboard est calculé par le **serveur du chat
 
 ```
 API du chat ──Bearer──► oauth2-proxy de l'application ──► application (route de résumé)
-            └─Bearer──► module de résumé monté dans le serveur de messagerie
+            └─Bearer──► service qui vérifie lui-même le jeton (serveur d'outils des fichiers)
 ```
 
 | Destinataire | Vérification | Ce qu'il refuse |
@@ -137,8 +137,9 @@ Sortie du MCP : DNS, le fournisseur d'identité (clés publiques et échange) et
 | Sessions d'oauth2-proxy côté serveur (chat et autres applications derrière oauth2-proxy) | en service |
 | MCP « fichiers » : vérification, échange, recherche par le nom, liens construits par le chat | en service |
 | Lecture du contenu d'un document, réservée aux modèles locaux ([Modèles par rôle](13-modeles-par-role.md)) | déployé, recette à faire |
-| Routes de résumé du dashboard : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide), module de résumé de la messagerie (401 sans jeton) | en service, contrôlé sans jeton valide |
-| Appel des routes de résumé par le chat, avec le jeton de la personne (cuisine, visualisation, messagerie, fichiers) | en service, vérifié par l'administrateur |
+| Routes de résumé du dashboard : audiences, sorties réseau, applications qui acceptent le jeton porteur (403 à un jeton invalide) | en service, contrôlé sans jeton valide |
+| Appel des routes de résumé par le chat, avec le jeton de la personne (cuisine, visualisation, fichiers) | en service, vérifié par l'administrateur |
+| Résumés des finances, des courses et des applications de gestion | branchés (sorties, audiences), affichage en recette |
 | Validations humaines par le chat, avec le même jeton relayé | prévu (voir [Observabilité](10-observabilite.md)) |
 
 ---

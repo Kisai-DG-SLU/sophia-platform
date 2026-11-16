@@ -74,7 +74,7 @@ The dashboard's "What's new?" panel is computed by the **chat server**, which qu
 
 ```
 chat API ──Bearer──► application's oauth2-proxy ──► application (summary route)
-         └─Bearer──► summary module mounted in the messaging server
+         └─Bearer──► service that checks the token itself (files tool server)
 ```
 
 | Receiver | Check | What it refuses |
@@ -137,8 +137,9 @@ MCP egress: DNS, the identity provider (public keys and exchange) and the servic
 | Server-side oauth2-proxy sessions (chat and other applications behind oauth2-proxy) | in service |
 | "Files" MCP: verification, exchange, search by name, links built by the chat | in service |
 | Reading a document's content, reserved to local models ([Models by role](13-modeles-par-role.en.md)) | deployed, acceptance test pending |
-| Dashboard summary routes: audiences, network egress, applications that accept the bearer token (403 for an invalid token), messaging summary module (401 without a token) | in service, checked without a valid token |
-| The chat calling the summary routes with the person's token (cooking, visualisation, messaging, files) | in service, verified by the administrator |
+| Dashboard summary routes: audiences, network egress, applications that accept the bearer token (403 for an invalid token) | in service, checked without a valid token |
+| The chat calling the summary routes with the person's token (cooking, visualisation, files) | in service, verified by the administrator |
+| Summaries of finances, shopping and business applications | wired (egress, audiences), display under acceptance testing |
 | Human approvals through the chat, with the same relayed token | planned (see [Observability](10-observabilite.en.md)) |
 
 ---
