@@ -1,0 +1,13 @@
+# StorageClass des volumes du nœud (voir ../../stockage-persistant.md). Volumes statiques seulement : aucun
+# approvisionneur, chaque PV se crée à la main. Les gabarits de ce dépôt déclarent `local-storage` : sans cette
+# classe, leurs PVC se lient quand même à un PV qui convient, mais le nom ne désigne aucun objet. La créer met le nom
+# en accord sans toucher aux PV liés (storageClassName est immuable sur un PV lié).
+# Liaison immédiate : le comportement qu'ont déjà ces PVC. Retain : un volume du nœud ne s'efface jamais par la
+# suppression de sa PVC.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: Immediate

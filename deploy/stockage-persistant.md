@@ -52,6 +52,7 @@ Les namespaces sont variables pour que l'exemple soit réutilisable :
 | Contrainte | Conséquence |
 |---|---|
 | `storageClassName` vide ou `local-storage` sans provisionneur | aucun provisionnement automatique : le PV se crée à la main |
+| la StorageClass `local-storage` existe ([`okd/cluster/storageclasses.yaml`](okd/cluster/storageclasses.yaml) : sans approvisionneur, `Retain`, liaison immédiate) | le nom déclaré par les PVC désigne un objet réel ; la créer après coup ne touche pas aux PV liés |
 | PV et PVC désignés l'un l'autre (`claimRef` + `volumeName`) | aucune autre PVC ne prend le volume |
 | `persistentVolumeReclaimPolicy: Retain` | supprimer le PV ne touche pas aux données |
 

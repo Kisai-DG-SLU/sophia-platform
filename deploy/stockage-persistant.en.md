@@ -52,6 +52,7 @@ Namespaces are variables so the example stays reusable:
 | Constraint | Consequence |
 |---|---|
 | empty `storageClassName` or `local-storage` without a provisioner | no automatic provisioning: the PV is created by hand |
+| the `local-storage` StorageClass exists ([`okd/cluster/storageclasses.yaml`](okd/cluster/storageclasses.yaml): no provisioner, `Retain`, immediate binding) | the name declared by the PVCs points to a real object; creating it afterwards does not touch bound PVs |
 | PV and PVC bound to each other (`claimRef` + `volumeName`) | no other PVC takes the volume |
 | `persistentVolumeReclaimPolicy: Retain` | deleting the PV does not touch the data |
 
