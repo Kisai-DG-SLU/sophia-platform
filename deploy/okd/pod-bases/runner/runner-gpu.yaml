@@ -6,6 +6,11 @@ metadata:
   namespace: ${GIT_NAMESPACE}
 spec:
   replicas: 1
+  # Un seul GPU : l'ancien pod libère le GPU avant le nouveau. null : « oc apply » retire le rollingUpdate que
+  # l'API pose par défaut, sans quoi un Recreate avec rollingUpdate serait refusé.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
   selector:
     matchLabels:
       app: ${RUNNER_NAME:-forgejo-runner-gpu}
@@ -19,6 +24,9 @@ spec:
       - name: extract-runner
         image: gitea/act_runner:latest
         command: ["/bin/sh", "-c", "cp $(which act_runner) /shared/act_runner && chmod +x /shared/act_runner"]
+        resources:
+          requests: { cpu: 10m, memory: 32Mi }
+          limits: { cpu: 200m, memory: 128Mi }
         volumeMounts:
         - name: shared-bin
           mountPath: /shared
@@ -52,8 +60,13 @@ spec:
           value: ${RUNNER_NAME:-forgejo-runner-gpu}
         - name: GITEA_RUNNER_LABELS
           value: ${RUNNER_LABELS:-gpu:host,linux:host,pixi:host,exec:host}
+        # Ressources explicites : sous le LimitRange de son namespace, un conteneur sans limite de CPU ni de mémoire
+        # recevrait les valeurs par défaut (500m, 512 Mio), trop petites pour une CI GPU.
         resources:
+          requests: { cpu: 500m, memory: 1Gi }
           limits:
+            cpu: "4"
+            memory: 8Gi
             nvidia.com/gpu: ${GPU_COUNT:-1}
         volumeMounts:
         - name: shared-bin

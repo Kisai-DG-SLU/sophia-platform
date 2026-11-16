@@ -9,6 +9,8 @@
 #   sophia-apps       24 / 40Gi, 30      (les builds y tournent, dont une compilation de 16 CPU / 24Gi)
 #   ${AGENT_NAMESPACE} 28 / 48Gi, 15     (pod de lecture 16 / 32Gi compris)
 #   bureautique       10 / 10Gi, 15      (plus requests 2 CPU / 4Gi)
+#   forge              8 / 12Gi, 4       (runner GPU 4 / 8Gi compris, ressources propres)
+#   identité           8 / 10Gi, 10
 apiVersion: v1
 kind: ResourceQuota
 metadata:

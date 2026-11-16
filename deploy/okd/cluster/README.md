@@ -39,6 +39,9 @@ Un seul nœud porte la discussion, le modèle de langage, la voix, les agents, l
 | interface de discussion (namespace dédié) | 4 | 3 Gi | 6 | |
 | tableau de bord des workflows (namespace dédié) | 3 | 3 Gi | 5 | |
 | stockage objet | 3 | 3 Gi | 4 | |
+| forge | 8 | 12 Gi | 4 | tient ensemble Forgejo (1 CPU, 2 Gi), le runner GPU à son démarrage (4 CPU, 8 Gi, ressources propres) et l'extraction de nuit de la sauvegarde : pointe de 6 CPU, 10,5 Gi, 3 pods |
+| identité | 8 | 10 Gi | 10 | au moins deux fois les limites en service ; marge pour la montée de l'opérateur et un import du realm |
+| sauvegarde chiffrée | 4 | 6 Gi | 4 | voir [`../sauvegarde/`](../sauvegarde/README.md) |
 | chat permanent (namespace dédié) | 3 | 3 Gi | 8 | installé, en recette |
 | visio (namespace dédié) | 5 | 3 Gi | 8 | installé, en recette |
 | builds des outils MCP | un build à la fois | | | aucun compte d'agent dans le namespace |

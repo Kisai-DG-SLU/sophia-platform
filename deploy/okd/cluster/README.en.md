@@ -39,6 +39,9 @@ A single node carries chat, the language model, voice, agents, office suite, ima
 | chat interface (dedicated namespace) | 4 | 3 Gi | 6 | |
 | workflow dashboard (dedicated namespace) | 3 | 3 Gi | 5 | |
 | object storage | 3 | 3 Gi | 4 | |
+| forge | 8 | 12 Gi | 4 | holds together Forgejo (1 CPU, 2 Gi), the GPU runner at start-up (4 CPU, 8 Gi, its own resources) and the backup's night extraction: peak of 6 CPU, 10.5 Gi, 3 pods |
+| identity | 8 | 10 Gi | 10 | at least twice the limits in service; margin for the operator's upgrade and a realm import |
+| encrypted backup | 4 | 6 Gi | 4 | see [`../sauvegarde/`](../sauvegarde/README.en.md) |
 | persistent chat (dedicated namespace) | 3 | 3 Gi | 8 | installed, in acceptance testing |
 | video calls (dedicated namespace) | 5 | 3 Gi | 8 | installed, in acceptance testing |
 | MCP tool builds | one build at a time | | | no agent account in the namespace |
