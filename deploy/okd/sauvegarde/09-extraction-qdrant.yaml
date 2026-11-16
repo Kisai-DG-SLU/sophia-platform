@@ -1,0 +1,221 @@
+# Extraction de Qdrant (base vectorielle), par son API, sans toucher à son volume : un instantané complet
+# (POST /snapshots), téléchargé dans un emptyDir, puis supprimé sur Qdrant même en cas d'échec, et déposé dans le seau
+# interne export-qdrant avec l'identité export-qdrant, en écriture seule. Avant l'instantané, le journal donne les
+# collections et leurs points ; après, l'extraction refuse une archive à laquelle manque une collection qui a des
+# points. La nuit le lit et le chiffre avec le reste. Clé d'API : le Secret qdrant-cle de sophia-memory, celui que
+# Qdrant lit déjà.
+# Sous restricted-v2 (aucun volume de données monté) ; aucune entrée ; sorties : DNS, Qdrant (6333), S3 (8443). Une
+# règle d'entrée à part ouvre Qdrant au seul pod d'extraction, sans toucher aux autres règles de Qdrant.
+# Rendu par envsubst, avec la seule liste des variables SUSPENDRE et AWSCLI_VERSION : les « $ » des scripts restent.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: export-qdrant
+  namespace: sophia-memory
+automountServiceAccountToken: false
+---
+# Les images viennent du registre interne de sophia-sauvegarde (01-images.yaml) : lecture des images seulement.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: export-qdrant-image-puller
+  namespace: sophia-sauvegarde
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+- kind: ServiceAccount
+  name: export-qdrant
+  namespace: sophia-memory
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sorties-export-qdrant
+  namespace: sophia-memory
+spec:
+  podSelector:
+    matchLabels: { app: export-qdrant }
+  policyTypes: [Egress]
+  egress:
+    # Résolution des noms des Services qdrant-svc et s3
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+    # Instantané par l'API de Qdrant
+    - to:
+        - podSelector:
+            matchLabels: { app: qdrant }
+      ports:
+        - { protocol: TCP, port: 6333 }
+    # Dépôt de l'instantané dans le seau export-qdrant (même voie que Forgejo et Prosody)
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-storage }
+          podSelector:
+            matchLabels: { app: s3 }
+      ports:
+        - { protocol: TCP, port: 8443 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qdrant-depuis-export-qdrant
+  namespace: sophia-memory
+spec:
+  podSelector:
+    matchLabels: { app: qdrant }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: export-qdrant }
+      ports:
+        - { protocol: TCP, port: 6333 }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scripts-export-qdrant
+  namespace: sophia-memory
+data:
+  extraire-qdrant.py: |
+    import json
+    import os
+    import sys
+    import tarfile
+    import urllib.parse
+    import urllib.request
+    URL = os.environ.get("QDRANT_URL", "http://qdrant-svc.sophia-memory.svc:6333").rstrip("/")
+    CLE = os.environ["QDRANT_API_KEY"]
+    SORTIE = os.environ.get("EXTRACTION_TRAVAIL", "/travail") + "/qdrant.snapshot"
+    def appel(methode, chemin):
+        req = urllib.request.Request(URL + chemin, method=methode, headers={"api-key": CLE})
+        return urllib.request.urlopen(req, timeout=1800)
+    def lire(chemin):
+        with appel("GET", chemin) as r:
+            return json.load(r)["result"]
+    points = {}
+    for c in lire("/collections")["collections"]:
+        points[c["name"]] = lire("/collections/" + urllib.parse.quote(c["name"])).get("points_count") or 0
+    detail = ", ".join(n + " : " + str(p) for n, p in sorted(points.items()))
+    print("Qdrant :", len(points), "collections,", sum(points.values()), "points avant l'instantané (" + detail + ")")
+    with appel("POST", "/snapshots?wait=true") as r:
+        nom = json.load(r)["result"]["name"]
+    chemin = "/snapshots/" + urllib.parse.quote(nom)
+    taille = 0
+    try:
+        with appel("GET", chemin) as r, open(SORTIE, "wb") as f:
+            while True:
+                bloc = r.read(1 << 20)
+                if not bloc:
+                    break
+                f.write(bloc)
+                taille += len(bloc)
+    finally:
+        with appel("DELETE", chemin) as r:
+            r.read()
+    if taille == 0:
+        sys.exit("instantané de Qdrant vide")
+    with tarfile.open(SORTIE) as t:
+        membres = t.getnames()
+    manquantes = sorted(n for n, p in points.items() if p > 0 and not any(m.startswith(n) for m in membres))
+    if manquantes:
+        sys.exit("instantané incomplet : " + ", ".join(manquantes))
+    print("Qdrant : instantané complet", nom, "téléchargé,", taille // 1024, "Ko,", len(membres), "fichiers dans l'archive, supprimé de Qdrant")
+  deposer.sh: |
+    set -eu
+    A="aws --endpoint-url ${S3_URL:-https://s3.sophia-storage.svc:9000}"
+    $A s3 cp "/travail/$FICHIER" "s3://$SEAU/$FICHIER" --only-show-errors
+    date -u +%F > /travail/horodatage
+    $A s3 cp /travail/horodatage "s3://$SEAU/horodatage" --only-show-errors
+    echo "déposé : $FICHIER dans $SEAU, $(du -m "/travail/$FICHIER" | cut -f1) Mo"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-ca-export-qdrant
+  namespace: sophia-memory
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: extraction-qdrant
+  namespace: sophia-memory
+spec:
+  schedule: "55 2 * * *"
+  # true à la première mise en service (premiers lancements à la main), puis false (README.md).
+  suspend: ${SUSPENDRE}
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels: { app: export-qdrant }
+        spec:
+          restartPolicy: Never
+          serviceAccountName: export-qdrant
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          initContainers:
+            - name: extraire
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/python:3.13.17-slim-trixie
+              command: [python3, -I, /scripts/extraire-qdrant.py]
+              env:
+                - { name: HOME, value: /tmp }
+                - name: QDRANT_API_KEY
+                  valueFrom: { secretKeyRef: { name: qdrant-cle, key: cle } }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 200m, memory: 256Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] }, readOnlyRootFilesystem: true }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          containers:
+            - name: deposer
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/aws-cli:${AWSCLI_VERSION}
+              command: [sh, /scripts/deposer.sh]
+              env:
+                - { name: SEAU, value: export-qdrant }
+                - { name: FICHIER, value: qdrant.snapshot }
+                - { name: HOME, value: /tmp }
+                - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+                - { name: AWS_CA_BUNDLE, value: /etc/ca/service-ca.crt }
+                - { name: AWS_REQUEST_CHECKSUM_CALCULATION, value: when_required }
+                - { name: AWS_RESPONSE_CHECKSUM_VALIDATION, value: when_required }
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: export-qdrant-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: export-qdrant-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { cpu: 200m, memory: 256Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] }, readOnlyRootFilesystem: true }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: travail
+              emptyDir: { sizeLimit: 4Gi }
+            - name: tmp
+              emptyDir: { sizeLimit: 256Mi }
+            - name: scripts
+              configMap: { name: scripts-export-qdrant }
+            - name: ca
+              configMap: { name: service-ca-export-qdrant }

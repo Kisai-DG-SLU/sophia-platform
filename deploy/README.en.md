@@ -57,6 +57,7 @@ Each directory describes one component: its choices and their reasons, its templ
 | [`okd/inference/`](okd/inference/) | local models: text and vision on GPU, voice and images on CPU |
 | [`okd/memory/`](okd/memory/) | embedding and the vector memory schema; [memory service](okd/memory/memoire/README.en.md) (versions, validation, rights, audit, isolated extraction) |
 | [`okd/storage/`](okd/storage/) | shared S3 object storage |
+| [`okd/sauvegarde/`](okd/sauvegarde/README.en.md) | encrypted backup (restic): databases every hour, Secrets and exports every night, checks and alerts |
 | [`okd/office/`](okd/office/) | office suite: each person's files and document editing (La Suite Drive, Collabora) |
 | [`okd/identity/`](okd/identity/), [`okd/ingress/`](okd/ingress/) | identity and SSO, certificates |
 | [`okd/apps/`](okd/apps/), [`okd/skills/`](okd/skills/), [`okd/dmz/`](okd/dmz/) | interface, local MCP tools, web airlock |

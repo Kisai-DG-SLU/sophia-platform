@@ -1,0 +1,62 @@
+# Seaux de la sauvegarde, dans le stockage objet commun (sophia-storage) : « sauvegardes », qui porte le dépôt restic
+# chiffré, et les seaux d'export export-forge, export-prosody et export-qdrant, où les extractions déposent leur
+# copie de la nuit (une seule copie, remplacée chaque nuit : l'historique est dans restic).
+# Ni versionnage ni verrouillage : restic prune doit pouvoir supprimer les paquets oubliés. La protection contre une
+# suppression malveillante relève de la copie hors site (README.md).
+# Identités (README.md, étape 3) : sauvegarde en Read, Write et List sur sauvegardes, Read et List sur les seaux
+# d'export ; export-forge, export-prosody et export-qdrant en Write seul sur leur seau. Rejouable.
+# Rendu par envsubst, avec la seule liste des variables AWSCLI_VERSION et AWSCLI_DIGEST : « $A » et « $S » restent.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-init-sauvegardes
+  namespace: sophia-storage
+  labels: { app: s3-init }
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: s3-init }
+    spec:
+      enableServiceLinks: false
+      restartPolicy: Never
+      containers:
+        - name: init
+          image: docker.io/amazon/aws-cli:${AWSCLI_VERSION}@${AWSCLI_DIGEST}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              A="aws --endpoint-url https://s3.sophia-storage.svc:9000"
+              for S in sauvegardes export-forge export-prosody export-qdrant; do
+                $A s3api head-bucket --bucket $S 2>/dev/null || $A s3api create-bucket --bucket $S
+                echo "$S, versioning (aucun attendu) :"; $A s3api get-bucket-versioning --bucket $S
+                echo "$S, verrouillage (aucun attendu) :"; $A s3api get-object-lock-configuration --bucket $S 2>&1 | tail -1
+              done
+              echo "seaux :"; $A s3api list-buckets --query 'Buckets[].Name' --output text
+          env:
+            - { name: HOME, value: /tmp }
+            - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+            - { name: AWS_CA_BUNDLE, value: /etc/ca/service-ca.crt }
+            - { name: AWS_REQUEST_CHECKSUM_CALCULATION, value: when_required }
+            - { name: AWS_RESPONSE_CHECKSUM_VALIDATION, value: when_required }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: s3-admin, key: access-key } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: s3-admin, key: secret-key } }
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: ca, mountPath: /etc/ca, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: ca
+          configMap: { name: service-ca }
+        - name: tmp
+          emptyDir: {}

@@ -118,7 +118,7 @@ Une brique n'est dite déployée que si elle tourne **et** que sa recette reprod
 |---|---|---|---|
 | Supervision minimale | Déployé | métriques des services, règles d'alerte, carte graphique, remplissage des volumes ; alertes filtrées envoyées à l'administrateur hors de la plateforme | [`okd/monitoring/`](../deploy/okd/monitoring/README.md), [observabilité](concepts/10-observabilite.md) |
 | Workflow « incident » et registre des incidents | Prévu | de l'alarme au plan approuvé, sans action automatique | [observabilité](concepts/10-observabilite.md) |
-| Sauvegarde planifiée et chiffrée | Déployé | depuis le 15/11 : bases toutes les heures, Secrets et exports chaque nuit, contrôle d'intégrité, essai de restauration chaque semaine, alertes ; copie hors site propre à chaque installation | [sécurité](security.md#protection-des-données) |
+| Sauvegarde planifiée et chiffrée | Déployé | depuis le 15/11 : bases toutes les heures, Secrets et exports chaque nuit, contrôle d'intégrité, essai de restauration chaque semaine, alertes ; copie hors site propre à chaque installation | [sécurité](security.md#protection-des-données), [recette](../deploy/okd/sauvegarde/README.md) |
 | Recettes reproductibles par composant | Déployé | gabarits à variables et procédures publiés dans ce dépôt | [`deploy/`](../deploy/README.md) |
 | Portabilité d'une installation | En cours | noms et chemins du nœud en variables dans les gabarits ; reste le choix du nœud de chaque volume | [feuille de route](roadmap.md) |
 | Contrôle de dérive entre le cluster et les dépôts | En cours | en lecture, déterministe, avec alerte | |

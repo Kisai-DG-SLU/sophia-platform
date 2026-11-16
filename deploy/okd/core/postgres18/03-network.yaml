@@ -51,5 +51,9 @@ spec:
           podSelector:
             matchExpressions:
               - { key: app, operator: In, values: [synapse, mas] }
+        # Sauvegarde chiffrée (../../sauvegarde/README.md) : vidages horaires par le rôle sauvegarde
+        # (pg_read_all_data), namespace sans entrée ni accès Internet
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-sauvegarde }
       ports:
         - { protocol: TCP, port: 5432 }

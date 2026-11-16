@@ -1,0 +1,75 @@
+# Images des sauvegardes, importées par OKD sur leur empreinte et servies par le registre interne
+# (referencePolicy Local) : le namespace n'a pas d'accès Internet. Les extractions des autres namespaces
+# (sophia-git, sophia-messagerie, sophia-memory) tirent leurs images d'ici.
+#   - restic 0.19.1 : instantanés chiffrés ;
+#   - rclone 1.76.0 : copie des seaux d'export vers le volume de travail ;
+#   - postgresql-18 : la même image que l'instance (pg_dump doit être en version 18) ;
+#   - python 3.13.17 : extractions, copie cohérente de la base SQLite de Forgejo, export des Secrets ;
+#   - okd-cli : oc de la version du cluster, pour l'export des Secrets ;
+#   - aws-cli : dépôt des extractions dans leur seau.
+# Rendu par envsubst, avec la seule liste des variables PG18_DIGEST, OKD_CLI_IMAGE, AWSCLI_VERSION et AWSCLI_DIGEST.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: restic
+  namespace: sophia-sauvegarde
+spec:
+  tags:
+    - name: 0.19.1
+      from: { kind: DockerImage, name: docker.io/restic/restic@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510 }
+      referencePolicy: { type: Local }
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: rclone
+  namespace: sophia-sauvegarde
+spec:
+  tags:
+    - name: 1.76.0
+      from: { kind: DockerImage, name: docker.io/rclone/rclone@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466 }
+      referencePolicy: { type: Local }
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: postgresql-18
+  namespace: sophia-sauvegarde
+spec:
+  tags:
+    - name: instance
+      from: { kind: DockerImage, name: "quay.io/sclorg/postgresql-18-c10s@${PG18_DIGEST}" }
+      referencePolicy: { type: Local }
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: python
+  namespace: sophia-sauvegarde
+spec:
+  tags:
+    - name: 3.13.17-slim-trixie
+      from: { kind: DockerImage, name: docker.io/library/python@sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962 }
+      referencePolicy: { type: Local }
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: okd-cli
+  namespace: sophia-sauvegarde
+spec:
+  tags:
+    - name: cluster
+      from: { kind: DockerImage, name: "${OKD_CLI_IMAGE}" }
+      referencePolicy: { type: Local }
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: aws-cli
+  namespace: sophia-sauvegarde
+spec:
+  tags:
+    - name: "${AWSCLI_VERSION}"
+      from: { kind: DockerImage, name: "docker.io/amazon/aws-cli@${AWSCLI_DIGEST}" }
+      referencePolicy: { type: Local }

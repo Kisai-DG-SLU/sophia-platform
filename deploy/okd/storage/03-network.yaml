@@ -33,6 +33,23 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: "${SOPHIA_MEMORY_NAMESPACE}" }
           podSelector:
             matchLabels: { app: sophia-memoire }
+        # Sauvegarde chiffrée (../sauvegarde/README.md) : sophia-sauvegarde lit les trois seaux d'export et
+        # écrit le dépôt restic dans le seau sauvegardes ; chaque extraction, seul pod de son namespace,
+        # dépose sa copie de la nuit dans son seau d'export (identités en écriture seule)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-sauvegarde }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-git }
+          podSelector:
+            matchLabels: { app: export-forge }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-messagerie }
+          podSelector:
+            matchLabels: { app: export-prosody }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-memory }
+          podSelector:
+            matchLabels: { app: export-qdrant }
         - podSelector:
             matchLabels: { app: s3-init }
       ports:

@@ -1,0 +1,210 @@
+# Extraction de Forgejo. Un pod de sophia-sauvegarde ne peut pas lire le volume de Forgejo : la SCC fixe le niveau
+# SELinux au namespace. Ce CronJob tourne donc dans sophia-git et monte le volume de Forgejo en lecture seule
+# (volume RWO local, même nœud), sous l'uid 1000 de la forge, par la SCC lecture-forge (06-scc-lecture-forge.yaml),
+# racine en lecture seule. Il fait une copie cohérente de la base SQLite (API de copie de sqlite3, puis
+# integrity_check) et une archive du reste (sans la base vivante ni les caches : indexers, queues, sessions, journaux).
+# L'archive exclut tous les dépôts git (/data/git/repositories) : une installation doit prévoir la copie de ses
+# dépôts à part (README.md, « Périmètre »). Base, app.ini, pièces jointes, avatars, LFS et autres données hors dépôts
+# restent. L'archive est déposée dans le seau interne export-forge avec l'identité export-forge, en écriture seule.
+# La sauvegarde de la nuit la lit et la chiffre. Aucun droit de la forge retiré ni réduit.
+# Rendu par envsubst, avec la seule liste des variables SUSPENDRE, AWSCLI_VERSION et FORGEJO_PVC : les « $ » des
+# scripts restent.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: export-forge
+  namespace: sophia-git
+---
+# Les images viennent du registre interne de sophia-sauvegarde (01-images.yaml) : lecture des images seulement.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: export-forge-image-puller
+  namespace: sophia-sauvegarde
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+- kind: ServiceAccount
+  name: export-forge
+  namespace: sophia-git
+---
+# Sorties du seul pod d'extraction : DNS et SeaweedFS. Ne sélectionne aucun autre pod du namespace : Forgejo et
+# les droits de la forge ne changent pas.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sorties-export-forge
+  namespace: sophia-git
+spec:
+  podSelector:
+    matchLabels: { app: export-forge }
+  policyTypes: [Egress]
+  egress:
+    # Résolution du nom du Service s3
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+    # Dépôt de la copie dans le seau export-forge
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-storage }
+          podSelector:
+            matchLabels: { app: s3 }
+      ports:
+        - { protocol: TCP, port: 8443 }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scripts-export-forge
+  namespace: sophia-git
+data:
+  extraire-forgejo.py: |
+    import configparser
+    import os
+    import sqlite3
+    import sys
+    import tarfile
+    DATA = os.environ.get("EXTRACTION_DATA", "/data")
+    TRAVAIL = os.environ.get("EXTRACTION_TRAVAIL", "/travail")
+    DEPOTS = DATA + "/git/repositories"
+    texte = open(os.environ.get("GITEA_APP_INI", DATA + "/gitea/conf/app.ini")).read()
+    ini = configparser.ConfigParser(interpolation=None, strict=False)
+    ini.read_string("[racine]\n" + texte)
+    base = ini.get("database", "PATH", fallback=DATA + "/gitea/forgejo.db")
+    if not os.path.isabs(base):
+        base = os.path.join(DATA, base)
+    copie = TRAVAIL + "/forgejo.db"
+    source = sqlite3.connect("file:" + base + "?mode=ro", uri=True)
+    cible = sqlite3.connect(copie)
+    source.backup(cible)
+    source.close()
+    etat = cible.execute("pragma integrity_check").fetchone()[0]
+    cible.close()
+    if not etat == "ok":
+        sys.exit("copie de la base de Forgejo : integrity_check = " + etat)
+    EXCLUS = {base, base + "-wal", base + "-shm", base + "-journal"}
+    CACHES = tuple(DATA + "/" + c for c in ("gitea/indexers", "gitea/queues", "gitea/sessions", "gitea/log", "log", "tmp"))
+    def garder(info):
+        chemin = DATA + info.name[len("data"):]
+        if chemin in EXCLUS or chemin.startswith(CACHES):
+            return None
+        if chemin == DEPOTS or chemin.startswith(DEPOTS + "/"):
+            return None
+        return info
+    with tarfile.open(TRAVAIL + "/forgejo.tar", "w") as t:
+        t.add(DATA, arcname="data", filter=garder)
+        t.add(copie, arcname="base/forgejo.db")
+    os.remove(copie)
+    n = 0
+    if os.path.isdir(DEPOTS):
+        for proprietaire in os.listdir(DEPOTS):
+            chemin_p = os.path.join(DEPOTS, proprietaire)
+            if os.path.isdir(chemin_p):
+                n += sum(1 for d in os.listdir(chemin_p) if d.endswith(".git"))
+    print("dépôts git exclus de l'archive :", n)
+    print("Forgejo : base copiée (integrity_check ok), archive de", os.path.getsize(TRAVAIL + "/forgejo.tar") // 2**20, "Mo")
+  deposer.sh: |
+    set -eu
+    A="aws --endpoint-url ${S3_URL:-https://s3.sophia-storage.svc:9000}"
+    $A s3 cp "/travail/$FICHIER" "s3://$SEAU/$FICHIER" --only-show-errors
+    date -u +%F > /travail/horodatage
+    $A s3 cp /travail/horodatage "s3://$SEAU/horodatage" --only-show-errors
+    echo "déposé : $FICHIER dans $SEAU, $(du -m "/travail/$FICHIER" | cut -f1) Mo"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-ca-export-forge
+  namespace: sophia-git
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: extraction-forgejo
+  namespace: sophia-git
+spec:
+  schedule: "45 2 * * *"
+  # true à la première mise en service (premiers lancements à la main), puis false (README.md).
+  suspend: ${SUSPENDRE}
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 2400
+      template:
+        metadata:
+          labels: { app: export-forge }
+          annotations: { openshift.io/required-scc: lecture-forge }
+        spec:
+          restartPolicy: Never
+          serviceAccountName: export-forge
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            seccompProfile: { type: RuntimeDefault }
+          initContainers:
+            - name: extraire
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/python:3.13.17-slim-trixie
+              command: [python3, -I, /scripts/extraire-forgejo.py]
+              env:
+                - { name: HOME, value: /tmp }
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { cpu: "1", memory: 512Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] }, readOnlyRootFilesystem: true }
+              volumeMounts:
+                - { name: donnees, mountPath: /data, readOnly: true }
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          containers:
+            - name: deposer
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/aws-cli:${AWSCLI_VERSION}
+              command: [sh, /scripts/deposer.sh]
+              env:
+                - { name: SEAU, value: export-forge }
+                - { name: FICHIER, value: forgejo.tar }
+                - { name: HOME, value: /tmp }
+                - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+                - { name: AWS_CA_BUNDLE, value: /etc/ca/service-ca.crt }
+                - { name: AWS_REQUEST_CHECKSUM_CALCULATION, value: when_required }
+                - { name: AWS_RESPONSE_CHECKSUM_VALIDATION, value: when_required }
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: export-forge-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: export-forge-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { cpu: 500m, memory: 512Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] }, readOnlyRootFilesystem: true }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: donnees
+              persistentVolumeClaim: { claimName: ${FORGEJO_PVC} }
+            - name: travail
+              emptyDir: { sizeLimit: 15Gi }
+            - name: tmp
+              emptyDir: { sizeLimit: 512Mi }
+            - name: scripts
+              configMap: { name: scripts-export-forge }
+            - name: ca
+              configMap: { name: service-ca-export-forge }

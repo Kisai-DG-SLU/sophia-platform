@@ -1,0 +1,162 @@
+# Extraction de Prosody (messagerie XMPP). Même raison que pour Forgejo : le niveau SELinux du namespace
+# sophia-messagerie. Prosody stocke ses données en fichiers plats (stockage interne, data_path) : une archive suffit.
+# Le CronJob tourne dans sophia-messagerie sous restricted-v2, comme Prosody, monte son volume et dépose l'archive dans
+# le seau export-prosody (identité en écriture seule). Le namespace refuse toute sortie par défaut : la règle
+# sorties-export-prosody ne sélectionne que ce pod.
+# Rendu par envsubst, avec la seule liste des variables SUSPENDRE, AWSCLI_VERSION et PROSODY_PVC : les « $ » des
+# scripts restent.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: export-prosody
+  namespace: sophia-messagerie
+---
+# Les images viennent du registre interne de sophia-sauvegarde (01-images.yaml) : lecture des images seulement.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: export-prosody-image-puller
+  namespace: sophia-sauvegarde
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+- kind: ServiceAccount
+  name: export-prosody
+  namespace: sophia-messagerie
+---
+# Sorties du seul pod d'extraction : DNS et SeaweedFS. Ne sélectionne aucun autre pod du namespace : Prosody et les autres pods gardent leurs règles.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sorties-export-prosody
+  namespace: sophia-messagerie
+spec:
+  podSelector:
+    matchLabels: { app: export-prosody }
+  policyTypes: [Egress]
+  egress:
+    # Résolution du nom du Service s3
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+    # Dépôt de la copie dans le seau export-prosody
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-storage }
+          podSelector:
+            matchLabels: { app: s3 }
+      ports:
+        - { protocol: TCP, port: 8443 }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scripts-export-prosody
+  namespace: sophia-messagerie
+data:
+  extraire-prosody.py: |
+    import os
+    import tarfile
+    DONNEES = "/var/lib/prosody-messagerie"
+    with tarfile.open("/travail/prosody.tar", "w") as t:
+        t.add(DONNEES, arcname="prosody")
+    print("Prosody : archive de", os.path.getsize("/travail/prosody.tar") // 2**20, "Mo")
+  deposer.sh: |
+    set -eu
+    A="aws --endpoint-url ${S3_URL:-https://s3.sophia-storage.svc:9000}"
+    $A s3 cp "/travail/$FICHIER" "s3://$SEAU/$FICHIER" --only-show-errors
+    date -u +%F > /travail/horodatage
+    $A s3 cp /travail/horodatage "s3://$SEAU/horodatage" --only-show-errors
+    echo "déposé : $FICHIER dans $SEAU, $(du -m "/travail/$FICHIER" | cut -f1) Mo"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-ca-export-prosody
+  namespace: sophia-messagerie
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: extraction-prosody
+  namespace: sophia-messagerie
+spec:
+  schedule: "50 2 * * *"
+  # true à la première mise en service (premiers lancements à la main), puis false (README.md).
+  suspend: ${SUSPENDRE}
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 2400
+      template:
+        metadata:
+          labels: { app: export-prosody }
+        spec:
+          restartPolicy: Never
+          serviceAccountName: export-prosody
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          initContainers:
+            - name: extraire
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/python:3.13.17-slim-trixie
+              command: [python3, -I, /scripts/extraire-prosody.py]
+              env:
+                - { name: HOME, value: /tmp }
+              # Limites basses : elles doivent tenir dans ce que laisse le quota du namespace de la messagerie,
+              # conteneur d'init compris.
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 200m, memory: 128Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: donnees, mountPath: /var/lib/prosody-messagerie }
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+          containers:
+            - name: deposer
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/aws-cli:${AWSCLI_VERSION}
+              command: [sh, /scripts/deposer.sh]
+              env:
+                - { name: SEAU, value: export-prosody }
+                - { name: FICHIER, value: prosody.tar }
+                - { name: HOME, value: /tmp }
+                - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+                - { name: AWS_CA_BUNDLE, value: /etc/ca/service-ca.crt }
+                - { name: AWS_REQUEST_CHECKSUM_CALCULATION, value: when_required }
+                - { name: AWS_RESPONSE_CHECKSUM_VALIDATION, value: when_required }
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: export-prosody-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: export-prosody-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { cpu: 200m, memory: 192Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: donnees
+              persistentVolumeClaim: { claimName: ${PROSODY_PVC} }
+            - name: travail
+              emptyDir: { sizeLimit: 15Gi }
+            - name: tmp
+              emptyDir: { sizeLimit: 512Mi }
+            - name: scripts
+              configMap: { name: scripts-export-prosody }
+            - name: ca
+              configMap: { name: service-ca-export-prosody }

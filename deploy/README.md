@@ -49,6 +49,7 @@ Chaque dossier décrit un composant : ses choix et leurs raisons, ses gabarits (
 | [`okd/inference/`](okd/inference/) | modèles locaux : texte et vision sur GPU, voix et images sur CPU |
 | [`okd/memory/`](okd/memory/) | embedding et schéma de la mémoire vectorielle ; [service mémoire](okd/memory/memoire/README.md) (versions, validation, droits, audit, extraction isolée) |
 | [`okd/storage/`](okd/storage/) | stockage objet S3 commun |
+| [`okd/sauvegarde/`](okd/sauvegarde/README.md) | sauvegarde chiffrée (restic) : bases chaque heure, Secrets et exports chaque nuit, contrôles et alertes |
 | [`okd/office/`](okd/office/) | bureautique : fichiers de chacun et édition des documents (La Suite Drive, Collabora) |
 | [`okd/identity/`](okd/identity/), [`okd/ingress/`](okd/ingress/) | identité et SSO, certificats |
 | [`okd/apps/`](okd/apps/), [`okd/skills/`](okd/skills/), [`okd/dmz/`](okd/dmz/) | interface, outils MCP locaux, sas web |

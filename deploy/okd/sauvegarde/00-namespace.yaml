@@ -1,0 +1,108 @@
+# Namespace des sauvegardes. Il lit les bases, les seaux d'export et les Secrets, et écrit le dépôt restic chiffré
+# dans le seau S3 « sauvegardes ». Aucune entrée, aucun accès Internet : la copie hors site est un sujet à part
+# (README, « Copie hors site »).
+# Rendu par envsubst, avec la seule liste des variables LAN_NODE_IP, SERVICE_NETWORK et POD_NETWORK (README.md).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sophia-sauvegarde
+  labels:
+    zone: sauvegarde
+---
+# Une sauvegarde à la fois (concurrencyPolicy: Forbid sur chaque CronJob), plus l'essai de restauration.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sauvegarde-quota
+  namespace: sophia-sauvegarde
+spec:
+  hard:
+    limits.cpu: "4"
+    limits.memory: 6Gi
+    pods: "4"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sauvegarde-defaults
+  namespace: sophia-sauvegarde
+spec:
+  limits:
+    - type: Container
+      default: { cpu: "1", memory: 1Gi }
+      defaultRequest: { cpu: 100m, memory: 256Mi }
+---
+# Aucune entrée.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: refus-par-defaut
+  namespace: sophia-sauvegarde
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sorties-sauvegarde
+  namespace: sophia-sauvegarde
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    # Résolution des noms de Service (port des pods dns-default)
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: openshift-dns }
+      ports:
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+    # Vidages horaires des bases
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-core }
+          podSelector:
+            matchLabels: { app: postgres-sophia-18 }
+      ports:
+        - { protocol: TCP, port: 5432 }
+    # Lecture des seaux d'export et écriture du dépôt restic dans le seau « sauvegardes »
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: sophia-storage }
+          podSelector:
+            matchLabels: { app: s3 }
+      ports:
+        - { protocol: TCP, port: 8443 }
+    # Export des Secrets des namespaces : le Service kubernetes aboutit à l'adresse du nœud, port 6443
+    - to:
+        - ipBlock: { cidr: "${LAN_NODE_IP}/32" }
+      ports:
+        - { protocol: TCP, port: 6443 }
+---
+# Seconde barrière : rien hors du cluster, sauf l'API (plan de contrôle). Pas d'accès Internet.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: sophia-sauvegarde
+spec:
+  egress:
+    - type: Allow
+      to: { cidrSelector: ${SERVICE_NETWORK} }
+    - type: Allow
+      to: { cidrSelector: ${POD_NETWORK} }
+    - type: Allow
+      to:
+        nodeSelector:
+          matchLabels: { node-role.kubernetes.io/control-plane: "" }
+      ports: [{ protocol: TCP, port: 6443 }]
+    - type: Deny
+      to: { cidrSelector: 0.0.0.0/0 }
+---
+# Compte des sauvegardes. Ses seuls droits : la lecture des Secrets des namespaces listés (02-lecture-secrets.yaml).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sauvegarde
+  namespace: sophia-sauvegarde

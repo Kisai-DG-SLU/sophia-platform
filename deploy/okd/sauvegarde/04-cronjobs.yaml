@@ -1,0 +1,286 @@
+# CronJobs des sauvegardes, heure de Paris (timeZone) :
+#   - sauvegarde-bases, toutes les heures à la minute 05 : les bases PostgreSQL (au plus une heure de perte) ;
+#   - sauvegarde-nuit, à 03:30 : seaux d'export de la forge, de la messagerie et de la base vectorielle, remplis à
+#     02:45, 02:50 et 02:55 par leurs extractions (07 à 09), puis Secrets ; rétention, prune et check ;
+#   - essai-restauration, le dimanche à 08:00 : restauration chronométrée d'une base (600 s au plus).
+# Aucun ne se chevauche (concurrencyPolicy: Forbid). Images servies par le registre interne (01-images.yaml).
+# Secrets attendus : restic-mot-de-passe, postgres-sauvegarde, sauvegarde-s3 (README.md). Volume de travail en
+# emptyDir : rien ne reste en clair après le passage.
+# Rendu par envsubst, avec la seule liste des variables SUSPENDRE et SECRETS_NAMESPACES : les « $ » des scripts
+# restent.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sauvegarde-bases
+  namespace: sophia-sauvegarde
+spec:
+  schedule: "5 * * * *"
+  # true à la première mise en service (premiers lancements à la main), puis false (README.md).
+  suspend: ${SUSPENDRE}
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 900
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels: { app: sauvegarde-bases }
+        spec:
+          restartPolicy: Never
+          serviceAccountName: sauvegarde
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          initContainers:
+            - name: vidage
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/postgresql-18:instance
+              command: [sh, /scripts/vider-bases.sh]
+              env:
+                - { name: PGHOST, value: postgres-sophia-18.sophia-core.svc }
+                - { name: PGUSER, value: sauvegarde }
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: postgres-sauvegarde, key: password } }
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits: { cpu: "1", memory: 512Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+          containers:
+            - name: restic
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/restic:0.19.1
+              command: [sh, /scripts/restic-bases.sh]
+              env:
+                - { name: RESTIC_REPOSITORY, value: "s3:https://s3.sophia-storage.svc:9000/sauvegardes" }
+                - { name: RESTIC_PASSWORD_FILE, value: /secrets/restic/password }
+                - { name: RESTIC_CACERT, value: /etc/ca/service-ca.crt }
+                - { name: RESTIC_CACHE_DIR, value: /travail/cache }
+                - { name: HOME, value: /travail }
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits: { cpu: "1", memory: 1Gi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: restic, mountPath: /secrets/restic, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+          volumes:
+            - name: travail
+              emptyDir: { sizeLimit: 10Gi }
+            - name: scripts
+              configMap: { name: scripts-sauvegarde }
+            - name: restic
+              secret: { secretName: restic-mot-de-passe, defaultMode: 0400 }
+            - name: ca
+              configMap: { name: service-ca }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sauvegarde-nuit
+  namespace: sophia-sauvegarde
+spec:
+  schedule: "30 3 * * *"
+  # true à la première mise en service (premiers lancements à la main), puis false (README.md).
+  suspend: ${SUSPENDRE}
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 10800
+      template:
+        metadata:
+          labels: { app: sauvegarde-nuit }
+        spec:
+          restartPolicy: Never
+          serviceAccountName: sauvegarde
+          enableServiceLinks: false
+          initContainers:
+            - name: seaux
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/rclone:1.76.0
+              command: [sh, /scripts/copier-seaux.sh]
+              env:
+                - { name: RCLONE_CONFIG_S3_TYPE, value: s3 }
+                - { name: RCLONE_CONFIG_S3_PROVIDER, value: SeaweedFS }
+                - { name: RCLONE_CONFIG_S3_ENDPOINT, value: "https://s3.sophia-storage.svc:9000" }
+                - { name: RCLONE_CA_CERT, value: /etc/ca/service-ca.crt }
+                - { name: HOME, value: /travail }
+                - name: RCLONE_CONFIG_S3_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: RCLONE_CONFIG_S3_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits: { cpu: "1", memory: 1Gi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+            - name: outil-oc
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/okd-cli:cluster
+              command: [cp, /usr/bin/oc, /outils/oc]
+              resources:
+                requests: { cpu: 10m, memory: 32Mi }
+                limits: { cpu: 200m, memory: 128Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: outils, mountPath: /outils }
+            - name: secrets
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/python:3.13.17-slim-trixie
+              command: [python3, -I, /scripts/exporter-secrets.py]
+              env:
+                - { name: HOME, value: /tmp }
+                - name: NAMESPACES
+                  value: "${SECRETS_NAMESPACES}"
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { cpu: 500m, memory: 512Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: outils, mountPath: /outils, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          containers:
+            - name: restic
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/restic:0.19.1
+              command: [sh, /scripts/restic-nuit.sh]
+              env:
+                - { name: RESTIC_REPOSITORY, value: "s3:https://s3.sophia-storage.svc:9000/sauvegardes" }
+                - { name: RESTIC_PASSWORD_FILE, value: /secrets/restic/password }
+                - { name: RESTIC_CACERT, value: /etc/ca/service-ca.crt }
+                - { name: RESTIC_CACHE_DIR, value: /travail/cache }
+                - { name: HOME, value: /travail }
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 200m, memory: 512Mi }
+                limits: { cpu: "2", memory: 2Gi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: restic, mountPath: /secrets/restic, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+          volumes:
+            - name: travail
+              emptyDir: { sizeLimit: 30Gi }
+            - name: outils
+              emptyDir: { sizeLimit: 512Mi }
+            - name: tmp
+              emptyDir: { sizeLimit: 1Gi }
+            - name: scripts
+              configMap: { name: scripts-sauvegarde }
+            - name: restic
+              secret: { secretName: restic-mot-de-passe, defaultMode: 0400 }
+            - name: ca
+              configMap: { name: service-ca }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: essai-restauration
+  namespace: sophia-sauvegarde
+spec:
+  # Dimanche 08:00, après la fenêtre de la nuit (03:30, une heure de retard admise et trois de durée, soit 07:30 au plus) :
+  # nuit, vidage horaire et essai ensemble dépasseraient les 4 CPU du quota.
+  schedule: "0 8 * * 0"
+  # true à la première mise en service (premiers lancements à la main), puis false (README.md).
+  suspend: ${SUSPENDRE}
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels: { app: essai-restauration }
+        spec:
+          restartPolicy: Never
+          serviceAccountName: sauvegarde
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          initContainers:
+            - name: restaurer
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/restic:0.19.1
+              command: [sh, /scripts/essai-restaurer.sh]
+              env:
+                - { name: RESTIC_REPOSITORY, value: "s3:https://s3.sophia-storage.svc:9000/sauvegardes" }
+                - { name: RESTIC_PASSWORD_FILE, value: /secrets/restic/password }
+                - { name: RESTIC_CACERT, value: /etc/ca/service-ca.crt }
+                - { name: RESTIC_CACHE_DIR, value: /travail/cache }
+                - { name: HOME, value: /travail }
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_SECRET_ACCESS_KEY } }
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits: { cpu: "1", memory: 1Gi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: restic, mountPath: /secrets/restic, readOnly: true }
+                - { name: ca, mountPath: /etc/ca, readOnly: true }
+            - name: postgres
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/postgresql-18:instance
+              restartPolicy: Always
+              env:
+                - { name: POSTGRESQL_ADMIN_PASSWORD, value: essai-local }
+              startupProbe:
+                exec: { command: [pg_isready, -h, 127.0.0.1] }
+                periodSeconds: 2
+                failureThreshold: 60
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits: { cpu: "1", memory: 1Gi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: donnees, mountPath: /var/lib/pgsql/data }
+          containers:
+            - name: verifier
+              image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/postgresql-18:instance
+              command: [sh, /scripts/essai-verifier.sh]
+              env:
+                - { name: PGHOST, value: 127.0.0.1 }
+                - { name: PGUSER, value: postgres }
+                - { name: PGPASSWORD, value: essai-local }
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits: { cpu: "1", memory: 512Mi }
+              securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: travail, mountPath: /travail }
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+          volumes:
+            - name: travail
+              emptyDir: { sizeLimit: 20Gi }
+            - name: donnees
+              emptyDir: { sizeLimit: 10Gi }
+            - name: scripts
+              configMap: { name: scripts-sauvegarde }
+            - name: restic
+              secret: { secretName: restic-mot-de-passe, defaultMode: 0400 }
+            - name: ca
+              configMap: { name: service-ca }

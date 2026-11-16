@@ -1,0 +1,48 @@
+# Création du dépôt restic chiffré dans le seau « sauvegardes », une seule fois, avant les premiers lancements.
+# Mêmes image, compte, Secrets et certificat que les CronJobs. Aucune variable à rendre.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: restic-init
+  namespace: sophia-sauvegarde
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 259200
+  template:
+    metadata:
+      labels: { app: restic-init }
+    spec:
+      restartPolicy: Never
+      serviceAccountName: sauvegarde
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: init
+          image: image-registry.openshift-image-registry.svc:5000/sophia-sauvegarde/restic:0.19.1
+          command: [restic, init]
+          env:
+            - { name: RESTIC_REPOSITORY, value: "s3:https://s3.sophia-storage.svc:9000/sauvegardes" }
+            - { name: RESTIC_PASSWORD_FILE, value: /secrets/restic/password }
+            - { name: RESTIC_CACERT, value: /etc/ca/service-ca.crt }
+            - { name: RESTIC_CACHE_DIR, value: /travail/cache }
+            - { name: HOME, value: /travail }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_ACCESS_KEY_ID } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: sauvegarde-s3, key: AWS_SECRET_ACCESS_KEY } }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: travail, mountPath: /travail }
+            - { name: restic, mountPath: /secrets/restic, readOnly: true }
+            - { name: ca, mountPath: /etc/ca, readOnly: true }
+      volumes:
+        - name: travail
+          emptyDir: { sizeLimit: 10Gi }
+        - name: restic
+          secret: { secretName: restic-mot-de-passe, defaultMode: 0400 }
+        - name: ca
+          configMap: { name: service-ca }

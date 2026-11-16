@@ -1,0 +1,330 @@
+# Alertes de la sauvegarde, sur les séries de kube-state-metrics de la plateforme. Une règle par namespace : Thanos
+# Ruler ne montre à une règle que les séries de son namespace. Étiquette « sophia: oui » : celle que route la
+# supervision (../monitoring/). Cinq alertes par CronJob :
+#   - EnEchec : le dernier lancement s'est fini sans succès (ou n'a jamais réussi), aucun Job actif ;
+#   - EnRetard : pas de succès depuis le seuil (2 h pour l'horaire, 26 h pour le quotidien, 8 jours pour
+#     l'hebdomadaire) ;
+#   - JamaisReussie : CronJob actif sans aucun succès depuis le seuil ;
+#   - Absente : le CronJob n'existe plus ;
+#   - Suspendue (warning) : le CronJob est suspendu depuis une heure.
+# Mise en service : les CronJobs sont créés suspendus et lancés d'abord à la main. Retard et « jamais réussie »
+# s'éteignent tant que le CronJob est suspendu, et « suspendue » sonne : c'est l'alerte forcée qui prouve la chaîne
+# jusqu'à l'administrateur. Les Jobs lancés par « oc create job --from=cronjob/… » portent l'ownerReference du
+# CronJob et remplissent lastSuccessfulTime. Aucune variable à rendre.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-sauvegardes
+  namespace: sophia-git
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sauvegardes-sophia-git
+    rules:
+    - alert: SophiaSauvegardeEnEchec
+      expr: (kube_cronjob_status_last_schedule_time{namespace="sophia-git",cronjob="extraction-forgejo"} > on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-git",cronjob="extraction-forgejo"} or (kube_cronjob_status_last_schedule_time{namespace="sophia-git",cronjob="extraction-forgejo"} unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-git",cronjob="extraction-forgejo"})) and on (namespace, cronjob) (kube_cronjob_status_active{namespace="sophia-git",cronjob="extraction-forgejo"} == 0)
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-git/extraction-forgejo : le dernier lancement a échoué'
+        action: oc -n sophia-git get jobs, puis le journal du dernier Job (oc -n sophia-git logs job/<nom> --all-containers)
+    - alert: SophiaSauvegardeEnRetard
+      expr: (time() - kube_cronjob_status_last_successful_time{namespace="sophia-git",cronjob="extraction-forgejo"} > 93600) unless on (namespace, cronjob) (kube_cronjob_spec_suspend{namespace="sophia-git",cronjob="extraction-forgejo"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-git/extraction-forgejo : aucun succès depuis plus de 26 h'
+        action: oc -n sophia-git get cronjob extraction-forgejo et les derniers Jobs ; lancer à la main si besoin (oc -n sophia-git create job --from=cronjob/extraction-forgejo <nom>)
+    - alert: SophiaSauvegardeJamaisReussie
+      expr: (kube_cronjob_spec_suspend{namespace="sophia-git",cronjob="extraction-forgejo"} == 0) unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-git",cronjob="extraction-forgejo"}
+      for: 93600s
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-git/extraction-forgejo : active depuis plus de 26 h sans aucun succès'
+        action: oc -n sophia-git get cronjob extraction-forgejo -o yaml (status) et les Jobs du namespace
+    - alert: SophiaSauvegardeAbsente
+      expr: absent(kube_cronjob_spec_suspend{namespace="sophia-git",cronjob="extraction-forgejo"})
+      for: 30m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-git/extraction-forgejo : le CronJob n''existe plus'
+        action: réappliquer le gabarit versionné (deploy/okd/sauvegarde)
+    - alert: SophiaSauvegardeSuspendue
+      expr: kube_cronjob_spec_suspend{namespace="sophia-git",cronjob="extraction-forgejo"} == 1
+      for: 1h
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-git/extraction-forgejo : CronJob suspendu, aucune sauvegarde automatique'
+        action: attendu pendant la mise en service (premiers lancements à la main) ; sinon lever la suspension
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-sauvegardes
+  namespace: sophia-memory
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sauvegardes-sophia-memory
+    rules:
+    - alert: SophiaSauvegardeEnEchec
+      expr: (kube_cronjob_status_last_schedule_time{namespace="sophia-memory",cronjob="extraction-qdrant"} > on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-memory",cronjob="extraction-qdrant"} or (kube_cronjob_status_last_schedule_time{namespace="sophia-memory",cronjob="extraction-qdrant"} unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-memory",cronjob="extraction-qdrant"})) and on (namespace, cronjob) (kube_cronjob_status_active{namespace="sophia-memory",cronjob="extraction-qdrant"} == 0)
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-memory/extraction-qdrant : le dernier lancement a échoué'
+        action: oc -n sophia-memory get jobs, puis le journal du dernier Job (oc -n sophia-memory logs job/<nom> --all-containers)
+    - alert: SophiaSauvegardeEnRetard
+      expr: (time() - kube_cronjob_status_last_successful_time{namespace="sophia-memory",cronjob="extraction-qdrant"} > 93600) unless on (namespace, cronjob) (kube_cronjob_spec_suspend{namespace="sophia-memory",cronjob="extraction-qdrant"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-memory/extraction-qdrant : aucun succès depuis plus de 26 h'
+        action: oc -n sophia-memory get cronjob extraction-qdrant et les derniers Jobs ; lancer à la main si besoin (oc -n sophia-memory create job --from=cronjob/extraction-qdrant <nom>)
+    - alert: SophiaSauvegardeJamaisReussie
+      expr: (kube_cronjob_spec_suspend{namespace="sophia-memory",cronjob="extraction-qdrant"} == 0) unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-memory",cronjob="extraction-qdrant"}
+      for: 93600s
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-memory/extraction-qdrant : active depuis plus de 26 h sans aucun succès'
+        action: oc -n sophia-memory get cronjob extraction-qdrant -o yaml (status) et les Jobs du namespace
+    - alert: SophiaSauvegardeAbsente
+      expr: absent(kube_cronjob_spec_suspend{namespace="sophia-memory",cronjob="extraction-qdrant"})
+      for: 30m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-memory/extraction-qdrant : le CronJob n''existe plus'
+        action: réappliquer le gabarit versionné (deploy/okd/sauvegarde)
+    - alert: SophiaSauvegardeSuspendue
+      expr: kube_cronjob_spec_suspend{namespace="sophia-memory",cronjob="extraction-qdrant"} == 1
+      for: 1h
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-memory/extraction-qdrant : CronJob suspendu, aucune sauvegarde automatique'
+        action: attendu pendant la mise en service (premiers lancements à la main) ; sinon lever la suspension
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-sauvegardes
+  namespace: sophia-messagerie
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sauvegardes-sophia-messagerie
+    rules:
+    - alert: SophiaSauvegardeEnEchec
+      expr: (kube_cronjob_status_last_schedule_time{namespace="sophia-messagerie",cronjob="extraction-prosody"} > on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-messagerie",cronjob="extraction-prosody"} or (kube_cronjob_status_last_schedule_time{namespace="sophia-messagerie",cronjob="extraction-prosody"} unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-messagerie",cronjob="extraction-prosody"})) and on (namespace, cronjob) (kube_cronjob_status_active{namespace="sophia-messagerie",cronjob="extraction-prosody"} == 0)
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-messagerie/extraction-prosody : le dernier lancement a échoué'
+        action: oc -n sophia-messagerie get jobs, puis le journal du dernier Job (oc -n sophia-messagerie logs job/<nom> --all-containers)
+    - alert: SophiaSauvegardeEnRetard
+      expr: (time() - kube_cronjob_status_last_successful_time{namespace="sophia-messagerie",cronjob="extraction-prosody"} > 93600) unless on (namespace, cronjob) (kube_cronjob_spec_suspend{namespace="sophia-messagerie",cronjob="extraction-prosody"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-messagerie/extraction-prosody : aucun succès depuis plus de 26 h'
+        action: oc -n sophia-messagerie get cronjob extraction-prosody et les derniers Jobs ; lancer à la main si besoin (oc -n sophia-messagerie create job --from=cronjob/extraction-prosody <nom>)
+    - alert: SophiaSauvegardeJamaisReussie
+      expr: (kube_cronjob_spec_suspend{namespace="sophia-messagerie",cronjob="extraction-prosody"} == 0) unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-messagerie",cronjob="extraction-prosody"}
+      for: 93600s
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-messagerie/extraction-prosody : active depuis plus de 26 h sans aucun succès'
+        action: oc -n sophia-messagerie get cronjob extraction-prosody -o yaml (status) et les Jobs du namespace
+    - alert: SophiaSauvegardeAbsente
+      expr: absent(kube_cronjob_spec_suspend{namespace="sophia-messagerie",cronjob="extraction-prosody"})
+      for: 30m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-messagerie/extraction-prosody : le CronJob n''existe plus'
+        action: réappliquer le gabarit versionné (deploy/okd/sauvegarde)
+    - alert: SophiaSauvegardeSuspendue
+      expr: kube_cronjob_spec_suspend{namespace="sophia-messagerie",cronjob="extraction-prosody"} == 1
+      for: 1h
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-messagerie/extraction-prosody : CronJob suspendu, aucune sauvegarde automatique'
+        action: attendu pendant la mise en service (premiers lancements à la main) ; sinon lever la suspension
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sophia-sauvegardes
+  namespace: sophia-sauvegarde
+  labels:
+    sophia: oui
+spec:
+  groups:
+  - name: sophia-sauvegardes-sophia-sauvegarde
+    rules:
+    - alert: SophiaSauvegardeEnEchec
+      expr: (kube_cronjob_status_last_schedule_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} > on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} or (kube_cronjob_status_last_schedule_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"})) and on (namespace, cronjob) (kube_cronjob_status_active{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} == 0)
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-bases : le dernier lancement a échoué'
+        action: oc -n sophia-sauvegarde get jobs, puis le journal du dernier Job (oc -n sophia-sauvegarde logs job/<nom> --all-containers)
+    - alert: SophiaSauvegardeEnRetard
+      expr: (time() - kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} > 7200) unless on (namespace, cronjob) (kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-bases : aucun succès depuis plus de 2 h'
+        action: oc -n sophia-sauvegarde get cronjob sauvegarde-bases et les derniers Jobs ; lancer à la main si besoin (oc -n sophia-sauvegarde create job --from=cronjob/sauvegarde-bases <nom>)
+    - alert: SophiaSauvegardeJamaisReussie
+      expr: (kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} == 0) unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"}
+      for: 7200s
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-bases : active depuis plus de 2 h sans aucun succès'
+        action: oc -n sophia-sauvegarde get cronjob sauvegarde-bases -o yaml (status) et les Jobs du namespace
+    - alert: SophiaSauvegardeAbsente
+      expr: absent(kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"})
+      for: 30m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-bases : le CronJob n''existe plus'
+        action: réappliquer le gabarit versionné (deploy/okd/sauvegarde)
+    - alert: SophiaSauvegardeSuspendue
+      expr: kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-bases"} == 1
+      for: 1h
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-bases : CronJob suspendu, aucune sauvegarde automatique'
+        action: attendu pendant la mise en service (premiers lancements à la main) ; sinon lever la suspension
+    - alert: SophiaSauvegardeEnEchec
+      expr: (kube_cronjob_status_last_schedule_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} > on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} or (kube_cronjob_status_last_schedule_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"})) and on (namespace, cronjob) (kube_cronjob_status_active{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} == 0)
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-nuit : le dernier lancement a échoué'
+        action: oc -n sophia-sauvegarde get jobs, puis le journal du dernier Job (oc -n sophia-sauvegarde logs job/<nom> --all-containers)
+    - alert: SophiaSauvegardeEnRetard
+      expr: (time() - kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} > 93600) unless on (namespace, cronjob) (kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-nuit : aucun succès depuis plus de 26 h'
+        action: oc -n sophia-sauvegarde get cronjob sauvegarde-nuit et les derniers Jobs ; lancer à la main si besoin (oc -n sophia-sauvegarde create job --from=cronjob/sauvegarde-nuit <nom>)
+    - alert: SophiaSauvegardeJamaisReussie
+      expr: (kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} == 0) unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"}
+      for: 93600s
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-nuit : active depuis plus de 26 h sans aucun succès'
+        action: oc -n sophia-sauvegarde get cronjob sauvegarde-nuit -o yaml (status) et les Jobs du namespace
+    - alert: SophiaSauvegardeAbsente
+      expr: absent(kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"})
+      for: 30m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-nuit : le CronJob n''existe plus'
+        action: réappliquer le gabarit versionné (deploy/okd/sauvegarde)
+    - alert: SophiaSauvegardeSuspendue
+      expr: kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="sauvegarde-nuit"} == 1
+      for: 1h
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/sauvegarde-nuit : CronJob suspendu, aucune sauvegarde automatique'
+        action: attendu pendant la mise en service (premiers lancements à la main) ; sinon lever la suspension
+    - alert: SophiaSauvegardeEnEchec
+      expr: (kube_cronjob_status_last_schedule_time{namespace="sophia-sauvegarde",cronjob="essai-restauration"} > on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="essai-restauration"} or (kube_cronjob_status_last_schedule_time{namespace="sophia-sauvegarde",cronjob="essai-restauration"} unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="essai-restauration"})) and on (namespace, cronjob) (kube_cronjob_status_active{namespace="sophia-sauvegarde",cronjob="essai-restauration"} == 0)
+      for: 5m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/essai-restauration : le dernier lancement a échoué'
+        action: oc -n sophia-sauvegarde get jobs, puis le journal du dernier Job (oc -n sophia-sauvegarde logs job/<nom> --all-containers)
+    - alert: SophiaSauvegardeEnRetard
+      expr: (time() - kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="essai-restauration"} > 691200) unless on (namespace, cronjob) (kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="essai-restauration"} == 1)
+      for: 10m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/essai-restauration : aucun succès depuis plus de 8 jours'
+        action: oc -n sophia-sauvegarde get cronjob essai-restauration et les derniers Jobs ; lancer à la main si besoin (oc -n sophia-sauvegarde create job --from=cronjob/essai-restauration <nom>)
+    - alert: SophiaSauvegardeJamaisReussie
+      expr: (kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="essai-restauration"} == 0) unless on (namespace, cronjob) kube_cronjob_status_last_successful_time{namespace="sophia-sauvegarde",cronjob="essai-restauration"}
+      for: 691200s
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/essai-restauration : active depuis plus de 8 jours sans aucun succès'
+        action: oc -n sophia-sauvegarde get cronjob essai-restauration -o yaml (status) et les Jobs du namespace
+    - alert: SophiaSauvegardeAbsente
+      expr: absent(kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="essai-restauration"})
+      for: 30m
+      labels:
+        severity: critical
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/essai-restauration : le CronJob n''existe plus'
+        action: réappliquer le gabarit versionné (deploy/okd/sauvegarde)
+    - alert: SophiaSauvegardeSuspendue
+      expr: kube_cronjob_spec_suspend{namespace="sophia-sauvegarde",cronjob="essai-restauration"} == 1
+      for: 1h
+      labels:
+        severity: warning
+        sophia: oui
+      annotations:
+        summary: 'Sauvegarde sophia-sauvegarde/essai-restauration : CronJob suspendu, aucune sauvegarde automatique'
+        action: attendu pendant la mise en service (premiers lancements à la main) ; sinon lever la suspension

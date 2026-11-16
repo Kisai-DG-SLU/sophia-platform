@@ -1,0 +1,131 @@
+# Scripts des sauvegardes. Lancés par « sh » ou « python3 », sans ligne d'interpréteur. Ils s'arrêtent au premier
+# échec (set -eu), et le CronJob échoue avec eux : les alertes le disent (11-alertes.yaml).
+#   - vider-bases.sh (image postgresql-18) : rôles sans mots de passe, puis chaque base en -Fc -Z0 (sans compression,
+#     pour que restic déduplique d'une heure à l'autre), relue par pg_restore --list. Propriétaires et droits gardés
+#     dans le vidage (pas de --no-owner) : un schéma possédé par son écrivain revient à son propriétaire. Les réglages
+#     par base (ALTER DATABASE … SET) ne sont pas dans un vidage : la reconstruction les remet ;
+#   - restic-bases.sh, restic-nuit.sh (image restic) : instantanés et rétention ; la nuit, en plus, prune et check. Le
+#     dépôt doit exister (05-restic-init.yaml) : « restic cat config » échoue sinon. --retry-lock 30m : le prune de la
+#     nuit prend un verrou exclusif, la sauvegarde horaire suivante attend au lieu d'échouer ;
+#   - copier-seaux.sh (image rclone) : copie des trois seaux d'export (forge, messagerie, base vectorielle) vers le
+#     volume de travail ; un export qui n'est pas du jour (date UTC) arrête la sauvegarde ;
+#   - exporter-secrets.py (image python, oc copié de l'image okd-cli) : Secrets des namespaces de NAMESPACES, sans ceux
+#     des comptes de service, métadonnées réduites ; fichiers en mode 600 ;
+#   - essai-restaurer.sh, essai-verifier.sh : essai hebdomadaire chronométré, 600 s au plus (BASE_ESSAI force la base) :
+#     rôles restaurés d'abord (sans mots de passe), puis la base avec ses propriétaires, contrôlés schéma par schéma,
+#     et ses décomptes de lignes, table par table.
+# Aucune variable à rendre : les « $ » sont ceux des scripts.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-ca
+  namespace: sophia-sauvegarde
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scripts-sauvegarde
+  namespace: sophia-sauvegarde
+data:
+  vider-bases.sh: |
+    set -eu
+    D=/travail/pg
+    rm -rf "$D"
+    mkdir -p "$D"
+    pg_dumpall --globals-only --no-role-passwords -f "$D/globales.sql"
+    psql -d postgres -Atc "select datname from pg_database where datallowconn and not datistemplate order by 1" > "$D/bases.txt"
+    test -s "$D/bases.txt"
+    while read -r b; do
+      pg_dump -Fc -Z0 -d "$b" -f "$D/$b.dump"
+      pg_restore --list "$D/$b.dump" > /dev/null
+    done < "$D/bases.txt"
+    echo "vidages : $(wc -l < "$D/bases.txt") bases, $(du -sm "$D" | cut -f1) Mo"
+  restic-bases.sh: |
+    set -eu
+    restic cat config > /dev/null
+    restic --retry-lock 30m backup --tag bases --host sophia /travail/pg
+    restic --retry-lock 30m forget --tag bases --group-by tags --keep-hourly 48 --keep-daily 7 --keep-weekly 5 --keep-monthly 12
+  copier-seaux.sh: |
+    set -eu
+    for s in export-forge export-prosody export-qdrant; do
+      rclone sync "s3:$s" "/travail/s3/$s" --checksum --fast-list
+    done
+    for e in export-forge export-prosody export-qdrant; do
+      [ "$(cat /travail/s3/$e/horodatage)" = "$(date -u +%F)" ] || { echo "export périmé : $e"; exit 1; }
+    done
+    du -sm /travail/s3/*
+  exporter-secrets.py: |
+    import json
+    import os
+    import subprocess
+    import sys
+    NAMESPACES = os.environ["NAMESPACES"].split()
+    COMPTES = {"kubernetes.io/service-account-token", "kubernetes.io/dockercfg", "kubernetes.io/dockerconfigjson"}
+    os.umask(0o077)
+    os.makedirs("/travail/secrets", exist_ok=True)
+    total = 0
+    for ns in NAMESPACES:
+        r = subprocess.run(["/outils/oc", "get", "secrets", "-n", ns, "-o", "json"], capture_output=True, text=True)
+        if r.returncode:
+            sys.exit(ns + " : lecture des Secrets refusée")
+        gardes = []
+        for s in json.loads(r.stdout)["items"]:
+            meta = s["metadata"]
+            notes = dict(meta.get("annotations") or {})
+            if s.get("type") in COMPTES and "kubernetes.io/service-account.name" in notes:
+                continue
+            notes.pop("kubectl.kubernetes.io/last-applied-configuration", None)
+            s["metadata"] = {"name": meta["name"], "namespace": ns, "labels": meta.get("labels") or {}, "annotations": notes}
+            gardes.append(s)
+        with open("/travail/secrets/" + ns + ".json", "w") as f:
+            json.dump({"apiVersion": "v1", "kind": "List", "items": gardes}, f)
+        total += len(gardes)
+    print("Secrets exportés :", total, "dans", len(NAMESPACES), "namespaces")
+  restic-nuit.sh: |
+    set -eu
+    restic cat config > /dev/null
+    restic --retry-lock 30m backup --tag nuit --host sophia /travail/s3 /travail/secrets
+    restic --retry-lock 30m forget --tag bases --group-by tags --keep-hourly 48 --keep-daily 7 --keep-weekly 5 --keep-monthly 12
+    restic --retry-lock 30m forget --tag nuit --group-by tags --keep-daily 7 --keep-weekly 5 --keep-monthly 12 --prune
+    restic --retry-lock 30m check --read-data-subset 2%
+  essai-restaurer.sh: |
+    set -eu
+    date +%s > /travail/debut
+    restic cat config > /dev/null
+    restic --retry-lock 30m restore latest --tag bases --host sophia --target /travail/r
+    P=/travail/r/travail/pg
+    n=$(wc -l < "$P/bases.txt")
+    if [ -n "${BASE_ESSAI:-}" ]; then
+      b=$BASE_ESSAI
+    elif [ "$(date +%d)" -le 7 ]; then
+      b=$(ls -S "$P"/*.dump | head -1 | xargs basename | sed 's/\.dump$//')
+    else
+      i=$(( $(date +%V | sed 's/^0//') % n + 1 ))
+      b=$(sed -n "${i}p" "$P/bases.txt")
+    fi
+    echo "$b" > /travail/choisie
+    echo "base choisie : $b"
+  essai-verifier.sh: |
+    set -eu
+    b=$(cat /travail/choisie)
+    D=/travail/r/travail/pg/$b.dump
+    psql -d postgres -q -f /travail/r/travail/pg/globales.sql > /dev/null 2>&1 || true
+    createdb essai
+    pg_restore --exit-on-error -d essai "$D"
+    pg_restore --list "$D" | awk '$4 == "SCHEMA" && $5 == "-" {print $6, $7}' > /travail/proprietaires
+    while read -r n p; do
+      q=$(psql -d essai -Atc "select pg_get_userbyid(nspowner) from pg_namespace where nspname = '$n'")
+      [ "$q" = "$p" ] || { echo "ÉCART de propriétaire : schéma $n, $q pour $p"; exit 1; }
+    done < /travail/proprietaires
+    pg_restore --data-only -f - "$D" | awk '/^COPY /{t=$2; n=0; next} /^\\\.$/{if (t) print t, n; t=""; next} t{n++}' > /travail/attendu
+    k=0
+    while read -r t n; do
+      c=$(psql -d essai -Atc "select count(*) from $t")
+      [ "$c" = "$n" ] || { echo "ÉCART : $t, $c lignes restaurées pour $n vidées"; exit 1; }
+      k=$((k + 1))
+    done < /travail/attendu
+    d=$(( $(date +%s) - $(cat /travail/debut) ))
+    echo "restauration de $b : $k tables, décomptes égaux, $(wc -l < /travail/proprietaires) schémas à leur propriétaire, $d s"
+    [ "$d" -le 600 ] || { echo "trop long : $d s pour 600 au plus"; exit 1; }

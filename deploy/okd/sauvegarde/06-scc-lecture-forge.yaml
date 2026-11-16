@@ -1,0 +1,74 @@
+# SCC « lecture-forge ». Forgejo tourne sous l'uid 1000 de son image, et son volume /data appartient à l'uid 1000,
+# en mode 0700 : seul l'uid 1000 lit la forge. Cette SCC n'admet que l'uid 1000, sans aucun accès à l'hôte ni
+# capacité, racine en lecture seule, volumes limités. Elle sert à l'extraction (07-extraction-forgejo.yaml) et, le
+# jour venu, à la restauration. Utilisable par le SEUL compte sophia-git/export-forge (ClusterRole « use » limité à
+# son nom, un RoleBinding), et choisie explicitement par chaque pod (annotation openshift.io/required-scc). Priorité
+# nulle : elle n'est jamais choisie à la place d'une autre pour un pod qui ne l'épingle pas.
+# Limite : l'étroitesse ne vaut que pour les pods épinglés. Si les comptes du namespace de la forge ont reçu ailleurs
+# une SCC plus large, un pod non épinglé la garde : relire ces droits avant d'appliquer.
+# fsGroup et groupes supplémentaires : MustRunAs dans la plage du namespace. Les pods n'en demandent pas ; l'admission
+# pose le premier de la plage, celui que porte déjà le pod de Forgejo, et le volume, monté en lecture seule, ne change
+# pas de propriétaire. Aucune variable à rendre.
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: lecture-forge
+  annotations:
+    kubernetes.io/description: >-
+      Sauvegarde de Forgejo : extraction, sonde et restauration sous l'uid 1000 de l'image de Forgejo. Aucun
+      accès à l'hôte, aucune capacité, racine en lecture seule. Utilisable par sophia-git/export-forge seulement.
+priority: null
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+requiredDropCapabilities:
+  - ALL
+readOnlyRootFilesystem: true
+runAsUser:
+  type: MustRunAs
+  uid: 1000
+seLinuxContext:
+  type: MustRunAs
+fsGroup:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+seccompProfiles:
+  - runtime/default
+volumes:
+  - configMap
+  - emptyDir
+  - persistentVolumeClaim
+  - secret
+users: []
+groups: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scc-lecture-forge
+rules:
+  - apiGroups: [security.openshift.io]
+    resources: [securitycontextconstraints]
+    resourceNames: [lecture-forge]
+    verbs: [use]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: scc-lecture-forge-export-forge
+  namespace: sophia-git
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scc-lecture-forge
+subjects:
+  - kind: ServiceAccount
+    name: export-forge
+    namespace: sophia-git
