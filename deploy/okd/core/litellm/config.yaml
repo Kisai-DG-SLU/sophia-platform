@@ -33,7 +33,7 @@ data:
           input_cost_per_token: 0.000001
           output_cost_per_token: 0.000001
 
-      # Inférence locale (P0) : llama.cpp sur l'A2, Qwen3.5-9B Q6_K, dans sophia-inference.
+      # Inférence locale (P0) : llama.cpp sur l'A2, Qwen3.6-35B-A3B UD-Q4_K_M hybride (experts en partie en RAM), dans sophia-inference.
       # Gratuit (coût 0) ; aucune donnée ne sort du cluster. Appels d'outils : --jinja côté serveur.
       - model_name: sophia-local
         litellm_params:

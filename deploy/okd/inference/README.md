@@ -6,9 +6,11 @@ Un modèle de langage qui lit aussi les images, servi par le GPU du serveur, une
 
 | Élément | Choix | Raison |
 |---|---|---|
-| Modèle de texte | **Qwen3.5-9B**, GGUF **Q6_K** (7,5 Go, Apache 2.0) | **appels d'outils fiables** (MCP, skills, multi-agent) : tau2-bench ≈ 87, contre ≈ 36 pour un modèle de taille voisine essayé d'abord ; tient sur une carte de 16 Go avec du contexte |
+| Modèle de texte | **Qwen3.6-35B-A3B**, GGUF **UD-Q4_K_M** (22,66 Go, Apache 2.0), en **hybride** : experts des 34 premières couches en RAM (`--n-cpu-moe 34`), le reste et le cache sur la carte | meilleure qualité sur les séries des services (80/85, contre 74/85 pour Qwen3.5-9B dans les mêmes conditions) ; modèle à experts (≈ 3 milliards de paramètres actifs par token), donc lisible en partie par le CPU : 13,06 Go de carte en médiane sur 16 |
+| Réglages du modèle hybride | paquets d'invite de 4 096 tokens (`-b`/`-ub`) ; seuil de l'op offload à 128 tokens (`GGML_OP_OFFLOAD_MIN_BATCH`) | un seul téléversement des experts par paquet : lecture à froid divisée par 3,2 ; une invite courte reste sur le CPU, sans copie des experts : 0,93 s en médiane au lieu de 1,86 s |
+| CPU du serveur de texte | **20 CPU exclusifs**, 20 fils : pod `Guaranteed` (demandes égales aux limites, conteneur d'attente compris), kubelet en politique CPU `static` | les experts en RAM sont calculés par le CPU : des cœurs réservés ne se disputent ni avec etcd et l'API, ni avec la voix ; 20 CPU, une socket du nœud de référence |
 | Serveur | llama.cpp (`llama-server`), version figée | API compatible OpenAI, appels d'outils (`--jinja`), discussions en parallèle, cache de prompt |
-| Contexte | cache en 8 bits et partagé : 245 760 tokens, 61 440 par discussion | modèle hybride (8 couches d'attention complète sur 32) : ≈ 17 Kio de cache par token en 8 bits ; même mémoire que 131 072 tokens en 16 bits |
+| Contexte | cache en 8 bits et partagé : 245 760 tokens, 61 440 par discussion | 8 places assurées de 30 720 tokens ; au-delà de 61 440, la relecture d'une discussion dépasse deux minutes |
 | Vision | module `mmproj` du même modèle (F16, 0,9 Go) sur le GPU (`--mmproj`), 2 048 tokens au plus par image | lire un devoir, une photo, un document sans quitter le serveur ; la borne tient la mémoire et le temps |
 | Raisonnement interne | coupé par défaut (`--reasoning off`), réactivable par requête | mesuré : même fiabilité des outils, boucles deux fois plus rapides |
 | Image | construite dans le cluster, CUDA compatible avec le pilote du nœud | l'image officielle visait une version de CUDA plus récente que le pilote |
@@ -18,16 +20,18 @@ Un modèle de langage qui lit aussi les images, servi par le GPU du serveur, une
 | Génération d'images | **stable-diffusion.cpp**, SDXL-Turbo en 1 étape + décodeur TAESDXL, CPU, 512 × 512 | une dizaine de secondes par image sans GPU ; la carte reste au texte. **Licence de SDXL-Turbo : usage non commercial** — à remplacer par un modèle à licence ouverte pour un usage commercial |
 | Contrôle des images | classifieur d'images (Apache 2.0) après chaque génération | un contrôle déterministe autour de la sortie du modèle, en plus des règles appliquées avant |
 
-## Mesures (carte d'entrée de gamme de 16 Go, CPU Xeon de 2016)
+## Mesures (carte d'entrée de gamme de 16 Go, CPU Xeon de 2016, 20 CPU réservés)
 
 | Mesure | Résultat |
 |---|---|
-| Appels d'outils (bon outil, arguments JSON valides, résultat exploité) | 8/8 |
-| Une discussion | 16,4 tokens/s, premier token 0,3 s |
-| Quatre discussions simultanées | 9,9 tokens/s chacune, 39 au total |
-| Boucle d'outil (recherche, météo, rappel), sans raisonnement | 4 à 21 s |
-| Information cachée dans ≈ 97 000 tokens | retrouvée (à 15 % et à 60 %) |
-| Lecture d'un très long prompt | ≈ 420 tokens/s (97 000 tokens ≈ 4 min) |
+| Séries de qualité des services (réponses jugées par le code des services) | 80/85 (74/85 pour Qwen3.5-9B) |
+| Une discussion | ≈ 27 tokens/s |
+| Six demandes simultanées | 5,4 à 6,4 tokens/s chacune (minimum, médiane) |
+| Premier token d'un tour déjà en cache, à six demandes | 7,8 s au pire (3,45 s pour Qwen3.5-9B) |
+| Lecture à froid d'un prompt | 8 000 tokens en 14,7 s ; 32 000 en 61 s ; 61 000 en 127 s |
+| Mémoire du GPU (NVML) | 13,06 Go en médiane, 13,69 au plus, sur 16,10 |
+
+Le premier mot peut donc attendre 6 à 13 s quand plusieurs personnes écrivent en même temps : c'est le prix de la qualité, accepté pour l'installation de référence. Le modèle précédent, **Qwen3.5-9B** Q6_K (7,5 Go, tout sur la carte, 16,4 tokens/s seul), reste sur le volume pour le retour arrière.
 
 ## Volume des modèles (préalable sur le nœud)
 
@@ -103,7 +107,8 @@ Crédit : Pocket TTS, de **Kyutai** ; poids sous licence **CC BY 4.0**, code sou
 ## Procédure (l'administrateur)
 
 0. Volume `lv-models` créé et monté sur le nœud (ci-dessus).
-1. Modèle de texte et module de vision déposés sur le nœud (`curl` à une révision figée, `sha256sum -c`, étiquette SELinux `container_file_t`) ; modèles vocaux : `fetch-voice-models.sh` ; modèles d'image : `fetch-image-models.sh`.
+   Kubelet du nœud en politique CPU `static` (`KubeletConfig` du pool du nœud, `cpuManagerPolicy: static`) : sans elle, le pod reste `Guaranteed` mais ses 20 CPU ne sont pas réservés. Le changement de politique redémarre le nœud. Vérifier aussi la capacité : les demandes de CPU du nœud, plus 20, doivent tenir dans l'allouable.
+1. Modèle de texte et module de vision déposés sur le nœud dans `qwen3.6-35b-a3b/` (`curl` à une révision figée, `sha256sum -c`, étiquette SELinux `container_file_t`) : `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` du dépôt `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`, enregistré sous `Qwen3.6-35B-A3B-UD-Q4_K_M-MTP.gguf` (il porte aussi la tête de prédiction multi-tokens, inutilisée ici), et `mmproj-F16.gguf` du dépôt `unsloth/Qwen3.6-35B-A3B-GGUF` ; modèles vocaux : `fetch-voice-models.sh` ; modèles d'image : `fetch-image-models.sh`.
 2. Images : `oc start-build` du serveur de texte, du service vocal, du générateur et du classifieur d'images.
 3. `00`, `01`, `04`, puis `03`, `05` et `06` : `--dry-run=server`, puis `apply`. Variables, par substitution nommée : `01-storage.yaml` porte `${NODE_NAME}`, nœud qui porte le volume (`oc get nodes`), et `${MODELS_MOUNT_POINT}`, point de montage du volume des modèles (`envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 01-storage.yaml | oc apply -f -`) ; `03-llama-server.yaml` porte `${NVIDIA_LIB_DIR}`, répertoire du nœud qui contient `libcuda.so.1`, le même que pour l'exporteur du nœud (`envsubst '${NVIDIA_LIB_DIR}' < 03-llama-server.yaml | oc apply -f -`) ; `05-voice.yaml` porte `${VOICE_REVISION}`, dossier de `voice/` qui réunit une révision des poids sans clonage, les voix calculées avec ses poids jumeaux et sa configuration (`envsubst '${VOICE_REVISION}' < 05-voice.yaml | oc apply -f -`).
 4. Routeur de modèles : alias de texte et de voix, puis ajout des alias aux clés virtuelles restreintes.

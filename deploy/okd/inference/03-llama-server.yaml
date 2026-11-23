@@ -1,13 +1,23 @@
-# Serveur d'inférence locale : llama.cpp, Qwen3.5-9B Q6_K, sur l'A2 (15 Go).
+# Serveur d'inférence locale : llama.cpp, Qwen3.6-35B-A3B UD-Q4_K_M hybride, sur l'A2 (15 Go).
 #
-# Mémoire GPU, mesurée par NVML (exporteur du nœud) : 14,24 Go à 8 places sur 16,10 Go (fixe : cache et tampons
-# réservés au démarrage). Rien d'autre sur la carte : la voix et les images sont sur le CPU.
-# Qwen3.5 est hybride (8 couches d'attention complète sur 32) : ≈ 32 Kio de cache par token en
-# 16 bits, ≈ 17 Kio en 8 bits (q8_0). Cache en 8 bits et PARTAGÉ (--kv-unified) : 245 760 tokens
-# dans la même mémoire que les 131 072 en 16 bits d'avant ; 8 places : 8 × 30 720 garantis, une discussion
-# peut aller jusqu'à 61 440 quand les autres sont plus courtes. La fenêtre par discussion est
-# bornée côté interface (SOPHIA_CONTEXT_LIMITS, 61 440) : au-delà, la lecture du prompt dépasse
-# la minute sur l'A2.
+# Modèle à experts (40 couches, 256 experts dont 8 actifs par jeton, ≈ 3 milliards de paramètres actifs) : 22,66 Go
+# de poids, plus que la carte. Réglages retenus au banc (6 demandes simultanées) :
+# - Experts des 34 premières couches gardés en RAM (--n-cpu-moe 34, ≈ 16,7 Go lus par le CPU), le reste et le
+#   cache sur la carte : mémoire GPU mesurée par NVML (exporteur du nœud) de 13,06 Go en médiane (13,69 au plus)
+#   sur 16,10. Rien d'autre sur la carte : la voix et les images sont sur le CPU.
+# - Paquets d'invite de 4096 jetons (-b/-ub) : un seul téléversement des experts par paquet (lecture à froid divisée
+#   par 3,2) ; leur tampon de calcul coûte ≈ 2,3 Go de carte, d'où 34 couches en RAM au lieu de 30.
+# - GGML_OP_OFFLOAD_MIN_BATCH=128 (lu par ggml-cuda.cu de llama.cpp v0.7.0, 32 par défaut) : une invite de moins de
+#   128 jetons reste sur le CPU, sans copie des experts (médiane des invites de 32 à 127 jetons : 0,93 s contre 1,86 s).
+# - 20 fils sur 20 CPU EXCLUSIFS : pod Guaranteed (demandes = limites pour chaque conteneur, initContainer compris),
+#   kubelet du nœud en politique CPU « static » (KubeletConfig, cpuManagerPolicy: static ; sans elle, les CPU ne sont
+#   pas réservés). 20 CPU = une socket du nœud de référence ; etcd, l'API, la voix et les applications partagent le
+#   reste. Mémoire : 22 Go de poids en cache de pages (mmap), dont ≈ 16,7 Go d'experts lus par le CPU : 40 Gi.
+# Mesures : 5,4 / 6,4 jetons/s par demande (min / médiane) à 6 demandes, 27 jetons/s pour une personne seule ;
+# premier jeton d'un tour en cache en 7,8 s au pire à 6 demandes ; lecture à froid de 8 k jetons en 14,7 s.
+# Cache en 8 bits et PARTAGÉ (--kv-unified) : 245 760 tokens et 8 places, 8 × 30 720 garantis, une discussion peut
+# aller jusqu'à 61 440 quand les autres sont plus courtes. La fenêtre par discussion est bornée côté interface
+# (SOPHIA_CONTEXT_LIMITS, 61 440) : relectures à froid de 32 k et 61 k mesurées à 61 s et 127 s.
 # --jinja : gabarit de discussion du modèle, nécessaire aux appels d'outils (MCP, skills).
 # --reasoning off : pas de raisonnement interne par défaut (latence), réactivable par requête.
 # Aucune sortie réseau (04-network) : le serveur ne parle qu'à LiteLLM.
@@ -38,20 +48,78 @@ spec:
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
+      # Attente du GPU : au démarrage du nœud, llama-server peut partir avant que le pilote ait chargé le module
+      # nvidia ; CUDA échoue alors et llama.cpp reste sur le CPU, sans réessayer. L'attente lit trois signaux du
+      # noyau dans /sys, sans privilège : modules nvidia et nvidia_uvm « live », et un GPU lié au pilote. Au-delà de
+      # DELAI_GPU, elle échoue : llama-server ne démarre pas sur le CPU, le kubelet relance l'attente (jusqu'à 5 min
+      # entre deux essais) et le pod reste visible en Init. Image : celle de llama-server, dont /bin/sh est dash.
+      initContainers:
+        - name: attente-gpu
+          image: image-registry.openshift-image-registry.svc:5000/sophia-apps/llama-server:v0.7.0-cu124
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -u
+              RACINE=$RACINE_SYS
+              DELAI=$DELAI_GPU
+              PAS=$PAS_GPU
+              debut=$(date +%s)
+              while :; do
+                manque=""
+                [ "$(cat "$RACINE/module/nvidia/initstate" 2>/dev/null)" = live ] || manque="$manque module-nvidia"
+                [ "$(cat "$RACINE/module/nvidia_uvm/initstate" 2>/dev/null)" = live ] || manque="$manque module-nvidia_uvm"
+                gpu=""
+                for g in "$RACINE"/bus/pci/drivers/nvidia/[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*; do
+                  [ -e "$g" ] && gpu=$(basename "$g") && break
+                done
+                [ -n "$gpu" ] || manque="$manque gpu-lie-au-pilote"
+                if [ -z "$manque" ]; then
+                  echo "GPU prêt : modules nvidia et nvidia_uvm chargés, GPU $gpu lié au pilote"
+                  exit 0
+                fi
+                ecoule=$(( $(date +%s) - debut ))
+                if [ "$ecoule" -ge "$DELAI" ]; then
+                  echo "GPU absent après $DELAI s (manque :$manque) : llama-server ne démarre pas sur CPU ; le kubelet relance l'attente" >&2
+                  exit 1
+                fi
+                sleep "$PAS"
+              done
+          env:
+            - { name: RACINE_SYS, value: /sys }
+            - { name: DELAI_GPU, value: "300" }
+            - { name: PAS_GPU, value: "2" }
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:                    # demandes = limites : sans quoi le pod n'est pas Guaranteed (pas de CPU exclusifs)
+            requests: { cpu: 100m, memory: 32Mi }
+            limits: { cpu: 100m, memory: 32Mi }
       containers:
         - name: llama-server
           image: image-registry.openshift-image-registry.svc:5000/sophia-apps/llama-server:v0.7.0-cu124
           args:
             - --model
-            - /models/qwen3.5-9b/Qwen3.5-9B-Q6_K.gguf
+            - /models/qwen3.6-35b-a3b/Qwen3.6-35B-A3B-UD-Q4_K_M-MTP.gguf
             - --alias
             - sophia-local
-            # Vision : module mmproj de Qwen3.5 (F16, 0,92 Go) sur le GPU ; une image coûte
+            # Vision : module mmproj de Qwen3.6 (F16, 0,90 Go) sur le GPU ; une image coûte
             # au plus 2 048 tokens (assez pour lire un devoir, borne la mémoire et le temps).
             - --mmproj
-            - /models/qwen3.5-9b/mmproj-F16.gguf
+            - /models/qwen3.6-35b-a3b/mmproj-F16.gguf
             - --image-max-tokens
             - "2048"
+            - --n-cpu-moe
+            - "34"
+            - --threads
+            - "20"
+            - --threads-batch
+            - "20"
+            - --batch-size
+            - "4096"
+            - --ubatch-size
+            - "4096"
             - --host
             - 0.0.0.0
             - --port
@@ -80,15 +148,17 @@ spec:
           ports: [{ name: http, containerPort: 8080 }]
           env:
             - { name: LD_LIBRARY_PATH, value: /opt/nvidia-libs }
+            # Seuil de l'op offload : une invite de moins de 128 jetons reste sur le CPU (voir l'en-tête).
+            - { name: GGML_OP_OFFLOAD_MIN_BATCH, value: "128" }
           volumeMounts:
             - { name: models, mountPath: /models, readOnly: true }
             - { name: nvidia-libs, mountPath: /opt/nvidia-libs, readOnly: true }
           securityContext:
             privileged: true            # accès à /dev/nvidia* (chemin pur)
-          startupProbe:                 # chargement du modèle : jusqu'à 10 min
+          startupProbe:                 # chargement de 22 Go : jusqu'à 15 min (à froid, cache de pages vide)
             httpGet: { path: /health, port: http }
             periodSeconds: 10
-            failureThreshold: 60
+            failureThreshold: 90
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 15
@@ -97,9 +167,9 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 5
-          resources:
-            requests: { cpu: "2", memory: 4Gi }
-            limits: { cpu: "8", memory: 16Gi }
+          resources:                    # Guaranteed : 20 CPU exclusifs, entiers, égaux à --threads
+            requests: { cpu: "20", memory: 40Gi }
+            limits: { cpu: "20", memory: 40Gi }
       volumes:
         - name: models
           persistentVolumeClaim: { claimName: pvc-models, readOnly: true }

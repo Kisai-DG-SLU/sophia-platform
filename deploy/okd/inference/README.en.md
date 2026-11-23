@@ -6,9 +6,11 @@ A language model that also reads images, served by the server's GPU, a voice (re
 
 | Item | Choice | Reason |
 |---|---|---|
-| Text model | **Qwen3.5-9B**, GGUF **Q6_K** (7.5 GB, Apache 2.0) | **reliable tool calls** (MCP, skills, multi-agent): tau2-bench ≈ 87, against ≈ 36 for a similar-size model tried first; fits a 16 GB card with context |
+| Text model | **Qwen3.6-35B-A3B**, GGUF **UD-Q4_K_M** (22.66 GB, Apache 2.0), **hybrid**: experts of the first 34 layers in RAM (`--n-cpu-moe 34`), the rest and the cache on the card | better quality on the services' series (80/85, against 74/85 for Qwen3.5-9B under the same conditions); mixture-of-experts model (≈ 3 billion active parameters per token), so partly readable by the CPU: 13.06 GB of card memory at the median, out of 16 |
+| Hybrid model settings | 4,096-token prompt batches (`-b`/`-ub`); op offload threshold at 128 tokens (`GGML_OP_OFFLOAD_MIN_BATCH`) | a single upload of the experts per batch: cold reading divided by 3.2; a short prompt stays on the CPU, without copying the experts: 0.93 s at the median instead of 1.86 s |
+| Text server CPU | **20 exclusive CPUs**, 20 threads: `Guaranteed` pod (requests equal to limits, wait container included), kubelet with the `static` CPU policy | the experts in RAM are computed by the CPU: reserved cores compete neither with etcd and the API nor with the voice; 20 CPUs, one socket of the reference node |
 | Server | llama.cpp (`llama-server`), pinned version | OpenAI-compatible API, tool calls (`--jinja`), parallel conversations, prompt cache |
-| Context | 8-bit shared cache: 245,760 tokens, 61,440 per conversation | hybrid model (8 full-attention layers out of 32): ≈ 17 KiB of cache per token in 8 bits; same memory as 131,072 tokens in 16 bits |
+| Context | 8-bit shared cache: 245,760 tokens, 61,440 per conversation | 8 slots guaranteed 30,720 tokens each; beyond 61,440, re-reading a conversation takes more than two minutes |
 | Vision | the same model's `mmproj` module (F16, 0.9 GB) on the GPU (`--mmproj`), at most 2,048 tokens per image | read homework, a photo, a document without leaving the server; the cap bounds memory and time |
 | Internal reasoning | off by default (`--reasoning off`), can be re-enabled per request | measured: same tool reliability, loops twice as fast |
 | Image | built in the cluster, CUDA compatible with the node's driver | the official image targeted a newer CUDA than the driver |
@@ -18,16 +20,18 @@ A language model that also reads images, served by the server's GPU, a voice (re
 | Image generation | **stable-diffusion.cpp**, 1-step SDXL-Turbo + TAESDXL decoder, CPU, 512 × 512 | about ten seconds per image without a GPU; the card stays with text. **SDXL-Turbo licence: non-commercial use** — replace it with an openly licensed model for commercial use |
 | Image check | image classifier (Apache 2.0) after each generation | a deterministic check around the model's output, on top of the rules applied before |
 
-## Measurements (entry-level 16 GB card, 2016 Xeon CPU)
+## Measurements (entry-level 16 GB card, 2016 Xeon CPU, 20 reserved CPUs)
 
 | Measurement | Result |
 |---|---|
-| Tool calls (right tool, valid JSON arguments, result used) | 8/8 |
-| One conversation | 16.4 tokens/s, first token 0.3 s |
-| Four simultaneous conversations | 9.9 tokens/s each, 39 in total |
-| Tool loop (search, weather, reminder), without reasoning | 4 to 21 s |
-| Fact hidden in ≈ 97,000 tokens | found (at 15 % and 60 %) |
-| Reading a very long prompt | ≈ 420 tokens/s (97,000 tokens ≈ 4 min) |
+| Services' quality series (answers judged by the services' code) | 80/85 (74/85 for Qwen3.5-9B) |
+| One conversation | ≈ 27 tokens/s |
+| Six simultaneous requests | 5.4 to 6.4 tokens/s each (minimum, median) |
+| First token of a turn already cached, with six requests | 7.8 s at worst (3.45 s for Qwen3.5-9B) |
+| Cold reading of a prompt | 8,000 tokens in 14.7 s; 32,000 in 61 s; 61,000 in 127 s |
+| GPU memory (NVML) | 13.06 GB at the median, 13.69 at most, out of 16.10 |
+
+The first word can therefore take 6 to 13 s when several people write at the same time: that is the price of quality, accepted for the reference installation. The previous model, **Qwen3.5-9B** Q6_K (7.5 GB, fully on the card, 16.4 tokens/s alone), stays on the volume for rollback.
 
 ## Model volume (node prerequisite)
 
@@ -103,7 +107,8 @@ Credit: Pocket TTS, by **Kyutai**; weights under **CC BY 4.0**, code under MIT. 
 ## Procedure (administrator)
 
 0. `lv-models` volume created and mounted on the node (above).
-1. Text model and vision module placed on the node (`curl` at a pinned revision, `sha256sum -c`, SELinux label `container_file_t`); voice models: `fetch-voice-models.sh`; image models: `fetch-image-models.sh`.
+   Node kubelet with the `static` CPU policy (`KubeletConfig` of the node's pool, `cpuManagerPolicy: static`): without it, the pod stays `Guaranteed` but its 20 CPUs are not reserved. Changing the policy reboots the node. Also check capacity: the node's CPU requests, plus 20, must fit in the allocatable CPU.
+1. Text model and vision module placed on the node in `qwen3.6-35b-a3b/` (`curl` at a pinned revision, `sha256sum -c`, SELinux label `container_file_t`): `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` from the `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` repository, saved as `Qwen3.6-35B-A3B-UD-Q4_K_M-MTP.gguf` (it also carries the multi-token prediction head, unused here), and `mmproj-F16.gguf` from the `unsloth/Qwen3.6-35B-A3B-GGUF` repository; voice models: `fetch-voice-models.sh`; image models: `fetch-image-models.sh`.
 2. Images: `oc start-build` for the text server, the voice service, the image generator and its classifier.
 3. `00`, `01`, `04`, then `03`, `05` and `06`: `--dry-run=server`, then `apply`. Variables, through a named substitution: `01-storage.yaml` carries `${NODE_NAME}`, the node carrying the volume (`oc get nodes`), and `${MODELS_MOUNT_POINT}`, the models volume's mount point (`envsubst '${NODE_NAME} ${MODELS_MOUNT_POINT}' < 01-storage.yaml | oc apply -f -`); `03-llama-server.yaml` carries `${NVIDIA_LIB_DIR}`, the node directory holding `libcuda.so.1`, the same as for the node exporter (`envsubst '${NVIDIA_LIB_DIR}' < 03-llama-server.yaml | oc apply -f -`); `05-voice.yaml` carries `${VOICE_REVISION}`, the folder of `voice/` that groups one revision of the no-cloning weights, the voices computed with its twin weights and its configuration (`envsubst '${VOICE_REVISION}' < 05-voice.yaml | oc apply -f -`).
 4. Model router: text and voice aliases, then add the aliases to restricted virtual keys.

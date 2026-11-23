@@ -58,11 +58,11 @@ Réseau : refus par défaut en entrée et en sortie, puis une règle par flux ; 
 
 ## Inférence — `sophia-inference` ([`okd/inference/`](okd/inference/README.md))
 
-Quota du namespace : 36 CPU, 40 Gi, 6 pods. Les trois serveurs lisent le même volume de modèles (volume logique dédié de 200 Gi, monté en lecture seule).
+Quota du namespace : 40 CPU, 64 Gi, 6 pods. Les trois serveurs lisent le même volume de modèles (volume logique dédié de 200 Gi, monté en lecture seule).
 
 | Composant | Stockage | Ressources | Image | Exposition | Raison |
 |---|---|---|---|---|---|
-| Serveur du modèle de langage (`llama-server`, GPU) | volume des modèles ; bibliothèque du pilote montée depuis l'hôte | 2 CPU, 4 Gi → 8 CPU, 16 Gi | construite, version (`v0.7.0-cu124`) | Service 8080, aucune Route | CUDA compatible avec le pilote du nœud ; conteneur privilégié, sans ressource `nvidia.com/gpu` (le crochet de l'opérateur échoue sur ce nœud) ; seule classe qui préempte |
+| Serveur du modèle de langage (`llama-server`, GPU) | volume des modèles ; bibliothèque du pilote montée depuis l'hôte | 20 CPU exclusifs, 40 Gi (`Guaranteed`, demandes égales aux limites) | construite, version (`v0.7.0-cu124`) | Service 8080, aucune Route | modèle à experts dont une partie est calculée par le CPU (kubelet en politique CPU `static`) ; CUDA compatible avec le pilote du nœud ; conteneur privilégié, sans ressource `nvidia.com/gpu` (le crochet de l'opérateur échoue sur ce nœud) ; seule classe qui préempte |
 | Voix (reconnaissance et synthèse, CPU) | volume des modèles | 1 CPU, 2 Gi → 4 CPU, 4 Gi | construite, étiquette `latest` | Service 8000, aucune Route | le GPU reste au texte ; classe `sophia-voix` au-dessus des agents |
 | Génération d'images et classifieur (CPU) | volume des modèles | 1 CPU, 6 Gi → 8 CPU, 12 Gi ; classifieur 100m, 512 Mi → 2 CPU, 1 Gi | construites, étiquette `latest` | Service 1234 et 8001, aucune Route | plafonnée à 8 CPU pour ne pas concurrencer la voix ; contrôle déterministe de chaque image produite |
 | Exporteur de métriques du nœud ([`okd/monitoring/`](okd/monitoring/README.md)) | dossiers de l'hôte en lecture | 10m, 32 Mi → 100m, 64 Mi | empreinte, `IfNotPresent` | Service 9400, aucune Route | occupation de `/var` et des volumes dédiés, état du GPU |

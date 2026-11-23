@@ -58,11 +58,11 @@ Network: ingress and egress denied by default, then one rule per flow; EgressFir
 
 ## Inference — `sophia-inference` ([`okd/inference/`](okd/inference/README.en.md))
 
-Namespace quota: 36 CPU, 40 Gi, 6 pods. The three servers read the same models volume (dedicated 200 Gi logical volume, mounted read-only).
+Namespace quota: 40 CPU, 64 Gi, 6 pods. The three servers read the same models volume (dedicated 200 Gi logical volume, mounted read-only).
 
 | Component | Storage | Resources | Image | Exposure | Reason |
 |---|---|---|---|---|---|
-| Language model server (`llama-server`, GPU) | models volume; driver library mounted from the host | 2 CPU, 4 Gi → 8 CPU, 16 Gi | built, version (`v0.7.0-cu124`) | Service 8080, no Route | CUDA compatible with the node's driver; privileged container, without the `nvidia.com/gpu` resource (the operator's hook fails on this node); the only class that preempts |
+| Language model server (`llama-server`, GPU) | models volume; driver library mounted from the host | 20 exclusive CPUs, 40 Gi (`Guaranteed`, requests equal to limits) | built, version (`v0.7.0-cu124`) | Service 8080, no Route | mixture-of-experts model partly computed by the CPU (kubelet with the `static` CPU policy); CUDA compatible with the node's driver; privileged container, without the `nvidia.com/gpu` resource (the operator's hook fails on this node); the only class that preempts |
 | Voice (recognition and synthesis, CPU) | models volume | 1 CPU, 2 Gi → 4 CPU, 4 Gi | built, `latest` tag | Service 8000, no Route | the GPU stays with text; `sophia-voix` class above the agents |
 | Image generation and classifier (CPU) | models volume | 1 CPU, 6 Gi → 8 CPU, 12 Gi; classifier 100m, 512 Mi → 2 CPU, 1 Gi | built, `latest` tag | Service 1234 and 8001, no Route | capped at 8 CPU so as not to compete with voice; deterministic check of every generated image |
 | Node metrics exporter ([`okd/monitoring/`](okd/monitoring/README.en.md)) | host directories, read-only | 10m, 32 Mi → 100m, 64 Mi | digest, `IfNotPresent` | Service 9400, no Route | usage of `/var` and of the dedicated volumes, GPU state |

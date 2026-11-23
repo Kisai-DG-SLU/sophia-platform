@@ -17,9 +17,12 @@ metadata:
   name: inference-quota
   namespace: sophia-inference
 spec:
+  # Texte 20 CPU / 40 Gi (Guaranteed), voix 4 / 4 Gi, modèles d'image 10 / 13 Gi, exporteur du nœud 0,1 / 64 Mi :
+  # 34,1 CPU et 57,1 Gi. Tous en Recreate : aucun chevauchement au redéploiement ; la marge (5,9 CPU, 6,9 Gi) sert
+  # à un pod ponctuel.
   hard:
-    limits.memory: 40Gi      # texte 16 + voix 4 + modèles d'image 13 + marge
-    limits.cpu: "36"         # texte 8 + voix 4 + modèles d'image 17 + marge (redémarrages)
+    limits.memory: 64Gi
+    limits.cpu: "40"
     pods: "6"
 ---
 apiVersion: v1
