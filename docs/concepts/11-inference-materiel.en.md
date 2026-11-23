@@ -33,11 +33,13 @@ A single general model serves the interface, the modules, the agents and the pla
 
 | Period | Chat (bounded by the interface) | Background alias (module tasks, non-streaming) | Agent missions (bounded by the dispatcher) |
 |---|---|---|---|
-| Day | 2 | 1 | 1 |
+| Day | 4 | 1 | 1 |
 | 3 a.m. to 7 a.m. | 1 | 1 | 2 |
 
+School and the other interactive uses take the rest of the 8 slots.
+
 - **Two aliases on the same server** (in service). The main alias stays with chat, school and interactive uses; school never waits. The "background" alias, limited to one request at a time, serves the agents and the modules' background tasks (recipe generation, shopping lists, chat titles and summaries), falling back to the main alias as long as it is not open to a module's key. **Limit**: when streaming, the router's lock is released at the first response and does not cover generation; it only applies to non-streaming calls.
-- **Chat bounded by the interface** (in service): 2 slots during the day, 1 at night; one more conversation waits a minute at most.
+- **Chat bounded by the interface** (in service): 4 slots during the day, 1 from 3 a.m. to 7 a.m.; one more conversation waits a minute at most.
 - **Missions bounded by the dispatcher**: one mission at a time per executor, and one or two missions on the background alias depending on the time. In service. Nothing is interrupted when the period changes: at 7 a.m., a running mission may make chat wait until it ends.
 - **Agents' context window** set to 64,000 tokens: the local server does not publish its window, and the agent fell back to 256,000, taking chat's reserve.
 - **Small decisions**: with a modest local model, plans are broken into constrained-output decisions, framed by rules (see [Deterministic Automation](09-automation-deterministe.en.md)).
