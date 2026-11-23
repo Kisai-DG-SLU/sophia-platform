@@ -1,13 +1,13 @@
 # Inference and Hardware
 
-This page says **which model serves whom**, **on which hardware**, and how a single graphics card is shared between uses without the chat suffering.
+This page says **which model serves whom**, **on which hardware**, and how a single graphics card is shared today between uses without the chat suffering.
 
 ---
 
 ## Principles
 
 - **100% local.** The target has always been fully local inference. A remote model is only a development exception, chosen by routing, never a dependency.
-- **One task family per card.** Language model, embedding, voice and vision: each card carries its own models, which isolates workloads. No model is split across several cards.
+- **The language model split by layers, perception apart.** The language model can span several cards, **by layers**: at each token, only small data passes from one card to the next, which the PCIe bus handles easily. *Tensor parallelism* is ruled out: it requires a direct link between the cards (NVLink). Perception, embedding, the graph and the small models have their own card, which isolates their workloads.
 - **One router for all.** Interface, modules and agents call models through router aliases (LiteLLM), never a server directly. Changing model is a routing change.
 - **The model chosen per task.** Routing, classification and extraction in constrained output do not need the same model as breaking down a complex goal.
 
@@ -17,19 +17,19 @@ This page says **which model serves whom**, **on which hardware**, and how a sin
 
 | Use | Where | Status |
 |---|---|---|
-| General model (text and vision), 9 billion parameters, quantized | the only graphics card (16 GB); 4 conversations in parallel over a shared context | in service |
+| General model (text and vision), mixture of experts: 35 billion parameters, 3 active, quantized | the only graphics card (16 GB, PCIe 3.0 x8); the experts of 34 layers stay in RAM, computed by 20 reserved cores; 8 conversations in parallel over a shared context | in service |
 | Embedding | CPU, in the memory zone | in service |
 | Voice (recognition, synthesis) and image generation | CPU, without network access | in service |
 | Interface, modules, school | local model by default | in service |
 | Pantheon agents | the local model, through the background alias; one router key per agent, limited to that alias and embedding | in service |
 
-The reference server takes three cards: the target is one card per task family. A second or third card will serve embedding, voice and vision, **not a second general model**.
+The reference server takes three cards. **Target**: cards 1 and 2 carry the language model together, split by layers (chat, school, agents); card 3 carries perception (vision, OCR, voice), embedding, the graph and the small models. With a single card, the bus is loaded by copying the experts kept in RAM (about 14.7 GB per prompt batch), and the first word can take 7.8 s when six requests arrive together. On two cards, almost the whole model fits in graphics memory, and that traffic essentially disappears. The gains are to be proven by a benchmark with the real mix (chat, school, agents).
 
 ---
 
 ## Sharing the card, priority to chat
 
-A single general model serves the interface, the modules, the agents and the planner. Without a rule, a background task can take a conversation's slots. The server keeps its 4 slots, set at startup; **the bound is held by the clients**:
+A single general model serves the interface, the modules, the agents and the planner. Without a rule, a background task can take a conversation's slots. The server has 8 slots, set at startup; **the bound is held by the clients**:
 
 | Period | Chat (bounded by the interface) | Background alias (module tasks, non-streaming) | Agent missions (bounded by the dispatcher) |
 |---|---|---|---|
@@ -50,15 +50,16 @@ A pitfall of moving to local: a remote model accepted two `system` messages in a
 
 | Option | Effect | Status |
 |---|---|---|
-| Keep the current model for every role, with the "background" alias | no extra cost; per-role acceptance tests to do | in service (first step) |
-| Mixture-of-experts model (35 billion parameters, 3 active) in hybrid card + RAM, replacing the current model | better reasoning expected; 12 to 16 cores during generation and 25 to 40 GB of memory, in direct competition with voice, images and office | to be measured, CPU peak included, before deciding |
+| A single model for every role, with the "background" alias | no extra cost; per-role acceptance tests to do | in service |
+| Mixture-of-experts model (35 billion parameters, 3 active) in hybrid card + RAM, replacing the 9-billion model | quality 80/85 against 74/85 on the services' series; 20 reserved cores and 40 Gi of memory; first word up to 7.8 s when six requests arrive together | in service, after a benchmark that measured the CPU peak; the 9-billion model stays available for rollback |
 | Second model on CPU for the agents | at least 16 cores permanently | ruled out: the CPU does not have that margin |
+| Language model split by layers over two cards | almost the whole model in graphics memory: hardly any copying of the experts over the bus, first word with several users expected much shorter| target; to be proven by a benchmark with the real mix |
 
 ---
 
 ## Resource budget
 
-RAM has headroom, **CPU does not**. Actual consumption is low (a few cores in normal times, an 11-core peak over a week), but declared limits exceeded the node's capacity, and upcoming workloads (office suite, hybrid model, memory re-indexing) are heavy. **In service** (recipe: [`deploy/okd/cluster/`](../../deploy/okd/cluster/)):
+RAM has headroom, **CPU does not**. Actual consumption is low (a few cores in normal times, an 11-core peak over a week), but declared limits exceeded the node's capacity, and the new workloads (office suite, hybrid model, memory re-indexing) are heavy. The hybrid model alone reserves 20 cores, one socket of the reference node. **In service** (recipe: [`deploy/okd/cluster/`](../../deploy/okd/cluster/)):
 
 - **Priorities, without preemption**: a **base** above everything (the cluster read pod, which lets you understand an outage, and the Git forge, where every deployment starts: never evicted), then chat and language model > voice > dispatcher and agents > office > images > development and child clusters. Only the language model server keeps the right to preempt;
 - **quotas** on limits, per namespace, and explicit requests and limits for every container; the agents namespace quota is set, after the read pod's class;

@@ -142,7 +142,7 @@ La documentation est organisée dans le répertoire [`docs/`](docs/index.md).
 | [Panthéon Agentique](docs/concepts/08-pantheon-agentique.md) | Agents spécialisés, confinement et isolation |
 | [Automation Déterministe](docs/concepts/09-automation-deterministe.md) | Le code orchestre, le modèle réfléchit, les règles décident |
 | [Observabilité](docs/concepts/10-observabilite.md) | Alarmes, workflow « incident », validation humaine |
-| [Inférence et matériel](docs/concepts/11-inference-materiel.md) | Une carte par famille de tâches, partage et priorité, budget CPU |
+| [Inférence et matériel](docs/concepts/11-inference-materiel.md) | Modèle et cible matérielle (trois cartes), partage et priorité, budget CPU |
 | [Relais de l'identité](docs/concepts/12-relais-identite.md) | Un outil MCP agit sous l'identité de la personne : relais, vérification et échange du jeton |
 | [Modèles par rôle](docs/concepts/13-modeles-par-role.md) | Modèle imposé par le serveur selon le rôle, une clé virtuelle par usage, clé maître confinée au routeur |
 

@@ -34,7 +34,7 @@ Welcome to the SophIA architecture documentation.
 | 08 | [Agentic Pantheon](concepts/08-pantheon-agentique.en.md) | Specialized agents, confinement and isolation |
 | 09 | [Deterministic Automation](concepts/09-automation-deterministe.en.md) | Code orchestrates, the model thinks, rules decide |
 | 10 | [Observability](concepts/10-observabilite.en.md) | Alarms, "incident" workflow, human approval |
-| 11 | [Inference and Hardware](concepts/11-inference-materiel.en.md) | One card per task family, sharing and priority, CPU budget |
+| 11 | [Inference and Hardware](concepts/11-inference-materiel.en.md) | Model and hardware target (three cards), sharing and priority, CPU budget |
 | 12 | [Identity Relay](concepts/12-relais-identite.en.md) | An MCP tool acts under the person's identity: token relay, verification and exchange |
 | 13 | [Models by Role](concepts/13-modeles-par-role.en.md) | Model enforced by the server per role, one virtual key per use, master key confined to the router |
 

@@ -119,7 +119,7 @@ Chaque information porte un jeu de **tags** fixé par l'administrateur (auteur, 
 
 ## Matériel
 
-L'implémentation de référence tourne sur un nœud unique, avec des GPU d'entrée de gamme — voir [Infrastructure POC](../deploy/infrastructure.md). La répartition visée attribue **une famille de tâches par carte** : modèle de langage, embedding, voix et vision. Chaque carte porte ses propres modèles, ce qui isole les charges. Aujourd'hui, une seule carte porte le modèle de langage, partagé entre la discussion, les modules et les agents ; voix, images et embedding tournent sur CPU — voir [Inférence et matériel](concepts/11-inference-materiel.md).
+L'implémentation de référence tourne sur un nœud unique, avec des GPU d'entrée de gamme — voir [Infrastructure POC](../deploy/infrastructure.md). Aujourd'hui, une seule carte de 16 Go (PCIe 3.0 x8) porte le modèle de langage, partagé entre la discussion, les modules et les agents : un modèle à experts dont une partie reste en mémoire vive, calculée par le CPU. Voix, images et embedding tournent sur CPU. La cible compte **trois cartes** : les deux premières portent ensemble le modèle de langage, réparti **par couches** (discussion, école, agents) ; la troisième porte la perception (vision, OCR, voix), l'embedding, le graphe et les petits modèles — voir [Inférence et matériel](concepts/11-inference-materiel.md).
 
 ---
 

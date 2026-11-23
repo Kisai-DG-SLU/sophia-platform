@@ -119,7 +119,7 @@ Every piece of information carries a set of **tags** defined by the administrato
 
 ## Hardware
 
-The reference implementation runs on a single node with entry-level GPUs — see [POC infrastructure](../deploy/infrastructure.en.md). The intended layout assigns **one family of tasks per card**: language model, embedding, voice and vision. Each card hosts its own models, which isolates the workloads. Today, a single card carries the language model, shared by chat, modules and agents; voice, images and embedding run on CPU — see [Inference and Hardware](concepts/11-inference-materiel.en.md).
+The reference implementation runs on a single node with entry-level GPUs — see [POC infrastructure](../deploy/infrastructure.en.md). Today, a single 16 GB card (PCIe 3.0 x8) carries the language model, shared by chat, modules and agents: a mixture-of-experts model part of which stays in RAM, computed by the CPU. Voice, images and embedding run on CPU. The target has **three cards**: the first two carry the language model together, split **by layers** (chat, school, agents); the third carries perception (vision, OCR, voice), embedding, the graph and the small models — see [Inference and Hardware](concepts/11-inference-materiel.en.md).
 
 ---
 
