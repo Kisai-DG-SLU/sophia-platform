@@ -23,7 +23,33 @@ Cette fiche dit **quel modèle sert qui**, **sur quel matériel**, et comment un
 | Interface, modules, école | modèle local par défaut | en service |
 | Agents du panthéon | le modèle local, par l'alias de fond ; une clé du routeur par agent, limitée à cet alias et à l'embedding | en service |
 
-Le serveur de référence accueille trois cartes. **Cible** : les cartes 1 et 2 portent ensemble le modèle de langage, réparti par couches (discussion, école, agents) ; la carte 3 porte la perception (vision, OCR, voix), l'embedding, le graphe et les petits modèles. Avec une seule carte, le bus est chargé par la copie des experts gardés en mémoire vive (environ 14,7 Go par paquet d'invite), et le premier mot peut attendre 7,8 s quand six demandes arrivent ensemble. Sur deux cartes, presque tout le modèle tient en mémoire graphique, et ce trafic disparaît pour l'essentiel. Les gains sont à prouver par un banc avec le mélange réel (discussions, école, agents).
+Le serveur de référence accueille trois cartes. **Cible, temps 1** : les cartes 1 et 2 portent ensemble le modèle de langage, réparti par couches (discussion, école, agents) ; la carte 3 porte la perception (vision, OCR, voix), l'embedding, le graphe et les petits modèles. Avec une seule carte, le bus est chargé par la copie des experts gardés en mémoire vive (environ 14,7 Go par paquet d'invite), et le premier mot peut attendre 7,8 s quand six demandes arrivent ensemble. Sur deux cartes, presque tout le modèle tient en mémoire graphique, et ce trafic disparaît pour l'essentiel. Les gains sont à prouver par un banc avec le mélange réel (discussions, école, agents).
+
+---
+
+## Temps 2 : une machine d'inférence derrière le routeur
+
+Le temps 1, les trois cartes A2 dans le serveur, reste la cible en cours. Le temps 2, à l'étude et sans décision d'achat, ajoute un **DGX Spark** : puce GB10, 128 Go de mémoire unifiée, partagée entre le processeur et le calcul graphique, débit mémoire d'environ 273 Go/s.
+
+- **Hors du serveur, derrière le routeur.** Le DGX Spark est une machine à part, jointe par le réseau derrière LiteLLM. Seules la requête et la réponse passent par le réseau, comme pour un modèle distant, mais en local : le débit du lien n'est pas un frein.
+- **Deux réserves de calcul** :
+
+| Réserve | Matériel | Usages |
+|---|---|---|
+| DGX Spark | la machine entière | discussion et école avec un modèle plus gros, modèle de code, vision avancée, modèles du monde au besoin (modèles qui prédisent l'évolution d'une scène) |
+| Cartes A2 | cartes 1 et 2, le modèle actuel réparti par couches | agents et tâches de fond ; secours de la discussion par les replis du routeur si le DGX Spark ne répond pas |
+| Cartes A2 | carte 3 | voix, embedding, lecture de documents |
+
+- **Les alias ne changent pas, seul le routage change.** Interface, modules et agents gardent leurs alias ; le routeur les dirige vers le DGX Spark ou vers les A2.
+- **L'embedding ne bouge pas** : changer de modèle d'embedding imposerait de réindexer toute la mémoire.
+
+**Limites** :
+
+- **calcul et débit partagés** : les modèles servis ensemble sur le DGX Spark se partagent son calcul et ses 273 Go/s ; plusieurs modèles chargés ne font pas plusieurs modèles rapides en même temps ;
+- **mémoire partagée avec le système** : 110 à 115 Go réellement utiles sur les 128 ;
+- **machine ARM, raccordée par le réseau** : les images des serveurs de modèles doivent exister pour cette architecture ; port 10 Gb/s à vérifier côté serveur ;
+- **consommation** de 170 à 240 W ;
+- **pas de point d'accès Internet** : la machine n'est jointe que par un point d'entrée déclaré dans le namespace d'inférence (`sophia-inference`), comme les autres serveurs de modèles.
 
 ---
 
@@ -55,7 +81,8 @@ Un piège du passage au local : un modèle distant acceptait deux messages `syst
 | Un seul modèle pour tous les rôles, avec l'alias « de fond » | aucun coût supplémentaire ; recettes par rôle à faire | en service |
 | Modèle à experts (35 milliards de paramètres, 3 actifs) en hybride carte + mémoire vive, à la place du modèle de 9 milliards | qualité 80/85 contre 74/85 aux séries des services ; 20 cœurs réservés et 40 Gi de mémoire ; premier mot jusqu'à 7,8 s quand six demandes arrivent ensemble | en service, après un banc qui a mesuré la pointe CPU ; le modèle de 9 milliards reste disponible pour le retour arrière |
 | Second modèle sur CPU pour les agents | au moins 16 cœurs en permanence | écarté : le CPU n'a pas cette marge |
-| Modèle de langage réparti par couches sur deux cartes | presque tout le modèle en mémoire graphique : presque plus de copie des experts par le bus, premier mot à plusieurs attendu bien plus court | cible ; à prouver par un banc avec le mélange réel |
+| Modèle de langage réparti par couches sur deux cartes | presque tout le modèle en mémoire graphique : presque plus de copie des experts par le bus, premier mot à plusieurs attendu bien plus court | cible, temps 1 ; à prouver par un banc avec le mélange réel |
+| Machine à mémoire unifiée (DGX Spark, 128 Go) hors du serveur, derrière le routeur | modèles plus gros, et plusieurs modèles chargés ensemble ; calcul et débit partagés entre eux ; les A2 passent aux agents, au secours et à la perception | temps 2, à l'étude |
 
 ---
 
